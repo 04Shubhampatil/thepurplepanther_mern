@@ -8,6 +8,7 @@ import rateLimit from 'express-rate-limit'
 import env from './config/env.js'
 import logger from './config/logger.js'
 import apiV1 from './routes/index.js'
+import { feed as metaCatalogFeed } from './controllers/catalog-feed.controller.js'
 import { errorHandler, notFoundHandler } from './middleware/error.middleware.js'
 import { installBigIntSerializer } from './utils/json.js'
 
@@ -85,6 +86,11 @@ if (env.STORAGE_ROOT) {
 
 // ---------------------------------------------------------------- routes
 app.use('/api/v1', apiV1)
+
+// The Meta catalog feed is also served at its ORIGINAL Laravel path, because Meta Commerce
+// Manager is configured against that URL. Serving both means the feed keeps working
+// through cutover without a change on Meta's side. See docs/route-mapping.md §6.
+app.get('/catalog/meta/products.csv', metaCatalogFeed)
 
 // ---------------------------------------------------------------- errors
 app.use(notFoundHandler)

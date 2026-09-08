@@ -6,6 +6,7 @@ import { clearGuestCartCookie } from '../middleware/guest-cart.middleware.js'
 import { ok, asyncHandler } from '../utils/api-response.js'
 import { BusinessError } from '../utils/api-error.js'
 import { ORDER_STATUSES, PAYMENT_STATUSES } from '../constants/order-statuses.js'
+import * as meta from '../integrations/meta/capi.js'
 
 /**
  * Checkout and payment endpoints. Public — guest checkout creates the account.
@@ -20,6 +21,9 @@ const GUEST_PASSWORD_COOKIE = 'pp_gp'
 export const show = asyncHandler(async (req, res) => {
   const context = await checkout.getCheckoutContext(req.user, req.guestCart)
   if (context.cart.count < 1) throw new BusinessError('Your cart is empty.')
+
+  meta.trackAsync('InitiateCheckout', req, meta.cartData(context.cart))
+
   return ok(res, context, 'Checkout')
 })
 
@@ -49,8 +53,19 @@ export const place = asyncHandler(async (req, res) => {
     })
   }
 
-  // TODO(phase 12): Meta CompleteRegistration (guest only) and AddPaymentInfo.
-  // Fire-and-forget, never awaited — Meta must never delay or fail checkout.
+  // Guest checkout created an account, so CompleteRegistration fires here too — matching
+  // CheckoutController::place. Both are fire-and-forget: Meta must never delay or fail a
+  // checkout.
+  const customer = meta.customerFromOrder(order)
+  if (guestPassword) {
+    meta.trackAsync(
+      'CompleteRegistration',
+      req,
+      { content_name: 'Checkout account', status: true },
+      customer,
+    )
+  }
+  meta.trackAsync('AddPaymentInfo', req, meta.orderData(order), customer)
 
   return ok(
     res,
@@ -83,8 +98,17 @@ export const verify = asyncHandler(async (req, res) => {
   res.clearCookie(GUEST_PASSWORD_COOKIE, { path: '/' })
   clearGuestCartCookie(res)
 
-  // TODO(phase 12): Meta Purchase, only when `alreadyPaid` is false, with
-  // event_id = `purchase_${orderNumber}` so Meta can dedupe a repeated callback.
+  // Only on the FIRST completion, and with a deterministic event id so Meta itself
+  // deduplicates a repeated callback. Emitting on every verify would inflate revenue.
+  if (!alreadyPaid) {
+    meta.trackAsync(
+      'Purchase',
+      req,
+      meta.orderData(order),
+      meta.customerFromOrder(order),
+      `purchase_${order.orderNumber}`,
+    )
+  }
 
   return ok(
     res,

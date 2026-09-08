@@ -2,6 +2,8 @@ import * as account from '../services/account.service.js'
 import { ok, created, noContent, asyncHandler } from '../utils/api-response.js'
 import { NotFoundError } from '../utils/api-error.js'
 import { ACCOUNT_PAGES, ACCOUNT_PAGE_ALIASES } from '../constants/cms.js'
+import * as meta from '../integrations/meta/capi.js'
+import prisma from '../config/database.js'
 
 /**
  * Account endpoints. Every route sits behind requireAuth + requireCustomer, and each
@@ -70,10 +72,18 @@ export const listWishlist = asyncHandler(async (req, res) =>
 )
 
 export const storeWishlist = asyncHandler(async (req, res) => {
-  const { item } = await account.addToWishlist(req.user.id, req.body.product_id)
+  const { item, created } = await account.addToWishlist(req.user.id, req.body.product_id)
 
-  // TODO(phase 12): Meta AddToWishlist, only when `created` is true — Laravel gated the
-  // event on wasRecentlyCreated so re-adding does not double-count.
+  // Gated on `created`, matching Laravel's wasRecentlyCreated check — re-adding an item
+  // already on the wishlist must not double-count the event.
+  if (created) {
+    void prisma.product
+      .findFirst({ where: { id: BigInt(req.body.product_id) }, include: { category: true } })
+      .then((product) => {
+        if (product) meta.trackAsync('AddToWishlist', req, meta.productData(product))
+      })
+      .catch(() => {})
+  }
 
   return ok(res, { item }, 'Added to wishlist.')
 })

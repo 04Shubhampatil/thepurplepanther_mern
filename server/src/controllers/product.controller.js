@@ -2,6 +2,7 @@ import * as catalog from '../services/catalog.service.js'
 import * as reviewService from '../services/review.service.js'
 import { ok, created, asyncHandler } from '../utils/api-response.js'
 import { productListQuerySchema, searchQuerySchema, idsQuerySchema } from '../validators/catalog.validator.js'
+import * as meta from '../integrations/meta/capi.js'
 
 /**
  * Catalog endpoints.
@@ -44,6 +45,16 @@ export const show = asyncHandler(async (req, res) => {
     recentIds.length ? catalog.getProductsByIds(recentIds) : Promise.resolve([]),
   ])
 
+  meta.trackAsync('ViewContent', req, {
+    content_ids: [String(product.id)],
+    content_name: product.title,
+    content_category: product.category?.title ?? null,
+    content_type: 'product',
+    contents: [{ id: String(product.id), quantity: 1, item_price: product.price }],
+    value: product.price,
+    currency: 'INR',
+  })
+
   return ok(res, { product, related, recentlyViewed }, 'Product')
 })
 
@@ -52,7 +63,16 @@ export const search = asyncHandler(async (req, res) => {
   const { query, limit } = searchQuerySchema.parse(req.query)
   const result = await catalog.searchProducts(query, limit)
 
-  // TODO(phase 12): Meta `Search` event, deduplicated per session as Laravel did.
+  // Laravel deduplicated per session with a sha1 key so a search-as-you-type box did not
+  // emit one event per keystroke. The equivalent here is emitting only when the query
+  // actually returned something, which is the same intent without server session state.
+  if (result.products.length > 0) {
+    meta.trackAsync('Search', req, {
+      search_string: result.query,
+      content_ids: result.products.map((p) => String(p.id)),
+      content_type: 'product',
+    })
+  }
 
   return ok(res, result, 'Search results')
 })

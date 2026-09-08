@@ -6,6 +6,7 @@ import { ok, asyncHandler } from '../utils/api-response.js'
 import { send } from '../integrations/email/mailer.js'
 import { customerPasswordResetMail } from '../integrations/email/templates/customer-password-reset.js'
 import logger from '../config/logger.js'
+import * as meta from '../integrations/meta/capi.js'
 
 /**
  * Customer authentication endpoints.
@@ -55,7 +56,18 @@ export const register = asyncHandler(async (req, res) => {
   setAuthCookie(res, user)
   await mergeGuestCart(req, res, user)
 
-  // TODO(phase 12): Meta CompleteRegistration event. Fire-and-forget, never awaited.
+  const parts = String(user.name ?? '').trim().split(/\s+/)
+  meta.trackAsync(
+    'CompleteRegistration',
+    req,
+    { content_name: 'Customer account', status: true },
+    {
+      email: user.email,
+      first_name: parts[0] ?? null,
+      last_name: parts.slice(1).join(' ') || null,
+      external_id: String(user.id),
+    },
+  )
 
   return ok(
     res,

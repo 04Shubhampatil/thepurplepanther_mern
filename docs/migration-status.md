@@ -3,7 +3,7 @@
 Single source of truth for progress. **Nothing is marked COMPLETE until every box in the
 completion criteria is genuinely ticked** — compiling is not completing.
 
-Last updated: 2026-09-08 · Current phase: **9+10 → 12**
+Last updated: 2026-09-08 · Current phase: **12 → 13**
 
 `COMPLETE*` = code complete and tested, with one task blocked on an external input that is
 named in that phase's section. It is not a substitute for COMPLETE and does not unblock a
@@ -48,7 +48,7 @@ Status values: `NOT STARTED` · `IN PROGRESS` · `BLOCKED` · `COMPLETE`
 | 9 | Checkout | COMPLETE* | NOT STARTED | PASS (52) | PASS (rules) |
 | 10 | Razorpay | COMPLETE* | NOT STARTED | PASS (with checkout) | PASS (rules) |
 | 11 | Email | COMPLETE* | n/a | PASS | PASS (subjects) |
-| 12 | Meta CAPI + catalog | NOT STARTED | NOT STARTED | NOT STARTED | NOT STARTED |
+| 12 | Meta CAPI + catalog | COMPLETE* | n/a | PASS (47) | PASS (9 events) |
 | 13 | Admin panel | NOT STARTED | NOT STARTED | NOT STARTED | NOT STARTED |
 | 14 | Final integration | NOT STARTED | NOT STARTED | NOT STARTED | NOT STARTED |
 
@@ -466,6 +466,75 @@ Rate limiting on `place` (creates a row and calls Razorpay on every request) and
 attempt looks like). Successful verifications are not counted, so a customer retrying after
 a network blip is never locked out of confirming an order they have paid for. Laravel had
 no limit on either.
+
+## Phase 12 — Meta CAPI, catalog feed, newsletter (backend)
+
+**Status: COMPLETE and tested.**
+
+| Task | Status |
+|---|---|
+| `integrations/meta/capi.js` — events, hashing, fail-soft | COMPLETE |
+| All **9** events wired at their original call sites | COMPLETE |
+| `services/catalog-feed.service.js` — 31-column CSV | COMPLETE |
+| **Audit R1 fixed** — feed token is mandatory | COMPLETE |
+| Newsletter subscribe/check + contact form | COMPLETE |
+| Tests — **47**; suite total **414** | COMPLETE |
+
+### Events emitted (exactly the 9 Laravel emitted)
+
+| Event | Call site |
+|---|---|
+| `ViewContent` | `GET /products/:slug` |
+| `Search` | `GET /search` |
+| `AddToCart` | cart add, buy-now |
+| `AddToWishlist` | wishlist add — **only when newly created** |
+| `InitiateCheckout` | `GET /checkout` |
+| `AddPaymentInfo` | `POST /checkout/place` |
+| `CompleteRegistration` | register, and guest-checkout account creation |
+| `Purchase` | `POST /checkout/verify` — **only on first completion** |
+| `Subscribe` | newsletter subscribe |
+
+`Contact`, `FindLocation`, `Schedule` and `StartTrial` remain declared but unemitted, as in
+the source.
+
+### Failure policy — the point of this phase
+
+`track()` never throws and never rejects; every call site uses `trackAsync`, which detaches
+and swallows. Seven tests cover API errors, network failure, timeout, disabled config and
+unsupported event names. Meta sits on the checkout path, so this is not defensive
+programming — it is the requirement.
+
+`Purchase` carries `event_id = purchase_{orderNumber}` so Meta deduplicates a repeated
+callback, and it fires only when `alreadyPaid` is false. Emitting on every verify would
+inflate reported revenue.
+
+### Hashing
+
+Normalise → SHA-256 → wrap in an **array** (Meta rejects a bare string). Match rate depends
+on byte-identical normalisation, so trimming, lower-casing, digit-stripping for phone/DOB
+and the `india → in` mapping are all pinned by tests.
+
+### Audit R1 — FIXED
+
+Laravel's guard was `if (token !== '' && !hash_equals(...)) abort(403)`, so an **unset**
+token disabled the check — and it was unset in production. The full active catalogue was
+downloadable by anyone with the URL.
+
+Now: `META_CATALOG_FEED_TOKEN` is mandatory (the server refuses to boot without it), the
+comparison is constant-time, and a missing, wrong or prefix token is always 403. Six tests
+cover it, including that the token never appears in a rejection.
+
+**Cutover action required:** generate a token and update the feed URL in Meta Commerce
+Manager. The feed is served at BOTH `/catalog/meta/products.csv` (the original Laravel path,
+so nothing breaks mid-cutover) and `/api/v1/catalog/meta/products.csv`.
+
+### Feed correctness
+
+31 columns in Meta's exact order. On sale, `price` carries the **MRP** and `sale_price` the
+reduced price — that is how Meta renders a strikethrough; sending the sale price as `price`
+loses the discount. Sellable quantity is the **minimum** of colour and size stock, never
+their product, because the two dimensions describe the same stock. Streaming uses a keyset
+cursor in pages of 250, so memory stays flat as the catalogue grows.
 
 ## Open decisions
 

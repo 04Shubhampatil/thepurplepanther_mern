@@ -3,6 +3,21 @@ import * as promotions from '../services/promotion.service.js'
 import { ok, asyncHandler } from '../utils/api-response.js'
 import { writeGuestCart } from '../middleware/guest-cart.middleware.js'
 import { BusinessError } from '../utils/api-error.js'
+import * as meta from '../integrations/meta/capi.js'
+import prisma from '../config/database.js'
+
+/**
+ * Meta AddToCart. Fire-and-forget: the product lookup and the send are both detached, so
+ * neither can delay or fail an add-to-cart.
+ */
+function trackAddToCart(req, productId, quantity) {
+  void prisma.product
+    .findFirst({ where: { id: BigInt(productId) }, include: { category: true } })
+    .then((product) => {
+      if (product) meta.trackAsync('AddToCart', req, meta.productData(product, quantity))
+    })
+    .catch(() => {})
+}
 
 /**
  * Cart endpoints.
@@ -41,7 +56,7 @@ export const store = asyncHandler(async (req, res) => {
     packageKey: req.body.package_key,
   })
 
-  // TODO(phase 12): Meta AddToCart. Fire-and-forget, never awaited.
+  trackAddToCart(req, req.body.product_id, Number(req.body.quantity ?? 1))
 
   return respondWithCart(req, res, guestCart, message)
 })
@@ -79,6 +94,8 @@ export const buyNow = asyncHandler(async (req, res) => {
     size: req.body.size,
     packageKey: req.body.package_key,
   })
+
+  trackAddToCart(req, req.body.product_id, Number(req.body.quantity ?? 1))
 
   const summary = await cart.getSummary(req.user, guestCart)
   writeGuestCart(res, guestCart)
