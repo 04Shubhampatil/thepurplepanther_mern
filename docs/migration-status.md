@@ -3,7 +3,7 @@
 Single source of truth for progress. **Nothing is marked COMPLETE until every box in the
 completion criteria is genuinely ticked** — compiling is not completing.
 
-Last updated: 2026-09-08 · Current phase: **5+7 → 6**
+Last updated: 2026-09-08 · Current phase: **6+8 → 9**
 
 `COMPLETE*` = code complete and tested, with one task blocked on an external input that is
 named in that phase's section. It is not a substitute for COMPLETE and does not unblock a
@@ -42,9 +42,9 @@ Status values: `NOT STARTED` · `IN PROGRESS` · `BLOCKED` · `COMPLETE`
 | 3 | Catalog | COMPLETE* | NOT STARTED | PASS (71) | PASS (rules) |
 | 4 | CMS / home | COMPLETE* | NOT STARTED | PASS (32) | PASS (rules) |
 | 5 | Cart | COMPLETE* | NOT STARTED | PASS (79) | PASS (rules) |
-| 6 | Wishlist | NOT STARTED | NOT STARTED | NOT STARTED | NOT STARTED |
+| 6 | Wishlist | COMPLETE* | NOT STARTED | PASS (with account) | PASS (rules) |
 | 7 | Promotions / coupons | COMPLETE* | NOT STARTED | PASS (with cart) | PASS (rules) |
-| 8 | Account | NOT STARTED | NOT STARTED | NOT STARTED | NOT STARTED |
+| 8 | Account | COMPLETE* | NOT STARTED | PASS (54) | PASS (rules) |
 | 9 | Checkout | NOT STARTED | NOT STARTED | NOT STARTED | NOT STARTED |
 | 10 | Razorpay | NOT STARTED | NOT STARTED | NOT STARTED | NOT STARTED |
 | 11 | Email | NOT STARTED | n/a | NOT STARTED | NOT STARTED |
@@ -346,6 +346,59 @@ totals. Every price is re-resolved from the database, coupons are re-validated o
 read, and quantities are re-checked against live stock on mutation and again before an order
 is created. A test confirms an unsigned forged cookie is ignored, and another confirms a
 client-submitted `unit_price` has no effect.
+
+## Phase 6 + 8 — Wishlist and account (backend)
+
+**Status: backend COMPLETE and tested.** Merged because the wishlist has no surface of its
+own — it is a tab of the account area and lives in `AccountController`.
+
+| Task | Status |
+|---|---|
+| `constants/order-statuses.js` — the status machine | COMPLETE |
+| `services/account.service.js` — bootstrap, profile, addresses, wishlist, reviews, orders | COMPLETE |
+| Profile update with current-password gate | COMPLETE |
+| Address CRUD + default handling | COMPLETE |
+| Wishlist add (idempotent) / remove by row or product | COMPLETE |
+| Review list and delete | COMPLETE |
+| Order history + single order lookup | COMPLETE |
+| Tests — **54**; suite total **315** | COMPLETE |
+| Verify against real data | BLOCKED (dev DB restore) |
+| React account pages | NOT STARTED |
+
+### Authorisation
+
+Every account mutation takes a row id from the URL, so each one re-reads the row and
+compares `user_id` before writing. Six tests attempt each mutation against another
+customer's row and assert 403 **and** that no write was issued — a missing ownership check
+is the classic IDOR and would be invisible in normal use. A missing row returns 404, not 403,
+so the API does not confirm which ids exist.
+
+The whole router sits behind `requireAuth + requireCustomer`, applied once at the router
+rather than per route, so a newly added endpoint cannot ship unauthenticated by omission.
+
+### Rules preserved
+
+- Profile: name is `first + last`; email unique excluding self; a password change requires
+  the **current** password, so a hijacked session cannot lock the owner out.
+- The **first** address a customer creates becomes default automatically — otherwise
+  checkout has nothing to pre-fill. Promoting one un-defaults every other.
+- Wishlist add is idempotent, matching `firstOrCreate` against the
+  `(user_id, product_id)` unique key. `created` is reported so phase 12 can gate the Meta
+  event the way `wasRecentlyCreated` did.
+- Reviews are matched by `user_id` **OR** `reviewer_email`, so a review left as a guest
+  before the account existed still appears.
+- Order history shows only `payment_status='paid'` **or** a status past payment. A `pending`
+  order is one where checkout started and Razorpay never confirmed; showing those would
+  present customers with orders they never completed.
+- Legacy `pending` displays as `Placed`; the stored value is untouched.
+- `/account/favorites` and `/account/wishlists` alias to `wishlist`.
+
+### Quirk carried over
+
+Review ownership is checked on `user_id` alone, but the list also matches on email. A review
+with a NULL `user_id` therefore appears in "My Reviews" and cannot be deleted. Preserved, and
+surfaced to the UI as `canDelete` so the frontend hides the control rather than offering an
+action that 403s.
 
 ## Open decisions
 
