@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate, useParams } from 'react-router-dom'
 import StoreLayout from '../layouts/StoreLayout.jsx'
+import AuthLayout from '../layouts/AuthLayout.jsx'
 import AdminLayout from '../layouts/AdminLayout.jsx'
 import { RequireCustomer, RequireAdmin, RequireGuest } from './guards.jsx'
 import Loading from '../components/common/Loading.jsx'
@@ -157,8 +158,6 @@ export default function AppRoutes() {
           <Route element={<RequireGuest />}>
             <Route path="login" element={<Login />} />
             <Route path="signup" element={<Signup />} />
-            <Route path="forgot-password" element={<ForgotPassword />} />
-            <Route path="reset-password/:token" element={<ResetPassword />} />
           </Route>
 
           <Route element={<RequireCustomer />}>
@@ -169,6 +168,15 @@ export default function AppRoutes() {
           {/* Clean category URLs. Declared LAST; the reserved list is the real guard. */}
           <Route path=":categorySlug" element={<CategoryRoute />} />
           <Route path="*" element={<NotFound />} />
+        </Route>
+
+        {/* The password pages have no site header in Blade — they get the stripped shell. */}
+        <Route element={<AuthLayout />}>
+          <Route element={<RequireGuest />}>
+            <Route path="forgot-password" element={<ForgotPassword />} />
+            <Route path="reset-password" element={<ResetPassword />} />
+            <Route path="reset-password/:token" element={<ResetPassword />} />
+          </Route>
         </Route>
 
         {/* Admin. The login page is outside the guard so an admin can reach it. */}

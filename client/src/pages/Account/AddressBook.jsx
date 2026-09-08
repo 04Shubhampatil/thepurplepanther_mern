@@ -1,256 +1,210 @@
 import { useState } from 'react'
-import { useForm } from 'react-hook-form'
-import { motion, AnimatePresence } from 'motion/react'
-import { Plus, Pencil, Trash2, Star } from 'lucide-react'
 import * as api from '../../services/endpoints.js'
-import Button from '../../components/ui/Button.jsx'
-import Badge from '../../components/ui/Badge.jsx'
-import Alert from '../../components/ui/Alert.jsx'
-import { Field, Input, Checkbox } from '../../components/ui/Field.jsx'
-
-const BLANK = {
-  name: '',
-  address_line1: '',
-  address_line2: '',
-  city: '',
-  state: '',
-  pincode: '',
-  country: 'India',
-  phone: '',
-  label: '',
-  is_default: false,
-}
 
 /**
- * Saved addresses.
+ * The Addresses panel — `addresses()`, `addressCard()` and the dialog handlers in
+ * account-dashboard.js.
  *
- * The first address a customer saves becomes the default automatically — that rule lives
- * on the server, so the list is replaced with what the server returns rather than being
- * patched optimistically.
+ * The form's own field names are the theme's (`full_name`, `line1`, `postcode`); the API
+ * takes Laravel's column names (`name`, `address_line1`, `pincode`). The mapping happens on
+ * submit rather than by renaming the inputs, because custom.css styles this dialog by those
+ * names and the labels are what a customer sees.
  */
-export default function AddressBook({ addresses, onChange }) {
+const EMPTY = {
+  id: null,
+  full_name: '',
+  line1: '',
+  city: '',
+  postcode: '',
+  country: '',
+  type: 'Shipping',
+  default: false,
+}
+
+export default function AddressBook({ addresses, onChanged }) {
   const [editing, setEditing] = useState(null)
-  const [failure, setFailure] = useState(null)
+  const [alert, setAlert] = useState('')
+  const [saving, setSaving] = useState(false)
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    setError,
-    formState: { errors, isSubmitting },
-  } = useForm({ defaultValues: BLANK })
-
-  const startCreate = () => {
-    setEditing('new')
-    reset(BLANK)
-  }
-
-  const startEdit = (address) => {
-    setEditing(address.id)
-    reset({
-      name: address.name ?? '',
-      address_line1: address.line1 ?? '',
-      address_line2: address.line2 ?? '',
-      city: address.city ?? '',
-      state: address.state ?? '',
-      pincode: address.postcode ?? '',
-      country: address.country ?? 'India',
-      phone: address.phone ?? '',
-      label: address.type ?? '',
-      is_default: address.default ?? false,
-    })
-  }
-
-  const refresh = async () => {
-    const { addresses: next } = await api.account.addresses()
-    onChange(next)
-  }
-
-  const onSubmit = async (values) => {
-    setFailure(null)
-    try {
-      if (editing === 'new') {
-        await api.account.createAddress(values)
-      } else {
-        await api.account.updateAddress(editing, values)
-      }
-      await refresh()
-      setEditing(null)
-    } catch (error) {
-      if (error.errors) {
-        Object.entries(error.errors).forEach(([field, messages]) =>
-          setError(field, { type: 'server', message: messages[0] }),
-        )
-      }
-      setFailure(error.message)
-    }
-  }
-
-  const remove = async (address) => {
-    await api.account.deleteAddress(address.id)
-    await refresh()
-  }
-
-  const makeDefault = async (address) => {
-    await api.account.setDefaultAddress(address.id)
-    await refresh()
-  }
-
-  const field = (name, label, required = false, className = '') => {
-    const id = `ad-${name}`
-    return (
-      <Field
-        label={label}
-        htmlFor={id}
-        required={required}
-        error={errors[name]?.message}
-        className={className}
-      >
-        <Input
-          id={id}
-          error={errors[name]}
-          {...register(name, required ? { required: `${label} is required.` } : {})}
-        />
-      </Field>
+  const open = (address) => {
+    setAlert('')
+    setEditing(
+      address
+        ? {
+            id: address.id,
+            full_name: address.name ?? '',
+            line1: address.line1 ?? '',
+            city: address.city ?? '',
+            postcode: address.postcode ?? '',
+            country: address.country ?? '',
+            type: address.type ?? 'Shipping',
+            default: Boolean(address.default),
+          }
+        : { ...EMPTY },
     )
   }
 
-  const action =
-    'inline-flex items-center gap-1.5 text-[12px] uppercase tracking-[0.08em] text-body transition-colors hover:text-brand'
+  const bind = (name) => ({
+    value: editing?.[name] ?? '',
+    onChange: (event) => setEditing((current) => ({ ...current, [name]: event.target.value })),
+  })
+
+  async function save() {
+    setAlert('')
+    setSaving(true)
+
+    const payload = {
+      name: editing.full_name,
+      address_line1: editing.line1,
+      city: editing.city,
+      pincode: editing.postcode,
+      country: editing.country,
+      label: editing.type,
+      is_default: editing.default,
+    }
+
+    try {
+      if (editing.id) await api.account.updateAddress(editing.id, payload)
+      else await api.account.createAddress(payload)
+
+      setEditing(null)
+      onChanged?.(editing.id ? 'Address updated.' : 'Address added.')
+    } catch (error) {
+      setAlert(error.message || 'Could not save that address.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function makeDefault(id) {
+    try {
+      await api.account.setDefaultAddress(id)
+      onChanged?.('Default address updated.')
+    } catch (error) {
+      onChanged?.(error.message || 'Could not set the default address.', true)
+    }
+  }
+
+  async function remove(id) {
+    // The original asked before deleting, via pp-confirm.js. Losing a saved address to a
+    // mis-click is the kind of thing people notice at checkout, so the prompt stays.
+    if (!window.confirm('Delete this address?')) return
+
+    try {
+      await api.account.deleteAddress(id)
+      onChanged?.('Address deleted.')
+    } catch (error) {
+      onChanged?.(error.message || 'Could not delete that address.', true)
+    }
+  }
 
   return (
-    <section>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="pp-heading">Addresses</h2>
-        <Button type="button" variant="outline" size="sm" onClick={startCreate}>
-          <Plus size={15} strokeWidth={1.5} aria-hidden="true" />
-          Add address
-        </Button>
-      </div>
+    <>
+      <section className="account-panel">
+        <div className="account-panel-head">
+          <h2>Saved addresses</h2>
+          <button className="account-text-button" type="button" data-add-address onClick={() => open(null)}>Add</button>
+        </div>
 
-      {failure && (
-        <Alert tone="error" className="mt-5">
-          {failure}
-        </Alert>
-      )}
-
-      <AnimatePresence initial={false}>
-        {editing && (
-          <motion.form
-            key="address-form"
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.2 }}
-            onSubmit={handleSubmit(onSubmit)}
-            noValidate
-            className="overflow-hidden"
-          >
-            <div className="mt-6 border border-line p-5">
-              <h3 className="pp-eyebrow text-ink">
-                {editing === 'new' ? 'New address' : 'Edit address'}
-              </h3>
-
-              <div className="mt-5 space-y-5">
-                {field('name', 'Full name', true)}
-                {field('address_line1', 'Address', true)}
-                {field('address_line2', 'Apartment, suite (optional)')}
-
-                <div className="grid gap-5 sm:grid-cols-3">
-                  {field('city', 'City', true)}
-                  {field('state', 'State')}
-                  {field('pincode', 'Pincode', true)}
-                </div>
-
-                <div className="grid gap-5 sm:grid-cols-2">
-                  {field('country', 'Country', true)}
-                  {field('phone', 'Phone')}
-                </div>
-
-                {field('label', 'Label (Home, Work…)')}
-
-                <Checkbox
-                  id="ad-default"
-                  label="Use as my default address"
-                  {...register('is_default')}
-                />
-              </div>
-
-              <div className="mt-6 flex flex-wrap items-center gap-3">
-                <Button type="submit" size="sm" loading={isSubmitting}>
-                  {isSubmitting ? 'Saving…' : 'Save address'}
-                </Button>
-                <button
-                  type="button"
-                  onClick={() => setEditing(null)}
-                  className="text-[13px] text-body underline underline-offset-2 transition-colors hover:text-brand"
-                >
-                  Cancel
-                </button>
-              </div>
+        <div id="addressList" className="address-grid">
+          {addresses.length === 0 ? (
+            <div className="account-empty">
+              <span aria-hidden="true">◇</span>
+              <h3>No addresses added</h3>
+              <p>Add a billing or shipping address for a faster checkout.</p>
             </div>
-          </motion.form>
-        )}
-      </AnimatePresence>
-
-      {addresses.length === 0 && !editing ? (
-        <p className="mt-6 text-body">You have not saved any addresses yet.</p>
-      ) : (
-        <ul className="mt-6 grid gap-5 md:grid-cols-2">
-          {addresses.map((address) => (
-            <li key={address.id}>
-              <article className="flex h-full flex-col border border-line p-5">
-                {address.default && (
-                  <Badge tone="outline" className="mb-3 self-start">
-                    Default
-                  </Badge>
-                )}
-
-                <p className="text-[14px] font-semibold text-ink">{address.name}</p>
-                <address className="mt-1.5 flex-1 not-italic text-body">
-                  {[
-                    address.line1,
-                    address.line2,
-                    address.city,
-                    address.state,
-                    address.postcode,
-                    address.country,
-                  ]
-                    .filter(Boolean)
-                    .join(', ')}
-                  {address.phone && (
-                    <>
-                      <br />
-                      {address.phone}
-                    </>
-                  )}
-                </address>
-
-                <div className="mt-4 flex flex-wrap items-center gap-4 border-t border-line pt-4">
-                  <button type="button" onClick={() => startEdit(address)} className={action}>
-                    <Pencil size={13} strokeWidth={1.5} aria-hidden="true" />
-                    Edit
-                    <span className="sr-only"> address for {address.name}</span>
-                  </button>
-
-                  {!address.default && (
-                    <button type="button" onClick={() => makeDefault(address)} className={action}>
-                      <Star size={13} strokeWidth={1.5} aria-hidden="true" />
-                      Make default
-                    </button>
-                  )}
-
-                  <button type="button" onClick={() => remove(address)} className={action}>
-                    <Trash2 size={13} strokeWidth={1.5} aria-hidden="true" />
-                    Delete
-                    <span className="sr-only"> address for {address.name}</span>
-                  </button>
+          ) : (
+            addresses.map((address) => (
+              <article className="address-card" data-address-id={address.id} key={address.id}>
+                <div>
+                  <span>{address.type || 'Shipping'}{address.default ? ' · Default' : ''}</span>
+                  <h3>{address.name}</h3>
+                  <p>
+                    {address.line1}<br />
+                    {address.city}, {address.postcode}<br />
+                    {address.country}
+                  </p>
+                </div>
+                <div>
+                  <button type="button" data-edit-address={address.id} onClick={() => open(address)}>Edit</button>
+                  <button type="button" data-default-address={address.id} onClick={() => makeDefault(address.id)}>Make default</button>
+                  <button type="button" data-delete-address={address.id} onClick={() => remove(address.id)}>Delete</button>
                 </div>
               </article>
-            </li>
-          ))}
-        </ul>
+            ))
+          )}
+        </div>
+      </section>
+
+      {/*
+        Rendered as a plain <div class="account-dialog"> rather than a <dialog>: the theme's
+        markup used <dialog> and showModal(), which React cannot open declaratively without
+        an effect reaching for the DOM node. The class is what carries the styling.
+      */}
+      {editing && (
+        <div id="addressDialog" className="account-dialog" open>
+          <form id="addressForm" className="account-form" noValidate onSubmit={(event) => { event.preventDefault(); save() }}>
+            <div className="account-panel-head">
+              <h2 id="addressDialogTitle">{editing.id ? 'Edit address' : 'Add address'}</h2>
+              <button type="button" data-close-address aria-label="Close" onClick={() => setEditing(null)}>×</button>
+            </div>
+
+            <div id="addressFormAlert" className="account-form-alert" role="alert" hidden={!alert}>{alert}</div>
+
+            <input type="hidden" name="id" value={editing.id ?? ''} readOnly />
+
+            <label>
+              Full name
+              <input type="text" name="full_name" required maxLength="255" autoComplete="name" {...bind('full_name')} />
+              <span className="field-error"></span>
+            </label>
+            <label>
+              Address
+              <input type="text" name="line1" required maxLength="255" autoComplete="street-address" {...bind('line1')} />
+              <span className="field-error"></span>
+            </label>
+            <div className="account-form-grid">
+              <label>
+                City
+                <input type="text" name="city" required maxLength="120" autoComplete="address-level2" {...bind('city')} />
+                <span className="field-error"></span>
+              </label>
+              <label>
+                Postal code
+                <input type="text" name="postcode" required maxLength="20" autoComplete="postal-code" {...bind('postcode')} />
+                <span className="field-error"></span>
+              </label>
+            </div>
+            <label>
+              Country
+              <input type="text" name="country" required maxLength="120" autoComplete="country-name" {...bind('country')} />
+              <span className="field-error"></span>
+            </label>
+            <label>
+              Type
+              <select name="type" {...bind('type')}>
+                <option value="Shipping">Shipping</option>
+                <option value="Billing">Billing</option>
+              </select>
+              <span className="field-error"></span>
+            </label>
+            <label className="account-check">
+              <input
+                type="checkbox"
+                name="default"
+                value="1"
+                checked={editing.default}
+                onChange={(event) => setEditing((current) => ({ ...current, default: event.target.checked }))}
+              />
+              {' '}Make default address
+            </label>
+
+            <button className="account-primary" type="button" data-save-address disabled={saving} onClick={save}>
+              Save address
+            </button>
+          </form>
+        </div>
       )}
-    </section>
+    </>
   )
 }
