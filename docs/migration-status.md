@@ -718,3 +718,55 @@ Recorded so they are not lost, and explicitly **not** done during migration:
 
 Exception: **audit R1 (unauthenticated catalog feed) is fixed during migration**, not deferred,
 because it is an active data-exposure issue. It is the only intentional behaviour change.
+
+---
+
+## Frontend: the theme is the source of truth
+
+The storefront is a **port of the Blade templates**, not a re-interpretation of them. The
+theme's own stylesheets, fonts and images are loaded from `/frontend` — the same path the
+Express app already serves them on (`app.js` → `express.static(THEME_ROOT)`) — so every
+relative `url()` inside `style.css` resolves unchanged and there is exactly one copy of the
+theme in the system.
+
+Two consequences worth stating plainly.
+
+**Tailwind is admin-only.** It lives in `src/admin.css`, imported on demand by
+`AdminLayout` / `AdminLogin`, and is stripped of Preflight (`tailwindcss/theme.css` +
+`tailwindcss/utilities.css`, not `tailwindcss`). Preflight is a global reset: it would undo
+the theme's heading sizes, list bullets and button borders the moment anyone opened the
+admin panel. Utilities alone add classes and reset nothing, so both stylesheets can share
+one SPA.
+
+**script.js runs once, and React owns the sliders.** `public/frontend/js/script.js` is a
+3,479-line IIFE that runs everything at parse time, including 82 `new Swiper(...)` calls.
+It is loaded once, after React's first commit, with a no-op Swiper stub in place
+(`src/theme/runtime.js`); `src/theme/sliders.js` then builds each page's sliders from the
+same option objects, copied verbatim. Letting script.js keep its sliders leaves timers
+pointed at unmounted markup — the homepage hero's `slideNext()` loop is the loud case.
+Re-running the whole file per route is worse: every delegated `$(document).on(...)` handler
+would be registered again and mmenu would build a second menu inside the first.
+
+`<nav id="menu">` is built imperatively (`components/layout/MobileNav.jsx`) because mmenu
+prepends it to `<body>`, out of React's tree. A node React believes it owns, under a parent
+it never gave it, crashes the next unmount.
+
+### Behaviour reproduced rather than corrected
+
+Both of these are defects in the source that the port keeps, because "fix it quietly" and
+"port it" are different jobs:
+
+| Where | What | Why it happens |
+|---|---|---|
+| Cart / checkout summary | The Discount row shows `-₹ 0.00` with no coupon | Blade puts `hidden` on a `.d-flex` element; Bootstrap's `.d-flex{display:flex!important}` comes later in the file than `[hidden]{display:none!important}` and wins at equal specificity |
+| Journal post | Prev/next read "? Previous" and "Next ?" | `blog-single.blade.php` contains a literal `?` — the arrows were lost to an encoding problem in the source file |
+
+### Deliberately not ported
+
+`shop-single.blade.php` contains `.legacy-product-section` and `.legacy-related-section`,
+about 400 lines between them. Both carry `display: none !important` in `style.css` (lines
+42941 and 43676): they are the previous design left in the file and render nothing.
+
+The two customer-care forms (Start My Return, Affiliates) remain decorative, as in
+`support-pages.js` — they print a thank-you and reset, and post nowhere. Giving them a real
+destination is a product decision, not a migration one.

@@ -20,7 +20,7 @@ export default function BeyondOrdinary() {
   return (
     <main>
       <section className="beyond-ordinary-hero" aria-labelledby="beyond-ordinary-title">
-        <img className="beyond-ordinary-hero__image" src="/frontend/images/beyond-ordinary/hero-editorial.jpg" alt="Woman wearing a precisely tailored ivory shirt" width="1536" height="1024" fetchpriority="high" />
+        <img className="beyond-ordinary-hero__image" src="/frontend/images/beyond-ordinary/hero-editorial.jpg" alt="Woman wearing a precisely tailored ivory shirt" width="1536" height="1024" fetchPriority="high" />
         <div className="beyond-ordinary-hero__shade"></div>
         <div className="beyond-ordinary-shell beyond-ordinary-hero__content">
           <h1 id="beyond-ordinary-title">BEYOND ORDINARY</h1>
