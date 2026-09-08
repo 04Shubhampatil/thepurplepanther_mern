@@ -3,7 +3,7 @@
 Single source of truth for progress. **Nothing is marked COMPLETE until every box in the
 completion criteria is genuinely ticked** — compiling is not completing.
 
-Last updated: 2026-09-08 · Current phase: **3 → 4**
+Last updated: 2026-09-08 · Current phase: **4 → 5**
 
 `COMPLETE*` = code complete and tested, with one task blocked on an external input that is
 named in that phase's section. It is not a substitute for COMPLETE and does not unblock a
@@ -40,7 +40,7 @@ Status values: `NOT STARTED` · `IN PROGRESS` · `BLOCKED` · `COMPLETE`
 | 1 | Backend foundation | COMPLETE* | n/a | PASS (22) | n/a |
 | 2 | Auth (customer + admin) | COMPLETE* | NOT STARTED | PASS (57) | PASS (rules) |
 | 3 | Catalog | COMPLETE* | NOT STARTED | PASS (71) | PASS (rules) |
-| 4 | CMS / home | NOT STARTED | NOT STARTED | NOT STARTED | NOT STARTED |
+| 4 | CMS / home | COMPLETE* | NOT STARTED | PASS (32) | PASS (rules) |
 | 5 | Cart | NOT STARTED | NOT STARTED | NOT STARTED | NOT STARTED |
 | 6 | Wishlist | NOT STARTED | NOT STARTED | NOT STARTED | NOT STARTED |
 | 7 | Promotions / coupons | NOT STARTED | NOT STARTED | NOT STARTED | NOT STARTED |
@@ -239,6 +239,50 @@ in production. Tests assert the include sets directly. Listing runs its count an
 |---|---|
 | I6 | Reviews are published immediately with no moderation queue |
 | I7 | Reviews require no purchase, and a guest review is auto-linked to a customer account by email alone — someone can attach a review to an account they did not authenticate as |
+
+## Phase 4 — CMS (backend)
+
+**Status: backend COMPLETE and tested. React pages deferred to the frontend pass.**
+
+| Task | Status |
+|---|---|
+| `constants/cms.js` — banner sections, site pages, support pages, account pages | COMPLETE |
+| `services/cms.service.js` — blog, banners, pages | COMPLETE |
+| `GET /blog` with news-type filter, featured post, pagination (9) | COMPLETE |
+| `GET /blog/:slug` with related, prev and next | COMPLETE |
+| `GET /news-types`, `GET /banners` | COMPLETE |
+| `GET /pages`, `GET /pages/:slug`, `GET /pages/support[/:page]` | COMPLETE |
+| Tests — **32**; suite total **182** | COMPLETE |
+| Verify queries against real data | BLOCKED (dev DB restore) |
+| React blog / support / about pages | NOT STARTED |
+
+### Laravel comparison
+
+Verified against `FrontendController::blog / blogSingle / support` and the two Support classes:
+
+- `scopePublished` = active AND (`published_at` IS NULL **OR** `<= now`). A post with no
+  publish date is **published**, not a draft — reading that branch the other way would
+  silently hide posts.
+- Featured post: featured-within-type → most recent-within-type, then **excluded** from the
+  paginated list so it does not render twice.
+- An unknown `?type=` falls through to all posts rather than 404ing (Laravel's `when()`).
+- `paginate(9)`; ordering `sort_order ASC, published_at DESC`.
+- prev/next navigate by **id**, not publish date — preserved as-is.
+- Support slugs validated against the 9-entry allow-list; 404 otherwise.
+- Banner sections: all 13 keys from `BannerSections`, first banner per section, active
+  images only, ordered by `sort_order`.
+
+### Design notes
+
+- List payloads omit `content`, so a 9-post page does not ship nine full article bodies.
+- Support page **content** stays in the view layer (Blade → React components), exactly as it
+  was. The API only validates the slug and resolves its title.
+
+### New finding — audit R11
+
+The `pages` table is **write-only** in the source application: admins can edit four pages but
+no storefront view reads them. `GET /pages/:slug` is exposed so the content is reachable;
+actually rendering it is a product decision, not a migration one.
 
 ## Open decisions
 
