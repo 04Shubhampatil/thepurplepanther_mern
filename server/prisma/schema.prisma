@@ -1,0 +1,761 @@
+// The Purple Panther — Prisma schema
+//
+// Written by hand from the authoritative production dump
+// (`u375273201_purple_panthdb 1.sql`, 35 tables) and cross-checked against
+// `docs/database-mapping.md`. It describes the EXISTING MySQL database.
+//
+// RULES:
+//   * No table or column is renamed. Every model uses @@map / @map.
+//   * Referential actions mirror the live foreign keys exactly.
+//   * `prisma migrate` is NEVER run against production. See database-mapping.md §8.
+//   * JSON columns are `longtext` with a json_valid() CHECK, not native JSON. They are
+//     modelled as String and parsed in the service layer — the same thing Laravel's
+//     'array' cast does. See utils/json.js.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+// ---------------------------------------------------------------- enums
+
+enum UserRole {
+  admin
+  customer
+}
+
+enum DiscountType {
+  percent
+  amount
+}
+
+// ---------------------------------------------------------------- users
+
+model User {
+  id              BigInt    @id @default(autoincrement())
+  name            String    @db.VarChar(255)
+  username        String?   @unique @db.VarChar(255)
+  email           String    @unique @db.VarChar(255)
+  phone           String?   @db.VarChar(255)
+  birthDate       DateTime? @map("birth_date") @db.Date
+  marketingOptIn  Boolean   @default(true) @map("marketing_opt_in")
+  avatar          String?   @db.VarChar(255)
+  platform        String?   @db.VarChar(255)
+  loginProvider   String    @default("email") @map("login_provider") @db.VarChar(255)
+  googleId        String?   @map("google_id") @db.VarChar(255)
+  emailVerifiedAt DateTime? @map("email_verified_at") @db.Timestamp(0)
+  password        String    @db.VarChar(255)
+  role            UserRole  @default(customer)
+  isActive        Boolean   @default(true) @map("is_active")
+  rememberToken   String?   @map("remember_token") @db.VarChar(100)
+  createdAt       DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt       DateTime? @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  addresses         UserAddress[]
+  bankAccounts      UserBankAccount[]
+  wishlists         Wishlist[]
+  cartItems         CartItem[]
+  reviews           ProductReview[]
+  orders            Order[]
+  couponRedemptions CouponRedemption[]
+
+  @@map("users")
+}
+
+model UserAddress {
+  id           BigInt    @id @default(autoincrement())
+  userId       BigInt    @map("user_id")
+  label        String?   @db.VarChar(255)
+  name         String?   @db.VarChar(255)
+  phone        String?   @db.VarChar(255)
+  addressLine1 String    @map("address_line1") @db.VarChar(255)
+  addressLine2 String?   @map("address_line2") @db.VarChar(255)
+  city         String?   @db.VarChar(255)
+  state        String?   @db.VarChar(255)
+  pincode      String?   @db.VarChar(255)
+  country      String?   @db.VarChar(255)
+  isDefault    Boolean   @default(false) @map("is_default")
+  createdAt    DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt    DateTime? @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "user_addresses_user_id_foreign")
+  @@map("user_addresses")
+}
+
+model UserBankAccount {
+  id            BigInt    @id @default(autoincrement())
+  userId        BigInt    @map("user_id")
+  accountHolder String    @map("account_holder") @db.VarChar(255)
+  bankName      String?   @map("bank_name") @db.VarChar(255)
+  accountNumber String    @map("account_number") @db.VarChar(255)
+  ifsc          String?   @db.VarChar(255)
+  isDefault     Boolean   @default(false) @map("is_default")
+  createdAt     DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt     DateTime? @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "user_bank_accounts_user_id_foreign")
+  @@map("user_bank_accounts")
+}
+
+// ---------------------------------------------------------------- taxonomy
+
+model Category {
+  id               BigInt    @id @default(autoincrement())
+  title            String    @unique @db.VarChar(255)
+  slug             String    @unique @db.VarChar(255)
+  image            String?   @db.VarChar(255)
+  shortDescription String?   @map("short_description") @db.VarChar(255)
+  hasColor         Boolean   @default(false) @map("has_color")
+  hasSize          Boolean   @default(false) @map("has_size")
+  showOnHome       Boolean   @default(false) @map("show_on_home")
+  isActive         Boolean   @default(true) @map("is_active")
+  sortOrder        Int       @default(0) @map("sort_order")
+  createdAt        DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt        DateTime? @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  subCategories SubCategory[]
+  products      Product[]
+
+  @@map("categories")
+}
+
+model SubCategory {
+  id         BigInt    @id @default(autoincrement())
+  categoryId BigInt    @map("category_id")
+  title      String    @unique @db.VarChar(255)
+  slug       String    @unique @db.VarChar(255)
+  image      String?   @db.VarChar(255)
+  isActive   Boolean   @default(true) @map("is_active")
+  sortOrder  Int       @default(0) @map("sort_order")
+  createdAt  DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt  DateTime? @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  category Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  products Product[]
+
+  @@index([categoryId], map: "sub_categories_category_id_foreign")
+  @@map("sub_categories")
+}
+
+model Brand {
+  id        BigInt    @id @default(autoincrement())
+  name      String    @unique @db.VarChar(255)
+  slug      String    @unique @db.VarChar(255)
+  image     String?   @db.VarChar(255)
+  isActive  Boolean   @default(true) @map("is_active")
+  sortOrder Int       @default(0) @map("sort_order")
+  createdAt DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  products Product[]
+
+  @@map("brands")
+}
+
+model Color {
+  id        BigInt    @id @default(autoincrement())
+  name      String    @unique @db.VarChar(255)
+  code      String?   @db.VarChar(20)
+  isActive  Boolean   @default(true) @map("is_active")
+  sortOrder Int       @default(0) @map("sort_order")
+  createdAt DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  productColors ProductColor[]
+  productImages ProductImage[]
+
+  @@map("colors")
+}
+
+model Size {
+  id        BigInt    @id @default(autoincrement())
+  name      String    @unique @db.VarChar(255)
+  isActive  Boolean   @default(true) @map("is_active")
+  sortOrder Int       @default(0) @map("sort_order")
+  createdAt DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  productSizes ProductSize[]
+
+  @@map("sizes")
+}
+
+model Offer {
+  id              BigInt    @id @default(autoincrement())
+  title           String    @unique @db.VarChar(255)
+  slug            String    @unique @db.VarChar(255)
+  description     String?   @db.Text
+  discountPercent Int       @default(0) @map("discount_percent") @db.UnsignedTinyInt
+  image           String?   @db.VarChar(255)
+  isActive        Boolean   @default(true) @map("is_active")
+  sortOrder       Int       @default(0) @map("sort_order")
+  createdAt       DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt       DateTime? @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  products Product[]
+
+  @@map("offers")
+}
+
+// ---------------------------------------------------------------- products
+
+model Product {
+  id            BigInt  @id @default(autoincrement())
+  title         String  @unique @db.VarChar(255)
+  slug          String  @unique @db.VarChar(255)
+  categoryId    BigInt  @map("category_id")
+  subCategoryId BigInt? @map("sub_category_id")
+  brandId       BigInt? @map("brand_id")
+  offerId       BigInt? @map("offer_id")
+
+  shortDescription String? @map("short_description") @db.Text
+  features         String? @db.LongText
+
+  mrp            Decimal @default(0.00) @db.Decimal(12, 2)
+  sellingPrice   Decimal @default(0.00) @map("selling_price") @db.Decimal(12, 2)
+  maxUnitBuy     Int     @default(1) @map("max_unit_buy")
+  deliveryCharge Decimal @default(0.00) @map("delivery_charge") @db.Decimal(12, 2)
+
+  featuredImage  String? @map("featured_image") @db.VarChar(255)
+  featuredImage2 String? @map("featured_image_2") @db.VarChar(255)
+
+  seoTitle        String? @map("seo_title") @db.VarChar(255)
+  metaDescription String? @map("meta_description") @db.Text
+  metaKeywords    String? @map("meta_keywords") @db.VarChar(255)
+
+  isActive           Boolean @default(true) @map("is_active")
+  isFeatured         Boolean @default(false) @map("is_featured")
+  isTodaysDeal       Boolean @default(false) @map("is_todays_deal")
+  isPopularAccessory Boolean @default(false) @map("is_popular_accessory")
+  isNewArrival       Boolean @default(false) @map("is_new_arrival")
+
+  showSizeGuide    Boolean @default(false) @map("show_size_guide")
+  sizeGuideContent String? @map("size_guide_content") @db.LongText
+  sizeGuideImage   String? @map("size_guide_image") @db.VarChar(255)
+
+  highlightsImage            String? @map("highlights_image") @db.VarChar(255)
+  highlightsShortDescription String? @map("highlights_short_description") @db.Text
+
+  // JSON-in-longtext. Parse/stringify via utils/json.js — never trust as native JSON.
+  highlightsItems   String? @map("highlights_items") @db.LongText
+  informationItems  String? @map("information_items") @db.LongText
+  specifications    String? @db.LongText
+  accessoryPackages String? @map("accessory_packages") @db.LongText
+
+  sortOrder Int       @default(0) @map("sort_order")
+  createdAt DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  category     Category     @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  subCategory  SubCategory? @relation(fields: [subCategoryId], references: [id], onDelete: SetNull)
+  brand        Brand?       @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  offer        Offer?       @relation(fields: [offerId], references: [id], onDelete: SetNull)
+
+  images       ProductImage[]
+  reviews      ProductReview[]
+  colors       ProductColor[]
+  sizes        ProductSize[]
+  cartItems    CartItem[]
+  orderItems   OrderItem[]
+  wishlists    Wishlist[]
+  homeSections HomeSectionProduct[]
+
+  @@index([categoryId], map: "products_category_id_foreign")
+  @@index([subCategoryId], map: "products_sub_category_id_foreign")
+  @@index([brandId], map: "products_brand_id_foreign")
+  @@index([offerId], map: "products_offer_id_foreign")
+  @@map("products")
+}
+
+/// Pivot WITH payload — `quantity` is the per-colour stock used by
+/// CartService.maximumQuantity(). Never sync this table by delete-all + recreate.
+model ProductColor {
+  id        BigInt @id @default(autoincrement())
+  productId BigInt @map("product_id")
+  colorId   BigInt @map("color_id")
+  quantity  Int    @default(0)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  color   Color   @relation(fields: [colorId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, colorId], map: "product_color_product_id_color_id_unique")
+  @@index([colorId], map: "product_color_color_id_foreign")
+  @@map("product_color")
+}
+
+/// Pivot WITH payload — see ProductColor.
+model ProductSize {
+  id        BigInt @id @default(autoincrement())
+  productId BigInt @map("product_id")
+  sizeId    BigInt @map("size_id")
+  quantity  Int    @default(0)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  size    Size    @relation(fields: [sizeId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, sizeId], map: "product_size_product_id_size_id_unique")
+  @@index([sizeId], map: "product_size_size_id_foreign")
+  @@map("product_size")
+}
+
+model ProductImage {
+  id        BigInt    @id @default(autoincrement())
+  productId BigInt    @map("product_id")
+  colorId   BigInt?   @map("color_id")
+  image     String    @db.VarChar(255)
+  sortOrder Int       @default(0) @map("sort_order")
+  createdAt DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  color   Color?  @relation(fields: [colorId], references: [id], onDelete: SetNull)
+
+  @@index([productId], map: "product_images_product_id_foreign")
+  @@index([colorId], map: "product_images_color_id_foreign")
+  @@map("product_images")
+}
+
+model ProductReview {
+  id            BigInt    @id @default(autoincrement())
+  productId     BigInt    @map("product_id")
+  userId        BigInt?   @map("user_id")
+  reviewerName  String    @map("reviewer_name") @db.VarChar(255)
+  reviewerEmail String?   @map("reviewer_email") @db.VarChar(255)
+  rating        Int       @default(5) @db.UnsignedTinyInt
+  comment       String?   @db.Text
+  image         String?   @db.VarChar(255)
+  isActive      Boolean   @default(true) @map("is_active")
+  createdAt     DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt     DateTime? @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([productId], map: "product_reviews_product_id_foreign")
+  @@index([userId], map: "product_reviews_user_id_foreign")
+  @@map("product_reviews")
+}
+
+// ---------------------------------------------------------------- cart & wishlist
+
+/// NOTE: the live table has NO unique constraint on the logical line key
+/// (user_id, product_id, color, size, package_key). De-duplication is enforced in
+/// cart.service.js, exactly as Laravel's CartService did. See audit R7.
+model CartItem {
+  id           BigInt    @id @default(autoincrement())
+  userId       BigInt    @map("user_id")
+  productId    BigInt    @map("product_id")
+  color        String?   @db.VarChar(80)
+  size         String?   @db.VarChar(40)
+  packageKey   String?   @map("package_key") @db.VarChar(50)
+  packageLabel String?   @map("package_label") @db.VarChar(120)
+  packagePrice Decimal?  @map("package_price") @db.Decimal(10, 2)
+  quantity     Int       @default(1)
+  createdAt    DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt    DateTime? @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId], map: "cart_items_product_id_foreign")
+  @@index([userId], map: "cart_items_user_id_index")
+  @@map("cart_items")
+}
+
+model Wishlist {
+  id        BigInt    @id @default(autoincrement())
+  userId    BigInt    @map("user_id")
+  productId BigInt    @map("product_id")
+  createdAt DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId], map: "wishlists_user_id_product_id_unique")
+  @@index([productId], map: "wishlists_product_id_foreign")
+  @@map("wishlists")
+}
+
+// ---------------------------------------------------------------- orders
+
+model Order {
+  id          BigInt @id @default(autoincrement())
+  orderNumber String @unique @map("order_number") @db.VarChar(255)
+  userId      BigInt @map("user_id")
+
+  userName  String? @map("user_name") @db.VarChar(255)
+  userPhone String? @map("user_phone") @db.VarChar(255)
+  userEmail String? @map("user_email") @db.VarChar(255)
+
+  shippingName    String? @map("shipping_name") @db.VarChar(255)
+  shippingPhone   String? @map("shipping_phone") @db.VarChar(255)
+  shippingEmail   String? @map("shipping_email") @db.VarChar(255)
+  shippingAddress String? @map("shipping_address") @db.Text
+  shippingCity    String? @map("shipping_city") @db.VarChar(255)
+  shippingState   String? @map("shipping_state") @db.VarChar(255)
+  shippingPincode String? @map("shipping_pincode") @db.VarChar(20)
+  shippingCountry String? @map("shipping_country") @db.VarChar(255)
+
+  orderNotes String? @map("order_notes") @db.Text
+
+  paymentMode     String? @map("payment_mode") @db.VarChar(255)
+  paymentId       String? @map("payment_id") @db.VarChar(255)
+  razorpayOrderId String? @map("razorpay_order_id") @db.VarChar(255)
+  paymentStatus   String  @default("pending") @map("payment_status") @db.VarChar(255)
+
+  subtotal       Decimal @default(0.00) @db.Decimal(12, 2)
+  discountAmount Decimal @default(0.00) @map("discount_amount") @db.Decimal(12, 2)
+  couponCode     String? @map("coupon_code") @db.VarChar(50)
+  couponId       BigInt? @map("coupon_id")
+  deliveryCharge Decimal @default(0.00) @map("delivery_charge") @db.Decimal(12, 2)
+  payableAmount  Decimal @default(0.00) @map("payable_amount") @db.Decimal(12, 2)
+
+  status               String    @default("placed") @db.VarChar(255)
+  orderedAt            DateTime? @map("ordered_at") @db.Timestamp(0)
+  expectedDeliveryDate DateTime? @map("expected_delivery_date") @db.Date
+  createdAt            DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt            DateTime? @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  coupon            Coupon?            @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  items             OrderItem[]
+  statusLogs        OrderStatusLog[]
+  couponRedemptions CouponRedemption[]
+
+  @@index([userId, orderedAt], map: "orders_user_id_ordered_at_index")
+  @@index([status], map: "orders_status_index")
+  @@index([couponId], map: "orders_coupon_id_foreign")
+  @@map("orders")
+}
+
+model OrderItem {
+  id        BigInt  @id @default(autoincrement())
+  orderId   BigInt  @map("order_id")
+  productId BigInt? @map("product_id")
+
+  productTitle String  @map("product_title") @db.VarChar(255)
+  productImage String? @map("product_image") @db.VarChar(255)
+  color        String? @db.VarChar(80)
+  size         String? @db.VarChar(40)
+  packageLabel String? @map("package_label") @db.VarChar(120)
+
+  price      Decimal @default(0.00) @db.Decimal(12, 2)
+  mrp        Decimal @default(0.00) @db.Decimal(12, 2)
+  saving     Decimal @default(0.00) @db.Decimal(12, 2)
+  quantity   Int     @default(1)
+  totalPrice Decimal @default(0.00) @map("total_price") @db.Decimal(12, 2)
+
+  status    String    @default("placed") @db.VarChar(255)
+  createdAt DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  order   Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([orderId], map: "order_items_order_id_foreign")
+  @@index([productId], map: "order_items_product_id_foreign")
+  @@map("order_items")
+}
+
+model OrderStatusLog {
+  id          BigInt    @id @default(autoincrement())
+  orderId     BigInt    @map("order_id")
+  status      String    @db.VarChar(255)
+  title       String?   @db.VarChar(255)
+  description String?   @db.Text
+  loggedAt    DateTime? @map("logged_at") @db.Timestamp(0)
+  createdAt   DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt   DateTime? @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId], map: "order_status_logs_order_id_foreign")
+  @@map("order_status_logs")
+}
+
+// ---------------------------------------------------------------- promotions
+
+model Coupon {
+  id          BigInt       @id @default(autoincrement())
+  code        String       @unique @db.VarChar(255)
+  offerType   String       @default("coupon") @map("offer_type") @db.VarChar(40)
+  description String?      @db.LongText
+
+  discountType    DiscountType @default(percent) @map("discount_type")
+  discountPercent Decimal?     @map("discount_percent") @db.Decimal(5, 2)
+  discountAmount  Decimal?     @map("discount_amount") @db.Decimal(10, 2)
+
+  maxDiscountStatus Boolean  @default(false) @map("max_discount_status")
+  maxDiscountAmount Decimal? @map("max_discount_amount") @db.Decimal(10, 2)
+  minCartStatus     Boolean  @default(false) @map("min_cart_status")
+  minCartAmount     Decimal? @map("min_cart_amount") @db.Decimal(10, 2)
+
+  appliesTo String @default("all") @map("applies_to") @db.VarChar(20)
+
+  // JSON-in-longtext arrays of ids. Parse via utils/json.js.
+  categoryIds String? @map("category_ids") @db.LongText
+  productIds  String? @map("product_ids") @db.LongText
+
+  minQuantity      Int? @map("min_quantity")
+  bogoBuyQuantity  Int? @map("bogo_buy_quantity")
+  bogoGetQuantity  Int? @map("bogo_get_quantity")
+
+  newCustomersOnly Boolean @default(false) @map("new_customers_only")
+  membersOnly      Boolean @default(false) @map("members_only")
+  freeShipping     Boolean @default(false) @map("free_shipping")
+  prepaidOnly      Boolean @default(false) @map("prepaid_only")
+
+  startsAt DateTime? @map("starts_at") @db.Timestamp(0)
+  endsAt   DateTime? @map("ends_at") @db.Timestamp(0)
+
+  usageLimit    Int?    @map("usage_limit")
+  usedCount     Int     @default(0) @map("used_count")
+  maxUsePerUser Boolean @default(false) @map("max_use_per_user")
+
+  image     String?   @db.VarChar(255)
+  isActive  Boolean   @default(true) @map("is_active")
+  isPublic  Boolean   @default(true) @map("is_public")
+  createdAt DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  redemptions CouponRedemption[]
+  orders      Order[]
+
+  @@map("coupons")
+}
+
+model CouponRedemption {
+  id             BigInt    @id @default(autoincrement())
+  couponId       BigInt    @map("coupon_id")
+  userId         BigInt?   @map("user_id")
+  orderId        BigInt?   @map("order_id")
+  code           String    @db.VarChar(50)
+  discountAmount Decimal   @default(0.00) @map("discount_amount") @db.Decimal(12, 2)
+  createdAt      DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt      DateTime? @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  coupon Coupon @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  order  Order? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([couponId], map: "coupon_redemptions_coupon_id_foreign")
+  @@index([userId], map: "coupon_redemptions_user_id_foreign")
+  @@index([orderId], map: "coupon_redemptions_order_id_foreign")
+  @@map("coupon_redemptions")
+}
+
+// ---------------------------------------------------------------- CMS
+
+model Banner {
+  id          BigInt    @id @default(autoincrement())
+  title       String    @db.VarChar(255)
+  section     String    @db.VarChar(255)
+  subtitle    String?   @db.Text
+  description String?   @db.Text
+  buttonText  String?   @map("button_text") @db.VarChar(100)
+  buttonLink  String?   @map("button_link") @db.VarChar(500)
+  buttonText2 String?   @map("button_text_2") @db.VarChar(100)
+  buttonLink2 String?   @map("button_link_2") @db.VarChar(500)
+  isActive    Boolean   @default(true) @map("is_active")
+  sortOrder   Int       @default(0) @map("sort_order")
+  createdAt   DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt   DateTime? @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  images BannerImage[]
+
+  @@map("banners")
+}
+
+/// ⚠️ The live table has NO foreign key AND NO index on banner_id (audit R4).
+/// The relation is declared here so `include` works; the constraint is a proposed
+/// post-cutover change (migration-status.md I2), not part of this migration.
+model BannerImage {
+  id          BigInt    @id @default(autoincrement())
+  bannerId    BigInt    @map("banner_id")
+  image       String    @db.VarChar(255)
+  mobileImage String?   @map("mobile_image") @db.VarChar(255)
+  title       String?   @db.VarChar(255)
+  subtitle    String?   @db.Text
+  buttonText  String?   @map("button_text") @db.VarChar(100)
+  buttonLink  String?   @map("button_link") @db.VarChar(500)
+  isActive    Boolean   @default(true) @map("is_active")
+  sortOrder   Int       @default(0) @map("sort_order")
+  createdAt   DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt   DateTime? @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  banner Banner @relation(fields: [bannerId], references: [id], onDelete: Cascade)
+
+  @@map("banner_images")
+}
+
+model HomeSectionProduct {
+  id        BigInt    @id @default(autoincrement())
+  productId BigInt    @map("product_id")
+  section   String    @default("shop_the_look") @db.VarChar(50)
+  position  Int       @db.UnsignedTinyInt
+  createdAt DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([section, position], map: "home_section_products_section_position_unique")
+  @@index([productId], map: "home_section_products_product_id_foreign")
+  @@map("home_section_products")
+}
+
+model NewsType {
+  id        BigInt    @id @default(autoincrement())
+  title     String    @db.VarChar(255)
+  slug      String    @unique @db.VarChar(255)
+  isActive  Boolean   @default(true) @map("is_active")
+  sortOrder Int       @default(0) @map("sort_order")
+  createdAt DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  posts BlogPost[]
+
+  @@map("news_types")
+}
+
+/// ⚠️ news_type_id has NO foreign key and NO index in the live schema (audit R4).
+model BlogPost {
+  id            BigInt    @id @default(autoincrement())
+  title         String    @db.VarChar(255)
+  slug          String    @db.VarChar(255)
+  newsTypeId    BigInt?   @map("news_type_id")
+  image         String?   @db.VarChar(255)
+  bannerImage   String?   @map("banner_image") @db.VarChar(255)
+  authorName    String    @default("Admin") @map("author_name") @db.VarChar(255)
+  excerpt       String?   @db.Text
+  content       String?   @db.LongText
+  commentsCount Int       @default(0) @map("comments_count")
+  isFeatured    Boolean   @default(false) @map("is_featured")
+  isActive      Boolean   @default(true) @map("is_active")
+  sortOrder     Int       @default(0) @map("sort_order")
+  publishedAt   DateTime? @map("published_at") @db.Timestamp(0)
+  createdAt     DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt     DateTime? @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  newsType NewsType? @relation(fields: [newsTypeId], references: [id], onDelete: SetNull)
+
+  @@map("blog_posts")
+}
+
+model Page {
+  id        BigInt    @id @default(autoincrement())
+  slug      String    @unique @db.VarChar(255)
+  title     String    @db.VarChar(255)
+  content   String?   @db.LongText
+  isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  @@map("pages")
+}
+
+// ---------------------------------------------------------------- misc
+
+model ContactMessage {
+  id        BigInt    @id @default(autoincrement())
+  name      String    @db.VarChar(255)
+  email     String    @db.VarChar(255)
+  subject   String?   @db.VarChar(255)
+  message   String    @db.Text
+  createdAt DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  @@map("contact_messages")
+}
+
+model Subscriber {
+  id        BigInt    @id @default(autoincrement())
+  email     String    @unique @db.VarChar(255)
+  createdAt DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  @@map("subscribers")
+}
+
+/// Single-row settings table. Read via shipping.service.js, which falls back to the
+/// schema defaults (899.00 / 60.00) when the row is missing — matching
+/// ShippingSetting::current() in Laravel.
+model ShippingSetting {
+  id                    BigInt    @id @default(autoincrement())
+  freeShippingThreshold Decimal   @default(899.00) @map("free_shipping_threshold") @db.Decimal(10, 2)
+  flatShippingRate      Decimal   @default(60.00) @map("flat_shipping_rate") @db.Decimal(10, 2)
+  createdAt             DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt             DateTime? @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  @@map("shipping_settings")
+}
+
+model PasswordResetAttempt {
+  id        BigInt   @id @default(autoincrement())
+  email     String   @db.VarChar(255)
+  ipAddress String?  @map("ip_address") @db.VarChar(45)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+
+  @@index([email], map: "password_reset_attempts_email_index")
+  @@map("password_reset_attempts")
+}
+
+// ---------------------------------------------------------------- framework tables
+// Retained so the Laravel app keeps working during the parallel run and rollback
+// stays possible. Only password_reset_tokens is read/written by the Node app.
+
+/// Shared with Laravel so reset links issued by either app remain valid.
+/// Primary key is `email` — this table has no id column.
+model PasswordResetToken {
+  email     String    @id @db.VarChar(255)
+  token     String    @db.VarChar(255)
+  createdAt DateTime? @map("created_at") @db.Timestamp(0)
+
+  @@map("password_reset_tokens")
+}
+
+/// Laravel's migration ledger. Never written by the Node app.
+model Migration {
+  id        Int    @id @default(autoincrement())
+  migration String @db.VarChar(255)
+  batch     Int
+
+  @@map("migrations")
+}
+
+/// Sanctum. Unused by application code; retained for schema fidelity.
+model PersonalAccessToken {
+  id            BigInt    @id @default(autoincrement())
+  tokenableType String    @map("tokenable_type") @db.VarChar(255)
+  tokenableId   BigInt    @map("tokenable_id")
+  name          String    @db.VarChar(255)
+  token         String    @unique @db.VarChar(64)
+  abilities     String?   @db.Text
+  lastUsedAt    DateTime? @map("last_used_at") @db.Timestamp(0)
+  expiresAt     DateTime? @map("expires_at") @db.Timestamp(0)
+  createdAt     DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt     DateTime? @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  @@index([tokenableType, tokenableId], map: "personal_access_tokens_tokenable_type_tokenable_id_index")
+  @@map("personal_access_tokens")
+}
+
+/// Queue is `sync`; this table is inert. Retained for schema fidelity.
+model FailedJob {
+  id         BigInt   @id @default(autoincrement())
+  uuid       String   @unique @db.VarChar(255)
+  connection String   @db.Text
+  queue      String   @db.Text
+  payload    String   @db.LongText
+  exception  String   @db.LongText
+  failedAt   DateTime @default(now()) @map("failed_at") @db.Timestamp(0)
+
+  @@map("failed_jobs")
+}
