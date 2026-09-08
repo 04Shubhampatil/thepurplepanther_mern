@@ -53,3 +53,39 @@ export function usePageTitle(title, description) {
     }
   }, [title, description])
 }
+
+/**
+ * A stylesheet only one page needs.
+ *
+ * beyond-ordinary.blade.php is the only page that loads beyond-ordinary.css, and its rules
+ * are written to win against style.css. Loading it globally would leak those overrides onto
+ * every other page, so the <link> is added on mount and removed on unmount — and reference
+ * counted, because React can mount the next page before unmounting the last and a naive
+ * remove would strip the sheet from under it.
+ */
+const sheetUsers = new Map()
+
+export function usePageStylesheet(href) {
+  useEffect(() => {
+    if (!href) return undefined
+
+    const count = sheetUsers.get(href) ?? 0
+    sheetUsers.set(href, count + 1)
+
+    if (count === 0) {
+      const link = document.createElement('link')
+      link.rel = 'stylesheet'
+      link.href = href
+      link.dataset.pageStylesheet = href
+      document.head.appendChild(link)
+    }
+
+    return () => {
+      const remaining = (sheetUsers.get(href) ?? 1) - 1
+      sheetUsers.set(href, remaining)
+      if (remaining > 0) return
+
+      document.head.querySelector(`link[data-page-stylesheet="${href}"]`)?.remove()
+    }
+  }, [href])
+}

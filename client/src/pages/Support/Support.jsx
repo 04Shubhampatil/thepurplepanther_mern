@@ -1,123 +1,210 @@
-import { useParams, NavLink } from 'react-router-dom'
-import { ChevronDown } from 'lucide-react'
-import { useApi } from '../../hooks/useApi.js'
-import * as api from '../../services/endpoints.js'
-import Loading from '../../components/common/Loading.jsx'
-import Seo from '../../components/common/Seo.jsx'
-import NotFound from '../NotFound.jsx'
-import ContactForm from './ContactForm.jsx'
-import SUPPORT_CONTENT from './supportContent.js'
-import Container from '../../components/ui/Container.jsx'
+import { useState } from 'react'
+import { Link, Navigate, useParams } from 'react-router-dom'
+import { SUPPORT_ROUTES, SUPPORT_CONTENT, DEFAULT_SUPPORT_PAGE } from './supportContent.js'
+import { useBodyClass, usePageTitle } from '../../theme/page.js'
 
 /**
- * Customer-care pages.
+ * Customer care — frontend/pages/support.blade.php plus support-pages.js.
  *
- * Content lives in the view layer, exactly as it did in Blade — the server validates the
- * slug against its allow-list and returns the title, and the copy is rendered from
- * `supportContent.js`. That keeps editorial text in version control rather than turning it
- * into an unplanned CMS.
+ * As with the account area, the Blade file is an empty `<div id="support-app">`; the markup
+ * being reproduced is the script's. Class names (`support-shell`, `support-layout`,
+ * `support-nav`, `support-accordion`, `support-form`) are what custom.css styles.
  *
- * FAQs use native <details>, so keyboard interaction, Find-in-page and the open/closed
- * state come from the browser rather than being rebuilt in state.
+ * The two forms are decorative in the original: support-pages.js intercepts the submit,
+ * writes "Thank you. Your information has been received." into the status line and resets
+ * the fields — it never posts anywhere. That is preserved rather than quietly wired to an
+ * endpoint, because sending a return request somewhere new would be a behaviour change, not
+ * a port. If these should reach a real inbox, that is a decision to make deliberately.
  */
-export default function Support() {
-  const { page = 'faqs' } = useParams()
-  const { data, error, loading } = useApi(() => api.cms.supportPage(page), [page])
-
-  const { data: index } = useApi(() => api.cms.supportPages(), [])
-
-  if (error?.status === 404) return <NotFound />
-  if (loading && !data) return <Loading full />
-  if (!data) return null
-
-  const content = SUPPORT_CONTENT[page]
-
-  const navClass = ({ isActive }) =>
-    [
-      'block whitespace-nowrap border-b-2 px-1 py-2 text-[14px] transition-colors md:border-b-0 md:border-l-2 md:px-4 md:py-2',
-      isActive
-        ? 'border-brand text-brand'
-        : 'border-transparent text-body hover:text-ink md:hover:border-line',
-    ].join(' ')
+function Accordion({ items, page }) {
+  const [open, setOpen] = useState(null)
 
   return (
-    <Container className="py-10 md:py-14">
-      <Seo title={data.title} description={`${data.title} — The Purple Panther customer care.`} />
-
-      <div className="grid gap-8 md:grid-cols-[240px_1fr] md:gap-12">
-        <nav aria-label="Customer care" className="md:border-r md:border-line md:pr-6">
-          <h2 className="pp-eyebrow text-ink">Customer care</h2>
-
-          <ul className="-mx-4 mt-4 flex gap-5 overflow-x-auto px-4 md:mx-0 md:block md:space-y-0.5 md:overflow-visible md:px-0">
-            {(index?.pages ?? []).map((item) => (
-              <li key={item.slug} className="shrink-0 md:shrink">
-                <NavLink to={`/support/${item.slug}`} className={navClass}>
-                  {item.title}
-                </NavLink>
-              </li>
-            ))}
-          </ul>
-        </nav>
-
-        <div className="min-w-0">
-          <h1 className="pp-heading">{data.title}</h1>
-
-          {content ? (
-            <div className="mt-5 max-w-2xl">
-              {content.intro && (
-                <p className="text-[17px] leading-relaxed text-ink">{content.intro}</p>
-              )}
-
-              {content.sections?.map((section, index) => (
-                <section key={index} className="mt-8">
-                  {section.heading && (
-                    <h2 className="text-[19px] font-semibold text-ink">{section.heading}</h2>
-                  )}
-
-                  {section.body?.map((paragraph, i) => (
-                    <p key={i} className="mt-3 leading-[1.9]">
-                      {paragraph}
-                    </p>
-                  ))}
-
-                  {section.list && (
-                    <ul className="mt-3 list-disc space-y-1.5 pl-5">
-                      {section.list.map((item, i) => (
-                        <li key={i}>{item}</li>
-                      ))}
-                    </ul>
-                  )}
-                </section>
+    <div className="support-accordion">
+      {items.map(([question, answers], index) => {
+        const expanded = open === index
+        return (
+          <article key={index}>
+            <button
+              type="button"
+              aria-expanded={expanded}
+              aria-controls={`answer-${page}-${index}`}
+              onClick={() => setOpen(expanded ? null : index)}
+            >
+              <span>{question}</span>
+              <b aria-hidden="true">{expanded ? '⌃' : '⌄'}</b>
+            </button>
+            <div id={`answer-${page}-${index}`} hidden={!expanded}>
+              {answers.map((answer, answerIndex) => (
+                // The FAQ copy contains <br> tags inline, which Blade rendered as markup.
+                <p key={answerIndex} dangerouslySetInnerHTML={{ __html: answer }} />
               ))}
-
-              {content.faqs && (
-                <div className="mt-10">
-                  {content.faqs.map((faq, index) => (
-                    <details key={index} className="group border-b border-line first:border-t">
-                      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-4 text-[15px] font-semibold text-ink transition-colors hover:text-brand [&::-webkit-details-marker]:hidden">
-                        {faq.q}
-                        <ChevronDown
-                          size={17}
-                          strokeWidth={1.5}
-                          aria-hidden="true"
-                          className="shrink-0 transition-transform duration-200 group-open:rotate-180"
-                        />
-                      </summary>
-                      <p className="pb-4 leading-[1.9]">{faq.a}</p>
-                    </details>
-                  ))}
-                </div>
-              )}
             </div>
-          ) : (
-            <p className="mt-5 text-body">
-              For help with this topic, please get in touch using the form below.
-            </p>
-          )}
+          </article>
+        )
+      })}
+    </div>
+  )
+}
 
-          <ContactForm subject={data.title} />
+function SupportForm({ block }) {
+  const [status, setStatus] = useState('')
+
+  function onSubmit(event) {
+    event.preventDefault()
+    if (!event.currentTarget.checkValidity()) {
+      event.currentTarget.reportValidity()
+      return
+    }
+    setStatus('Thank you. Your information has been received.')
+    event.currentTarget.reset()
+  }
+
+  const field = (input) => (
+    <label key={input.name}>
+      {input.label}
+      {input.control === 'textarea' ? (
+        <textarea name={input.name} rows={input.rows ?? 5} required={input.required} />
+      ) : input.control === 'select' ? (
+        <select name={input.name} required={input.required}>
+          {input.options.map(([value, label]) => (
+            <option value={value} key={label}>{label}</option>
+          ))}
+        </select>
+      ) : (
+        <input
+          name={input.name}
+          type={input.type ?? 'text'}
+          required={input.required}
+          placeholder={input.placeholder}
+        />
+      )}
+    </label>
+  )
+
+  return (
+    <form className="support-form" id={block.id} onSubmit={onSubmit}>
+      {(block.rows ?? []).map((row, index) => (
+        <div key={index}>{row.map(field)}</div>
+      ))}
+      {(block.fields ?? []).map(field)}
+      {block.check && (
+        <label className="support-check">
+          <input type="checkbox" required /> {block.check}
+        </label>
+      )}
+      <button className="support-primary" type="submit">{block.submitLabel}</button>
+      <p className="support-form-status" role="status">{status}</p>
+    </form>
+  )
+}
+
+function Block({ block, page }) {
+  switch (block.type) {
+    case 'lead':
+      return <p className="support-lead">{block.text}</p>
+
+    case 'accordion':
+      return <Accordion items={block.items} page={page} />
+
+    case 'paragraphs':
+      return block.items.map((text, index) => <p key={index}>{text}</p>)
+
+    case 'sections':
+      return block.items.map(([title, paragraphs], index) => (
+        <section className="support-copy-section" key={index}>
+          <h2>{title}</h2>
+          {paragraphs.map((text, textIndex) => <p key={textIndex}>{text}</p>)}
+        </section>
+      ))
+
+    case 'link':
+      return <Link className="support-primary" to={block.href}>{block.label}</Link>
+
+    case 'table':
+      return (
+        <div className="size-table-wrap">
+          <table className="size-table">
+            <tbody>
+              {block.rows.map(([size, ...cells]) => (
+                <tr key={size}>
+                  <th>{size}</th>
+                  {cells.map((cell, index) => <td key={index}>{cell}</td>)}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-      </div>
-    </Container>
+      )
+
+    case 'benefits':
+      return (
+        <div className="affiliate-benefits">
+          {block.items.map(([title, text]) => (
+            <article key={title}>
+              <strong>{title}</strong>
+              <p>{text}</p>
+            </article>
+          ))}
+        </div>
+      )
+
+    case 'form':
+      return <SupportForm block={block} />
+
+    default:
+      return null
+  }
+}
+
+export default function Support() {
+  const { page: requested } = useParams()
+  const [navOpen, setNavOpen] = useState(false)
+
+  const page = requested ?? DEFAULT_SUPPORT_PAGE
+  const content = SUPPORT_CONTENT[page]
+
+  useBodyClass('support-page')
+  usePageTitle(content ? `${content.title} - The Purple Panther` : 'Customer Care - The Purple Panther')
+
+  // support-pages.js fell back to FAQs for an unknown slug rather than 404ing.
+  if (!content) return <Navigate to={`/support/${DEFAULT_SUPPORT_PAGE}`} replace />
+
+  return (
+    <div id="support-app" className="support-app" data-support-page={page}>
+      <main className="support-shell">
+        <div className="support-layout">
+          <button
+            className="support-nav-toggle"
+            type="button"
+            aria-expanded={navOpen}
+            aria-controls="supportNav"
+            onClick={() => setNavOpen((open) => !open)}
+          >
+            Customer Care <span>+</span>
+          </button>
+          <nav id="supportNav" className={`support-nav${navOpen ? ' open' : ''}`} aria-label="Customer care">
+            {SUPPORT_ROUTES.map(([slug, label]) => (
+              <Link
+                to={`/support/${slug}`}
+                className={slug === page ? 'active' : undefined}
+                aria-current={slug === page ? 'page' : undefined}
+                key={slug}
+              >
+                {label}
+              </Link>
+            ))}
+          </nav>
+          <div className="support-content">
+            <section className="support-copy-section">
+              <h2>{content.title}</h2>
+              {content.blocks.map((block, index) => (
+                <Block block={block} page={page} key={index} />
+              ))}
+            </section>
+          </div>
+        </div>
+      </main>
+    </div>
   )
 }

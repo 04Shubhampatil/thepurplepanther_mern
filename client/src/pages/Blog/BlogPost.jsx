@@ -1,142 +1,143 @@
-import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, ArrowRight } from 'lucide-react'
+import { Link, useParams } from 'react-router-dom'
 import { useApi } from '../../hooks/useApi.js'
-import * as api from '../../services/endpoints.js'
 import Loading from '../../components/common/Loading.jsx'
-import ErrorMessage from '../../components/common/ErrorMessage.jsx'
-import Seo from '../../components/common/Seo.jsx'
 import NotFound from '../NotFound.jsx'
-import Container from '../../components/ui/Container.jsx'
-import Image from '../../components/ui/Image.jsx'
-import { formatDate, stripTags, truncate } from '../../utils/format.js'
+import { usePageTitle } from '../../theme/page.js'
+import * as api from '../../services/endpoints.js'
+
+/**
+ * frontend/pages/blog-single.blade.php.
+ *
+ * The post body is stored HTML from the admin editor and Blade printed it with `{!! !!}`,
+ * so it is rendered as HTML here too. That is the same trust boundary the source app has:
+ * the content comes from an authenticated admin, not from customers.
+ *
+ * Prev/next walk by ID rather than publish date — the server's ordering, kept from Laravel
+ * even though it can disagree with the list order.
+ *
+ * The literal "?" in the prev/next labels is in the Blade file itself (line 93 and 98): the
+ * arrows were lost to a bad encoding at some point and the source now contains a question
+ * mark. It is reproduced rather than guessed at, since guessing would change what ships.
+ */
+const INSTAGRAM = [1, 2, 3, 4, 5, 6, 7]
 
 export default function BlogPost() {
   const { slug } = useParams()
-  const { data, error, loading, refetch } = useApi(() => api.cms.post(slug), [slug])
+  const { data, error, loading } = useApi(() => api.cms.post(slug), [slug])
+
+  const post = data?.post ?? null
+  const relatedPosts = data?.relatedPosts ?? []
+  const prevPost = data?.prevPost ?? null
+  const nextPost = data?.nextPost ?? null
+
+  usePageTitle(post ? `${post.title} - The Purple Panther` : 'Journal - The Purple Panther', post?.excerpt)
 
   if (error?.status === 404) return <NotFound />
-  if (loading && !data) return <Loading full />
-  if (error) return <ErrorMessage error={error} onRetry={refetch} />
-  if (!data?.post) return <NotFound />
+  if (loading || !post) return <Loading full />
 
-  const { post, relatedPosts = [], prevPost, nextPost } = data
+  const author = (post.authorName || 'ADMIN').toUpperCase()
+  const date = post.publishedAt
+    ? new Date(post.publishedAt)
+        .toLocaleDateString('en-US', { month: 'long', day: '2-digit', year: 'numeric' })
+        .toUpperCase()
+    : ''
 
   return (
-    <article>
-      <Seo
-        title={post.title}
-        description={post.excerpt ?? truncate(stripTags(post.content), 160)}
-      />
-
-      {(post.bannerImage || post.image) && (
-        <Image
-          src={post.bannerImage ?? post.image}
-          alt=""
-          ratio="auto"
-          eager
-          className="h-[40vh] min-h-[240px] w-full md:h-[56vh]"
-        />
-      )}
-
-      <Container className="py-10 md:py-14">
-        <div className="mx-auto max-w-[760px]">
-          <p className="pp-eyebrow text-brand">
-            {[post.newsType?.title, post.publishedAt ? formatDate(post.publishedAt) : null]
-              .filter(Boolean)
-              .join(' · ')}
-          </p>
-
-          <h1 className="pp-heading mt-3">{post.title}</h1>
-
-          {post.authorName && (
-            <p className="mt-2 text-[13px] text-body">By {post.authorName}</p>
-          )}
-
-          {post.excerpt && (
-            <p className="mt-5 border-l-2 border-brand pl-5 text-[17px] leading-relaxed text-ink">
-              {post.excerpt}
-            </p>
-          )}
-
-          {/* CMS content is authored by admins in the panel, not by the public.
-              `.pp-prose` restores the typography Tailwind's Preflight strips. */}
-          {post.content && (
-            <div
-              className="pp-prose mt-8"
-              dangerouslySetInnerHTML={{ __html: post.content }}
-            />
-          )}
-
-          <nav
-            aria-label="Post navigation"
-            className="mt-12 flex flex-col gap-4 border-t border-line pt-6 sm:flex-row sm:items-start sm:justify-between"
-          >
-            {prevPost ? (
-              <Link
-                to={`/blog/${prevPost.slug}`}
-                className="group flex max-w-xs items-start gap-2 text-[14px] text-ink transition-colors hover:text-brand"
-              >
-                <ArrowLeft
-                  size={16}
-                  strokeWidth={1.5}
-                  aria-hidden="true"
-                  className="mt-1 shrink-0"
-                />
-                <span>
-                  <span className="pp-eyebrow block text-body">Previous</span>
-                  {prevPost.title}
-                </span>
-              </Link>
-            ) : (
-              <span />
-            )}
-
-            {nextPost ? (
-              <Link
-                to={`/blog/${nextPost.slug}`}
-                className="group flex max-w-xs items-start gap-2 text-[14px] text-ink transition-colors hover:text-brand sm:text-right"
-              >
-                <span className="sm:order-1">
-                  <span className="pp-eyebrow block text-body">Next</span>
-                  {nextPost.title}
-                </span>
-                <ArrowRight
-                  size={16}
-                  strokeWidth={1.5}
-                  aria-hidden="true"
-                  className="mt-1 shrink-0 sm:order-2"
-                />
-              </Link>
-            ) : (
-              <span />
-            )}
-          </nav>
+    <main className="body_content_wrapper position-relative">
+      <section className="blog-single-area pt120 pb-0">
+        <div className="gap-60">
+          <div className="container-fluid">
+            <div className="blog-header pb60">
+              <div className="text-center">
+                <h3 className="main-title text-uppercase">{post.title}</h3>
+                <div className="post-date pb-0 d-flex pt25 justify-content-center align-items-center gap-3">
+                  <p className="mb-0 name">BY {author}, {date}</p>
+                  {post.newsType && (
+                    <p className="comment mb-0"><span className="number">{post.newsType.title.toUpperCase()}</span></p>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="blog-single-post">
+              <img src={post.image} alt={post.title} className="img-fluid w-100" />
+            </div>
+          </div>
         </div>
-      </Container>
 
-      {relatedPosts.length > 0 && (
-        <Container className="pb-14 md:pb-20">
-          <h2 className="pp-heading">More stories</h2>
+        <div className="container">
+          <div className="row g-4">
+            <div className="col-lg-8 mx-auto">
+              <div className="blog-post-content pt60">
+                <div
+                  className="content-box journal-post-body"
+                  dangerouslySetInnerHTML={{ __html: post.content ?? '' }}
+                />
 
-          <ul className="mt-6 grid gap-x-6 gap-y-8 sm:grid-cols-2">
-            {relatedPosts.map((related) => (
-              <li key={related.id}>
-                <Link to={`/blog/${related.slug}`} className="group block">
-                  <Image
-                    src={related.image}
-                    alt=""
-                    ratio="wide"
-                    imgClassName="transition-transform duration-500 group-hover:scale-[1.03]"
-                  />
-                  <h3 className="mt-3 text-[17px] font-semibold leading-snug text-ink transition-colors group-hover:text-brand">
-                    {related.title}
-                  </h3>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </Container>
-      )}
-    </article>
+                <div className="blog-nav d-flex justify-content-between flex-wrap gap-3 mt60">
+                  {prevPost ? (
+                    <Link to={`/blog/${prevPost.slug}`} className="su-btn-4-black su-left-right">
+                      <span className="su-text">? Previous</span>
+                    </Link>
+                  ) : (
+                    <span></span>
+                  )}
+                  {nextPost && (
+                    <Link to={`/blog/${nextPost.slug}`} className="su-btn-4-black su-left-right">
+                      <span className="su-text">Next ?</span>
+                    </Link>
+                  )}
+                </div>
+
+                {relatedPosts.length > 0 && (
+                  <div className="related-article mt90">
+                    <h4 className="mb40">Related Articles</h4>
+                    <div className="row g-4">
+                      {relatedPosts.map((related) => (
+                        <div className="col-md-6" key={related.id}>
+                          <div className="for-blog position-relative">
+                            <div className="thumb overflow-hidden mb20">
+                              <Link to={related.url}>
+                                <img src={related.image} alt={related.title} className="img-fluid w-100" />
+                              </Link>
+                            </div>
+                            <h5 className="title"><Link to={related.url}>{related.title}</Link></h5>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="su-instagram-feed-16-area style14 gap-60 pt90 pb-0">
+        <div className="container-fluid">
+          <div className="row">
+            <div className="col-lg-12">
+              <div className="section-title style14 mb60 text-center">
+                <h2 className="sub-title">JOIN US</h2>
+                <h2 className="title">@WOOMEN</h2>
+              </div>
+            </div>
+          </div>
+          <div className="row">
+            <div className="col-lg-12">
+              <div className="insta-container-home7 d-flex">
+                {INSTAGRAM.map((n) => (
+                  <div className="item" key={n}>
+                    <div className="instagram-item mb30 text-center">
+                      <div className="thumb"><img src={`/frontend/images/home1/insta-${n}.jpg`} alt="" /></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
   )
 }
