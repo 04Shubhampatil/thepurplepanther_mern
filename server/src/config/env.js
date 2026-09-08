@@ -78,6 +78,7 @@ const schema = z.object({
   META_CATALOG_DEFAULT_BRAND: optional(''),
 
   STORAGE_ROOT: optional(''),
+  THEME_ROOT: optional(''),
   MEDIA_BASE_URL: optional('http://localhost:5000/storage'),
 
   RATE_LIMIT_WINDOW_MS: int(15 * 60 * 1000),

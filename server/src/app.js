@@ -84,6 +84,13 @@ if (env.STORAGE_ROOT) {
   app.use('/storage', express.static(env.STORAGE_ROOT, { maxAge: '7d', fallthrough: true }))
 }
 
+// The bundled theme (CSS, fonts, images) is served at /frontend, exactly as Laravel served
+// it. Keeping ONE copy at the same path means every relative url() inside the stylesheets
+// resolves unchanged, and the `frontend/...` fallbacks in utils/media.js keep working.
+if (env.THEME_ROOT) {
+  app.use('/frontend', express.static(env.THEME_ROOT, { maxAge: '30d', fallthrough: true }))
+}
+
 // ---------------------------------------------------------------- routes
 app.use('/api/v1', apiV1)
 
