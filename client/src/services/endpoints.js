@@ -60,6 +60,7 @@ export const cart = {
   applyCoupon: (code) => post('/cart/coupon', { code }),
   removeCoupon: () => del('/cart/coupon'),
   publicCoupons: () => get('/cart/coupons'),
+  recommendations: () => get('/cart/recommendations'),
 }
 
 // ── account ────────────────────────────────────────────────────────────────

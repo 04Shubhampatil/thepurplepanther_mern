@@ -26,6 +26,7 @@ router.use(attachUser, attachGuestCart)
 router.get('/', cartController.index)
 
 router.get('/coupons', cartController.publicCoupons)
+router.get('/recommendations', cartController.recommendations)
 router.post('/coupon', validate(applyCouponSchema), cartController.applyCoupon)
 router.delete('/coupon', cartController.removeCoupon)
 

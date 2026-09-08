@@ -269,6 +269,38 @@ export async function searchProducts(query, limit = 8) {
   return { query: term, products, count: products.length, seeAllUrl: `/shop?q=${encodeURIComponent(term)}` }
 }
 
+/**
+ * The "YOU MAY ALSO LIKE" rail on the cart page — FrontendController::cart.
+ *
+ * Four products, never fewer if the catalogue can supply them: new arrivals first, then
+ * the standard order, with anything already in the bag excluded. Laravel ran a second
+ * query to top the list back up to four when the first came up short, and that fallback is
+ * kept — the rail looked broken with two cards in a four-column grid.
+ */
+export async function getCartRecommendations(excludeIds = []) {
+  const exclude = excludeIds.map((id) => BigInt(id))
+  const notInCart = exclude.length ? { id: { notIn: exclude } } : {}
+
+  const primary = await prisma.product.findMany({
+    where: { ...ACTIVE, ...notInCart },
+    include: CARD_INCLUDE,
+    orderBy: [{ isNewArrival: 'desc' }, { sortOrder: 'asc' }, { id: 'desc' }],
+    take: 4,
+  })
+
+  if (primary.length >= 4) return primary.map(presentProductCard)
+
+  const already = [...exclude, ...primary.map((p) => p.id)]
+  const extra = await prisma.product.findMany({
+    where: { ...ACTIVE, ...(already.length ? { id: { notIn: already } } : {}) },
+    include: CARD_INCLUDE,
+    orderBy: { id: 'desc' },
+    take: 4 - primary.length,
+  })
+
+  return [...primary, ...extra].map(presentProductCard)
+}
+
 // ─────────────────────────────────────────────────────── home
 
 /**
@@ -387,5 +419,6 @@ export default {
   getRelatedProducts,
   getProductsByIds,
   searchProducts,
+  getCartRecommendations,
   getHomePage,
 }

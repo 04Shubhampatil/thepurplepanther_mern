@@ -1,5 +1,6 @@
 import * as cart from '../services/cart.service.js'
 import * as promotions from '../services/promotion.service.js'
+import * as catalog from '../services/catalog.service.js'
 import { ok, asyncHandler } from '../utils/api-response.js'
 import { writeGuestCart } from '../middleware/guest-cart.middleware.js'
 import { BusinessError } from '../utils/api-error.js'
@@ -129,4 +130,32 @@ export const publicCoupons = asyncHandler(async (req, res) =>
   ok(res, { coupons: await promotions.listPublicCoupons() }, 'Coupons'),
 )
 
-export default { index, store, update, destroy, buyNow, applyCoupon, removeCoupon, publicCoupons }
+/**
+ * GET /cart/recommendations — the cart page's "YOU MAY ALSO LIKE" rail.
+ *
+ * Its own endpoint rather than a field on the cart summary: the summary is re-read after
+ * every quantity change and by the bag drawer, and four extra products on each of those
+ * would be paid for many times over for a rail that only one page renders.
+ */
+export const recommendations = asyncHandler(async (req, res) => {
+  // The exclusion list comes from the SUMMARY, not from req.guestCart: a signed-in
+  // customer's lines live in the database, and reading the cookie would recommend them
+  // the things already in their bag.
+  const summary = await cart.getSummary(req.user, req.guestCart)
+  const productIds = [...new Set((summary.items ?? []).map((item) => item.productId))]
+
+  const products = await catalog.getCartRecommendations(productIds)
+  return ok(res, { products }, 'Recommendations')
+})
+
+export default {
+  index,
+  store,
+  update,
+  destroy,
+  buyNow,
+  applyCoupon,
+  removeCoupon,
+  publicCoupons,
+  recommendations,
+}
