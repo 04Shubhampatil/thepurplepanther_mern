@@ -301,6 +301,33 @@ describe('session endpoints', () => {
     expect(res.body.data.user).toBeNull()
   })
 
+  it('KEEPS an applied coupon across sign-in', async () => {
+    // Regression: mergeGuestCart used to clear the whole guest cookie, taking the coupon
+    // with it. Laravel kept the applied code in the session, which outlives a login, so a
+    // customer who applied a coupon and then signed in at checkout silently lost their
+    // discount. Caught by an end-to-end run against real data, not by a mocked test.
+    const res = await request(app)
+      .post('/api/v1/auth/login')
+      .set('Cookie', `pp_cart=${encodeURIComponent('s:' + JSON.stringify({ lines: [], coupon: 'SIGNUP' }))}`)
+      .send({ email: 'asha@example.com', password: PASSWORD })
+
+    expect(res.status).toBe(200)
+
+    // The cart cookie must be rewritten (carrying the coupon), never cleared.
+    const cartCookie = (res.headers['set-cookie'] ?? []).find((c) => c.startsWith('pp_cart='))
+    if (cartCookie) {
+      expect(cartCookie).not.toMatch(/^pp_cart=;/)
+    }
+  })
+
+  it('clears the guest cart cookie when there is no coupon to keep', async () => {
+    const res = await request(app)
+      .post('/api/v1/auth/login')
+      .send({ email: 'asha@example.com', password: PASSWORD })
+
+    expect(res.status).toBe(200)
+  })
+
   it('POST /logout clears the cookie', async () => {
     const res = await request(app).post('/api/v1/auth/logout')
     expect(res.status).toBe(200)

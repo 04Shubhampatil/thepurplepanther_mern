@@ -14,8 +14,10 @@
     "prisma:pull": "prisma db pull",
     "prisma:validate": "prisma validate",
     "prisma:studio": "prisma studio",
-    "db:restore": "node ../scripts/database/restore-dev.js",
-    "verify": "node ../scripts/verification/run-all.js",
+    "db:restore": "node scripts/database/restore-dev.js",
+    "verify:schema": "node scripts/verification/verify-schema.js",
+    "verify:data": "node scripts/verification/verify-data.js",
+    "verify": "npm run verify:schema && npm run verify:data",
     "test": "vitest run",
     "test:watch": "vitest"
   },

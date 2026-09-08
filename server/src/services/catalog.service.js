@@ -1,6 +1,7 @@
 import prisma from '../config/database.js'
 import { NotFoundError } from '../utils/api-error.js'
 import { presentProductCard, presentProductDetail } from '../utils/product-presenter.js'
+import { presentBanner } from './cms.service.js'
 
 /**
  * Catalog reads — products, categories and search.
@@ -277,9 +278,14 @@ export async function getHomePage() {
   ])
 
   // Banners are grouped by section; each section renders its first banner.
+  //
+  // presentBanner is REQUIRED here, not cosmetic: without it the raw `banners/x.jpg`
+  // column value reaches the browser and resolves against the site origin instead of the
+  // media base, so the homepage hero renders no image at all. Shared with the /banners
+  // endpoint so the two cannot diverge again.
   const bannerSections = {}
   for (const banner of banners) {
-    if (!bannerSections[banner.section]) bannerSections[banner.section] = banner
+    if (!bannerSections[banner.section]) bannerSections[banner.section] = presentBanner(banner)
   }
 
   const curatedIds = curated.map((row) => row.productId)

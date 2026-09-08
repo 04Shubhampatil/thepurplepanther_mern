@@ -17,14 +17,23 @@ import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
-import 'dotenv/config'
+import { fileURLToPath } from 'node:url'
+
+// Load server/.env explicitly. process.loadEnvFile (Node 20.12+) avoids depending on
+// the working directory, so these run correctly from anywhere.
+const here = path.dirname(fileURLToPath(import.meta.url))
+try {
+  process.loadEnvFile(path.resolve(here, '../../.env'))
+} catch {
+  // Already-set environment variables are used instead.
+}
 
 const PRODUCTION_DB_NAMES = ['u375273201_purple_panthdb']
 const ALLOWED_SUFFIXES = ['_dev', '_test', '_local']
 
 const DUMP_PATH =
   process.env.DUMP_PATH ||
-  path.resolve(process.cwd(), '../../thepurplepanther/u375273201_purple_panthdb 1.sql')
+  path.resolve(here, '../../../../thepurplepanther/u375273201_purple_panthdb 1.sql')
 
 function die(message) {
   console.error(`\n✖ ${message}\n`)

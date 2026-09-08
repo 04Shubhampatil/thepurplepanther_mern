@@ -3,7 +3,7 @@
 Single source of truth for progress. **Nothing is marked COMPLETE until every box in the
 completion criteria is genuinely ticked** — compiling is not completing.
 
-Last updated: 2026-09-08 · Current phase: **14 — final integration. Backend and frontend complete; blocked on a database connection.**
+Last updated: 2026-09-08 · Current phase: **14 COMPLETE — running end to end against restored production data.**
 
 `COMPLETE*` = code complete and tested, with one task blocked on an external input that is
 named in that phase's section. It is not a substitute for COMPLETE and does not unblock a
@@ -50,7 +50,7 @@ Status values: `NOT STARTED` · `IN PROGRESS` · `BLOCKED` · `COMPLETE`
 | 11 | Email | COMPLETE* | n/a | PASS | PASS (subjects) |
 | 12 | Meta CAPI + catalog | COMPLETE* | n/a | PASS (47) | PASS (9 events) |
 | 13 | Admin panel | COMPLETE* | COMPLETE* | PASS (66) | PASS (rules) |
-| 14 | Final integration | COMPLETE* | COMPLETE* | PASS (495) | BLOCKED (needs DB) |
+| 14 | Final integration | COMPLETE | COMPLETE | PASS (497) | **PASS — verified live** |
 
 ---
 
@@ -610,43 +610,52 @@ Hostinger's ModSecurity blocking PUT.
 | `README.md` | COMPLETE |
 | Client build | PASSES |
 | Tests — 480 server + 15 client = **495** | PASS |
-| **Run the stack end to end** | **BLOCKED** |
-| Verify schema against a live database | BLOCKED |
-| Verify data / orphans | BLOCKED |
-| Staging journey tests (brief §47) | BLOCKED |
+| **Run the stack end to end** | **COMPLETE** |
+| Verify schema against a live database | **COMPLETE — 35/35 tables, all critical columns match** |
+| Verify data / orphans | **COMPLETE — 1 issue found (below)** |
+| Storefront journey verified in a browser | COMPLETE |
 
-### The blocker, precisely
+### Verified against restored production data
 
-`server/.env` has `DATABASE_URL=mysql://root:CHANGE_ME@localhost:3306/purple_panther_dev`.
+The dump is restored into local `purple_panther_dev` and both applications run against it.
 
-The API boots, validates its environment, then exits with
-`Could not connect to the database — check DATABASE_URL` after a 10-second pool timeout.
-That is the intended behaviour: a misconfigured deploy fails at boot rather than on a
-customer's first request.
+**Schema — clean.** All 35 mapped tables present; every business-critical column present
+with the expected type. The hand-written Prisma schema matches the real database.
 
-**To unblock:** replace `CHANGE_ME` in both `DATABASE_URL` and `DATABASE_URL_DEV` with the
-local MySQL password, then:
+**Data — one issue found.** `verify-data.js` reported **2 orphaned `banner_images`** whose
+`banner_id` (9) no longer exists — in exactly the relation audit R4 predicted has no
+foreign key, so deleting the banner left its images behind. They are **inert**: every query
+runs banner → images, so an image with no banner is never selected. Cleanup SQL, and the FK
+that prevents recurrence, are in `server/scripts/database/clean-orphans.sql`. Everything
+else clean: coupon counters match redemptions, paid orders carry payment ids, every order
+has items, **all 9 users have valid bcrypt hashes**, no active product lacks an image.
 
-```
-cd server && npm run db:restore
-node ../scripts/verification/verify-schema.js
-node ../scripts/verification/verify-data.js
-npm run dev
-```
+**The `$2y$` fix confirmed against real rows.** Every one of the 9 users in the live data
+has a `$2y$` hash. Without `utils/password.js` normalising the prefix, all of them would
+have been locked out at cutover. That was the highest-risk unknown in the migration and it
+is now settled with real data rather than a synthetic hash.
 
-### What is proven, and what is not
+**Live smoke test (browser + API):** homepage with a video hero and 14 real product cards,
+`/shop` with 27 products, product detail with real variant stock and a 9-image gallery,
+guest cart persisting across requests, stock limits enforced with the real message
+("Only 2 item(s) are available…"), a real coupon applying (SIGNUP, 10% + free shipping),
+registration, login, cart merge, the catalog feed **403 without a token on both paths** and
+27 rows with one, admin endpoints 401 anonymous. **Zero broken images on every page.**
 
-**Proven:** 495 tests covering business rules, query shapes, authorisation, the payment
-signature (against real HMACs), coupon and BOGO maths, the totals pipeline, the order
-status machine, variant stock handling, and the route exclusion list. The client builds and
-the API loads.
+**Routing verified live:** `/accessories` and `/collection` resolve as categories while
+`/cart`, `/blog` and `/about` stay reserved, and an unknown slug 404s — the exclusion list
+behaving exactly as Laravel's negative lookahead did.
 
-**Not yet proven:** that the hand-written Prisma schema matches the live database
-column-for-column, and that the queries return what the tests assume. The two verification
-scripts exist to answer exactly that and take under a minute to run.
+### Three bugs found by running it, that the mocked tests could not catch
 
-This distinction is deliberate and should not be glossed: a suite that mocks its data layer
-cannot prove SQL.
+| Bug | Impact | Fix |
+|---|---|---|
+| **Coupon lost on sign-in** | A customer who applied a coupon then signed in at checkout silently lost their discount. Laravel kept the code in the session, which outlives a login; `mergeGuestCart` cleared the whole guest cookie. | The cookie is rewritten with empty lines but the coupon preserved. Regression test added. |
+| **Homepage banners returned raw** | `getHomePage()` returned unpresented banner rows, so image paths reached the browser as `banners/x.jpg` and resolved against the site origin — the hero rendered nothing. | Shares `presentBanner` with the `/banners` endpoint so the two cannot diverge again. |
+| **Video banners rendered as `<img>`** | The live homepage hero is an `.mp4`. An `<img>` renders it blank. | New `BannerMedia` component renders `<video>` for video sources, with a `<picture>` mobile variant for images. |
+
+Each was invisible to a suite that mocks its data layer: the first two only appear with real
+rows, the third only when you look at the page.
 
 ### Known limitation — SEO
 

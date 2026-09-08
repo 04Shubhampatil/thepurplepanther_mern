@@ -1,7 +1,7 @@
 import * as authService from '../services/auth.service.js'
 import * as cartService from '../services/cart.service.js'
 import { setAuthCookie, clearAuthCookie } from '../utils/auth-token.js'
-import { clearGuestCartCookie } from '../middleware/guest-cart.middleware.js'
+import { clearGuestCartCookie, writeGuestCart } from '../middleware/guest-cart.middleware.js'
 import { ok, asyncHandler } from '../utils/api-response.js'
 import { send } from '../integrations/email/mailer.js'
 import { customerPasswordResetMail } from '../integrations/email/templates/customer-password-reset.js'
@@ -20,11 +20,17 @@ import * as meta from '../integrations/meta/capi.js'
  */
 
 /**
- * Fold any guest cart into the account, then drop the guest cookie.
+ * Fold any guest cart into the account.
  *
  * Laravel called CartService::mergeSessionIntoUser on both login and registration. Without
  * it a customer who fills a cart, then signs in, watches it empty — the single most
  * visible auth regression there is.
+ *
+ * THE COUPON MUST SURVIVE. Laravel kept the applied code in the PHP session, which
+ * outlives a login. Here the guest LINES move into `cart_items`, but the coupon is still
+ * cookie state for signed-in customers too — so the cookie is rewritten with empty lines
+ * rather than cleared. Clearing it drops the discount silently, which is exactly what a
+ * customer applying a coupon and then signing in at checkout would hit.
  *
  * A merge failure must never fail the sign-in, so it is logged and swallowed.
  */
@@ -36,7 +42,13 @@ async function mergeGuestCart(req, res, user) {
   } catch (error) {
     logger.error({ err: error, userId: String(user.id) }, 'Guest cart merge failed')
   }
-  clearGuestCartCookie(res)
+
+  const coupon = req.guestCart?.coupon ?? null
+  if (coupon) {
+    writeGuestCart(res, { lines: [], coupon })
+  } else {
+    clearGuestCartCookie(res)
+  }
 }
 
 export const login = asyncHandler(async (req, res) => {

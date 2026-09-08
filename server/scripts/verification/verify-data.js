@@ -11,7 +11,17 @@
  *
  * Exit code 0 = clean, 1 = inconsistencies found.
  */
-import 'dotenv/config'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+// Load server/.env explicitly. process.loadEnvFile (Node 20.12+) avoids depending on
+// the working directory, so these run correctly from anywhere.
+const here = path.dirname(fileURLToPath(import.meta.url))
+try {
+  process.loadEnvFile(path.resolve(here, '../../.env'))
+} catch {
+  // Already-set environment variables are used instead.
+}
 import { PrismaClient } from '@prisma/client'
 import { PrismaMariaDb } from '@prisma/adapter-mariadb'
 
@@ -56,6 +66,7 @@ const EXPECTED_UPPER_BOUND = {
   subscriber: 5,
   page: 4,
   newsType: 6,
+  blogPost: 0, // no AUTO_INCREMENT recorded in the dump for this table
   shippingSetting: 1,
   passwordResetAttempt: 5,
 }

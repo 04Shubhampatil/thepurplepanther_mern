@@ -35,7 +35,8 @@ export default function Header() {
           </button>
 
           <Link to="/" className="pp-header__logo" aria-label="The Purple Panther — home">
-            <img src="/frontend/images/logo.png" alt="The Purple Panther" height="44" />
+            {/* logo-new.svg is what the Blade header used; logo.png does not exist. */}
+            <img src="/frontend/images/logo-new.svg" alt="The Purple Panther" height="44" />
           </Link>
 
           <nav className={`pp-header__nav ${menuOpen ? 'is-open' : ''}`} aria-label="Main">

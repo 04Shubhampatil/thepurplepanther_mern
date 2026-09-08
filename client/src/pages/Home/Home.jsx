@@ -5,6 +5,7 @@ import ProductGrid from '../../components/product/ProductGrid.jsx'
 import Loading from '../../components/common/Loading.jsx'
 import ErrorMessage from '../../components/common/ErrorMessage.jsx'
 import Seo from '../../components/common/Seo.jsx'
+import BannerMedia from '../../components/common/BannerMedia.jsx'
 
 /**
  * Homepage.
@@ -34,10 +35,12 @@ export default function Home() {
 
       {heroSlide && (
         <section className="pp-hero">
-          <img
+          {/* The live hero is an .mp4, so this must handle video as well as images. */}
+          <BannerMedia
             src={heroSlide.image}
+            mobileSrc={heroSlide.mobileImage}
             alt={heroSlide.title ?? hero.title ?? ''}
-            style={{ width: '100%', display: 'block' }}
+            eager
           />
           <div className="pp-hero__content container">
             {(heroSlide.title || hero.title) && <h1>{heroSlide.title ?? hero.title}</h1>}
@@ -70,10 +73,10 @@ export default function Home() {
 
       {banners.home_our_story?.images?.[0] && (
         <section className="pp-section pp-story">
-          <img
+          <BannerMedia
             src={banners.home_our_story.images[0].image}
+            mobileSrc={banners.home_our_story.images[0].mobileImage}
             alt={banners.home_our_story.title ?? 'Our story'}
-            style={{ width: '100%', display: 'block' }}
           />
           <div className="container">
             <h2>{banners.home_our_story.title}</h2>

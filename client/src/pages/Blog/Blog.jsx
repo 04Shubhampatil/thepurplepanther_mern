@@ -5,6 +5,7 @@ import Pagination from '../../components/common/Pagination.jsx'
 import Loading from '../../components/common/Loading.jsx'
 import ErrorMessage from '../../components/common/ErrorMessage.jsx'
 import Seo from '../../components/common/Seo.jsx'
+import BannerMedia from '../../components/common/BannerMedia.jsx'
 import { formatDate } from '../../utils/format.js'
 
 /**
@@ -46,10 +47,11 @@ export default function Blog() {
       <Seo title="Journal" description="Stories, notes and news from The Purple Panther." />
 
       {journalBanner?.images?.[0] && (
-        <img
+        <BannerMedia
           src={journalBanner.images[0].image}
+          mobileSrc={journalBanner.images[0].mobileImage}
           alt={journalBanner.title ?? ''}
-          style={{ width: '100%', display: 'block' }}
+          eager
         />
       )}
 

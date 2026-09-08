@@ -51,7 +51,7 @@ const presentPostCard = (post) => {
   return card
 }
 
-function presentBanner(banner) {
+export function presentBanner(banner) {
   if (!banner) return null
   return {
     id: banner.id,

@@ -2,7 +2,7 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "client",
+      "name": "storefront",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--prefix", "client"],
       "port": 5173

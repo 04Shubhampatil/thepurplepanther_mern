@@ -12,7 +12,17 @@
  * Usage: cd server && node ../scripts/verification/verify-schema.js
  * Exit 0 = match, 1 = drift.
  */
-import 'dotenv/config'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+// Load server/.env explicitly. process.loadEnvFile (Node 20.12+) avoids depending on
+// the working directory, so these run correctly from anywhere.
+const here = path.dirname(fileURLToPath(import.meta.url))
+try {
+  process.loadEnvFile(path.resolve(here, '../../.env'))
+} catch {
+  // Already-set environment variables are used instead.
+}
 import { PrismaClient } from '@prisma/client'
 import { PrismaMariaDb } from '@prisma/adapter-mariadb'
 
