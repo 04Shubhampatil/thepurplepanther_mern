@@ -159,6 +159,31 @@ export const useRecentStore = create((set, get) => ({
   exclude: (productId) => get().ids.filter((v) => v !== String(productId)),
 }))
 
+// ── header offers ──────────────────────────────────────────────────────────
+
+/**
+ * The coupon ticker across the top of every page.
+ *
+ * Laravel injected these into every view through a `View::composer`, so they were free.
+ * Here they are one request made once at boot and then held, rather than per page —
+ * publicly advertisable coupons change on a human timescale, not a per-navigation one.
+ */
+export const useOffersStore = create((set, get) => ({
+  offers: [],
+  loaded: false,
+
+  async load() {
+    if (get().loaded) return
+    try {
+      const { coupons } = await api.cart.publicCoupons()
+      set({ offers: coupons ?? [], loaded: true })
+    } catch {
+      // The header falls back to "SHOP NEW ARRIVALS", exactly as the @empty branch did.
+      set({ loaded: true })
+    }
+  },
+}))
+
 // ── site config ────────────────────────────────────────────────────────────
 
 export const useConfigStore = create((set, get) => ({

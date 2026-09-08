@@ -1,31 +1,82 @@
 <!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="icon" href="/favicon.ico" />
-    <meta name="theme-color" content="#3a1651" />
+<html dir="ltr" lang="en">
 
-    <title>The Purple Panther</title>
-    <meta name="description" content="The Purple Panther — beyond ordinary." />
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="keywords" content="clean, clothing, e-commerce, ecommerce, fashion, food, furniture, jewelry, modern, multipurpose, sports">
+  <meta name="description" content="The Purple Panther">
+  <meta name="unlockdesign" content="sani-ul-hassan">
 
-    <!--
-      No legacy stylesheets.
+  <!--
+    The Laravel theme's stylesheets, in the SAME order Blade emitted them, served from the
+    SAME /frontend path by the Express app (app.js -> express.static(THEME_ROOT)). One copy,
+    one path, so every relative url() inside the CSS still resolves and the rendered result
+    is byte-for-byte the design that shipped.
+  -->
+  <link rel="stylesheet" href="/frontend/css/bootstrap.min.css">
+  <link rel="stylesheet" href="/frontend/css/style.css">
+  <link rel="stylesheet" href="/frontend/css/custom.css?v=pricing-1">
+  <link rel="stylesheet" href="/frontend/css/site-drawers.css">
+  <link rel="stylesheet" href="/frontend/css/journal.css">
 
-      The Laravel theme loaded Bootstrap, Font Awesome, Flaticon, animate.css, Swiper CSS,
-      Magnific Popup, style.css, custom.css, custome-css.css, site-drawers.css,
-      journal.css and beyond-ordinary.css — roughly 2.3MB of CSS plus 8.7MB of icon fonts.
-      All of it is replaced by Tailwind, lucide-react and Motion. Styles are imported
-      through src/index.css so Vite can process and tree-shake them.
+  <title>The Purple Panther</title>
 
-      The theme's IMAGE assets are still served from the API at /frontend, because those
-      are real product and editorial photography, not styling.
-    -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+  <link href="/frontend/images/icon.svg" sizes="128x128" rel="shortcut icon" type="image/x-icon" />
+  <link href="/frontend/images/icon.svg" sizes="128x128" rel="shortcut icon" />
+  <link href="/frontend/images/icon.svg" sizes="60x60" rel="apple-touch-icon">
+  <link href="/frontend/images/icon.svg" sizes="72x72" rel="apple-touch-icon">
+  <link href="/frontend/images/icon.svg" sizes="114x114" rel="apple-touch-icon">
+  <link href="/frontend/images/icon.svg" sizes="180x180" rel="apple-touch-icon">
+
+  <!-- Meta Pixel Code -->
+  <script>
+    !function(f,b,e,v,n,t,s)
+    {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+    n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+    if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+    n.queue=[];t=b.createElement(e);t.async=!0;
+    t.src=v;s=b.getElementsByTagName(e)[0];
+    s.parentNode.insertBefore(t,s)}(window, document,'script',
+    'https://connect.facebook.net/en_US/fbevents.js');
+    fbq('init', '3592270860927181');
+    fbq('track', 'PageView');
+  </script>
+  <!-- End Meta Pixel Code -->
+
+  <!--
+    The vendor libraries the theme is built on, loaded HERE rather than before </body> so
+    that window.jQuery, window.Swiper and the plugins all exist before React's first render
+    commits. src/theme/ then runs the theme's own script.js once the markup is in the DOM.
+  -->
+  <script src="/frontend/js/jquery.js"></script>
+  <script src="/frontend/js/popper.min.js"></script>
+  <script src="/frontend/js/bootstrap.min.js"></script>
+  <script src="/frontend/js/bootstrap-select.min.js"></script>
+  <script src="/frontend/js/mmenu.js"></script>
+  <script src="/frontend/js/lazysize.min.js"></script>
+  <script src="/frontend/js/jquery.magnific-popup.min.js"></script>
+  <script src="/frontend/js/jquery.odometer.min.js"></script>
+  <script src="/frontend/js/jquery.appear.js"></script>
+  <script src="/frontend/js/swiper-bundle.min.js"></script>
+  <script src="/frontend/js/jquery.countdown.js"></script>
+  <script src="/frontend/js/jarallax.js"></script>
+  <script src="/frontend/js/wow.min.js"></script>
+</head>
+
+<body class="home21-type">
+  <!--
+    The pixel's <noscript> fallback sits in the body rather than the head, where Blade had
+    it: HTML forbids content inside a <noscript> in the head, and the build's HTML parser
+    rejects the document over it. Same request, same id, same effect.
+  -->
+  <noscript><img height="1" width="1" style="display:none"
+    src="https://www.facebook.com/tr?id=3592270860927181&ev=PageView&noscript=1"
+  /></noscript>
+
+  <div id="root"></div>
+  <script type="module" src="/src/main.jsx"></script>
+</body>
+
 </html>

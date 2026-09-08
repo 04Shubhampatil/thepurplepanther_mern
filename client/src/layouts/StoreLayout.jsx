@@ -1,28 +1,59 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
-import Header from '../components/layout/Header.jsx'
-import Footer from '../components/layout/Footer.jsx'
-import CartDrawer from '../components/cart/CartDrawer.jsx'
-import { useConfigStore, useCartStore } from '../store/index.js'
+import SiteHeader from '../components/layout/SiteHeader.jsx'
+import SiteFooter from '../components/layout/SiteFooter.jsx'
+import MinicartDrawer from '../components/cart/MinicartDrawer.jsx'
+import { bootTheme, initPagePlugins, applyDataBackgrounds } from '../theme/runtime.js'
+import { syncSiteConfig } from '../theme/site.js'
+import { useConfigStore, useCartStore, useAuthStore, useOffersStore } from '../store/index.js'
 
 /**
- * Storefront shell.
+ * Storefront shell — the Blade layout every frontend page shared.
  *
- * Config, categories and the cart load once here rather than per page, so navigating does
- * not re-fetch the header's data.
+ * The DOM here reproduces what Blade emitted around `@yield`: `.wrapper.ovh` holding the
+ * preloader, the header, the sign-in side panel, then `.body_content_wrapper` with the
+ * page, the footer and the scroll-to-top link. The theme's CSS and script.js both select
+ * on that structure, so it is layout, not decoration.
  *
- * The header is transparent only over the homepage hero, where it sits on top of the
- * video; everywhere else it is solid from the start.
+ * BOOT ORDER IS LOAD-BEARING. script.js runs once, and when it runs it takes over `#menu`
+ * and reads window.PP_SITE for the logo and account link it builds into the mmenu navbar.
+ * So: categories and session first, then PP_SITE, then the theme. Booting earlier gives a
+ * mobile menu with a missing accessories link and a permanent "Account" label for someone
+ * who is signed in — and mmenu refuses to re-initialise, so it never corrects itself.
  */
 export default function StoreLayout() {
   const loadConfig = useConfigStore((s) => s.load)
+  const loadOffers = useOffersStore((s) => s.load)
+  const categoriesLoaded = useConfigStore((s) => s.loaded)
+  const categories = useConfigStore((s) => s.categories)
   const refreshCart = useCartStore((s) => s.refresh)
+  const user = useAuthStore((s) => s.user)
+  const authLoading = useAuthStore((s) => s.loading)
   const { pathname } = useLocation()
+
+  const [themeReady, setThemeReady] = useState(false)
 
   useEffect(() => {
     loadConfig()
+    loadOffers()
     refreshCart()
-  }, [loadConfig, refreshCart])
+  }, [loadConfig, loadOffers, refreshCart])
+
+  useEffect(() => {
+    syncSiteConfig({ user, categories })
+  }, [user, categories])
+
+  useEffect(() => {
+    if (!categoriesLoaded || authLoading) return
+    bootTheme().then(() => setThemeReady(true))
+  }, [categoriesLoaded, authLoading])
+
+  // Per-route work script.js only ever did once per document.
+  useEffect(() => {
+    if (!themeReady) return
+    applyDataBackgrounds()
+    initPagePlugins()
+  }, [themeReady, pathname])
 
   // A full page load always started at the top; client-side navigation must match.
   useEffect(() => {
@@ -30,22 +61,19 @@ export default function StoreLayout() {
   }, [pathname])
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <a
-        href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[200] focus:bg-brand focus:px-4 focus:py-2 focus:text-white"
-      >
-        Skip to content
-      </a>
+    <div className="wrapper ovh">
+      <div className="preloader"></div>
 
-      <Header transparent={pathname === '/'} />
+      <SiteHeader />
 
-      <main id="main-content" className="flex-1">
+      <div className="body_content_wrapper position-relative">
         <Outlet />
-      </main>
 
-      <Footer />
-      <CartDrawer />
+        <SiteFooter />
+        <a className="scrollToHome" href="#"><i className="fas fa-angle-up"></i></a>
+      </div>
+
+      <MinicartDrawer />
     </div>
   )
 }

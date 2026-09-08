@@ -2,6 +2,7 @@ import prisma from '../config/database.js'
 import { NotFoundError } from '../utils/api-error.js'
 import { presentProductCard, presentProductDetail } from '../utils/product-presenter.js'
 import { presentBanner } from './cms.service.js'
+import { mediaUrl } from '../utils/media.js'
 
 /**
  * Catalog reads — products, categories and search.
@@ -103,7 +104,7 @@ export async function listProducts({ categorySlug = null, search = '', page = 1,
 
 /** All active categories, ordered as the storefront nav expects. */
 export async function listCategories() {
-  return prisma.category.findMany({
+  const rows = await prisma.category.findMany({
     where: ACTIVE,
     orderBy: [{ sortOrder: 'asc' }, { title: 'asc' }],
     select: {
@@ -117,6 +118,17 @@ export async function listCategories() {
       showOnHome: true,
     },
   })
+
+  // `url` and `imageUrl` are Category::frontendUrl() and getImageUrlAttribute(), resolved
+  // here rather than in the client. The clean category URL has one special case — the
+  // `collection` slug is its own route, not /collection-as-a-category — and the image
+  // falls back to the theme's placeholder. Both are behaviour, so they belong on the
+  // server where the original put them.
+  return rows.map((category) => ({
+    ...category,
+    url: category.slug === 'collection' ? '/collection' : `/${category.slug}`,
+    imageUrl: mediaUrl(category.image, 'frontend/images/img.jpg'),
+  }))
 }
 
 export async function listSubCategories(categoryId = null) {

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useNavigate } from 'react-router-dom'
 import * as api from '../../services/endpoints.js'
@@ -15,6 +15,11 @@ import { Field, Input } from '../../components/ui/Field.jsx'
  * Admin\AuthController::login — existing admins may be using either.
  */
 export default function AdminLogin() {
+  // Same reason as AdminLayout: the panel's stylesheet is admin-only, loaded on demand.
+  useEffect(() => {
+    import('../../admin.css')
+  }, [])
+
   const setUser = useAuthStore((s) => s.setUser)
   const navigate = useNavigate()
   const [failure, setFailure] = useState(null)

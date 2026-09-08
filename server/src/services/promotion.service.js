@@ -239,6 +239,58 @@ export async function recordRedemption(order, userId = null, tx = prisma) {
   })
 }
 
+/**
+ * Coupon::getBannerTextAttribute — the one line the header ticker shows.
+ *
+ * A ported accessor, not a new format: the fallback chain (rich-text description first,
+ * then BOGO, free shipping, flat amount, percent, and finally "SPECIAL OFFER") and the
+ * trailing-zero trimming are the original's, because these strings are what customers read
+ * at the top of every page.
+ */
+function trimAmount(value) {
+  return Number(value)
+    .toFixed(2)
+    .replace(/0+$/, '')
+    .replace(/\.$/, '')
+}
+
+export function bannerText(coupon) {
+  // strip_tags + html_entity_decode + collapse whitespace
+  const described = String(coupon.description ?? '')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#0?39;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\s+/gu, ' ')
+    .trim()
+  if (described !== '') return described
+
+  const code = String(coupon.code ?? '').toUpperCase()
+
+  if (coupon.offerType === 'bogo') {
+    const buy = Number(coupon.bogoBuyQuantity) || 1
+    const get = Number(coupon.bogoGetQuantity) || 1
+    return `${code} | BUY ${buy} GET ${get} FREE`
+  }
+
+  if (coupon.freeShipping && !coupon.discountPercent && !coupon.discountAmount) {
+    return `${code} | FREE SHIPPING`
+  }
+
+  if (coupon.discountType === 'amount' && coupon.discountAmount !== null && coupon.discountAmount !== undefined) {
+    return `${code} | FLAT ₹${trimAmount(coupon.discountAmount)} OFF`
+  }
+
+  if (coupon.discountPercent !== null && coupon.discountPercent !== undefined) {
+    return `${code} | ${trimAmount(coupon.discountPercent)}% OFF`
+  }
+
+  return `${code} | SPECIAL OFFER`
+}
+
 /** Publicly listable coupons — `is_public` gates what the storefront may advertise. */
 export async function listPublicCoupons() {
   const now = new Date()
@@ -258,6 +310,7 @@ export async function listPublicCoupons() {
     id: coupon.id,
     code: coupon.code,
     description: coupon.description,
+    bannerText: bannerText(coupon),
     label: discountLabel(coupon),
     freeShipping: Boolean(coupon.freeShipping),
     minCartAmount: coupon.minCartStatus ? toNumber(coupon.minCartAmount) : null,
@@ -266,6 +319,7 @@ export async function listPublicCoupons() {
 }
 
 export default {
+  bannerText,
   applyCode,
   quote,
   quoteCoupon,

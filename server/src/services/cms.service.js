@@ -51,6 +51,20 @@ const presentPostCard = (post) => {
   return card
 }
 
+const VIDEO_MIME = {
+  mp4: 'video/mp4',
+  webm: 'video/webm',
+  ogg: 'video/ogg',
+  ogv: 'video/ogg',
+  mov: 'video/quicktime',
+}
+
+const extensionOf = (path) => String(path ?? '').split('.').pop().toLowerCase()
+
+const isVideoFile = (path) => Object.hasOwn(VIDEO_MIME, extensionOf(path))
+
+const videoMimeType = (path) => VIDEO_MIME[extensionOf(path)] ?? 'video/mp4'
+
 export function presentBanner(banner) {
   if (!banner) return null
   return {
@@ -71,6 +85,11 @@ export function presentBanner(banner) {
       subtitle: image.subtitle,
       buttonText: image.buttonText,
       buttonLink: image.buttonLink,
+      // BannerImage::getIsVideoAttribute / getVideoMimeTypeAttribute. The homepage hero
+      // renders a <video> or a background image depending on this, so it has to be
+      // decided from the stored filename here rather than guessed in the browser.
+      isVideo: isVideoFile(image.image),
+      videoMimeType: videoMimeType(image.image),
     })),
   }
 }

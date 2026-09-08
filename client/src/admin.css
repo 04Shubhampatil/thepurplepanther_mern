@@ -1,10 +1,24 @@
 /*
+ * Admin panel styles. Loaded on demand by AdminLayout, never by the storefront.
+ */
+/*
  * Webfonts first: CSS requires @import to precede every rule except @charset/@layer.
  * DM Sans and Plus Jakarta Sans are the families the live site uses.
  */
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
 
-@import 'tailwindcss';
+/*
+ * Utilities and theme ONLY — deliberately not `@import 'tailwindcss'`, which also pulls in
+ * Preflight.
+ *
+ * The storefront is the Laravel theme, rendered against bootstrap.min.css and style.css
+ * loaded in index.html. Preflight is a global reset: it would strip the theme's heading
+ * sizes, list bullets and button borders the moment this file entered the document, and
+ * this file enters the document as soon as anyone opens the admin panel. Utilities alone
+ * add classes and reset nothing, so the two stylesheets can coexist in one SPA.
+ */
+@import 'tailwindcss/theme.css';
+@import 'tailwindcss/utilities.css';
 
 /*
  * Design tokens, measured from the live site (https://thepurplepanther.in) rather than

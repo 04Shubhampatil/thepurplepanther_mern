@@ -1,85 +1,369 @@
+import { useEffect } from 'react'
+import { Link } from 'react-router-dom'
+import PpPrice from '../../components/product/PpPrice.jsx'
+import ProductSliderCard from '../../components/product/ProductSliderCard.jsx'
+import HomeNewArrivals from '../../components/home/HomeNewArrivals.jsx'
+import ShopTheLook from '../../components/home/ShopTheLook.jsx'
+import Loading from '../../components/common/Loading.jsx'
 import { useApi } from '../../hooks/useApi.js'
+import { useSliders } from '../../theme/sliders.js'
+import { applyDataBackgrounds } from '../../theme/runtime.js'
+import { variantLabel } from '../../utils/variant-label.js'
 import * as api from '../../services/endpoints.js'
-import { useConfigStore } from '../../store/index.js'
-import Seo from '../../components/common/Seo.jsx'
-import ErrorMessage from '../../components/common/ErrorMessage.jsx'
-import { ProductGridSkeleton } from '../../components/ui/Skeleton.jsx'
-import Container from '../../components/ui/Container.jsx'
-import HeroSection from '../../components/home/HeroSection.jsx'
-import CollectionSection from '../../components/home/CollectionSection.jsx'
-import ProductCarousel from '../../components/home/ProductCarousel.jsx'
-import EditorialSection from '../../components/home/EditorialSection.jsx'
-import FabricLibrary from '../../components/home/FabricLibrary.jsx'
-import JournalSection from '../../components/home/JournalSection.jsx'
 
 /**
- * Homepage.
+ * frontend/pages/home.blade.php.
  *
- * Section order matches the live site exactly:
- *   hero → complete collection → shop the look → our story → popular accessories
- *        → fabric library → journal
+ * Section for section and class for class: hero, the curated collection tiles, the
+ * shoppable look, new arrivals beside the editorial image, Our Story, the two accessory
+ * carousels, the fabric library and the closing panel. The journal block stays commented
+ * out because it is commented out in the Blade file — uncommenting it here would put a
+ * section on the live homepage that is not on the live homepage.
  *
- * One request. The server applies every fallback chain (curated → featured → any), so no
- * section can render empty and the client does not need to know the rules.
+ * Every banner section falls back to the theme's own copy and imagery when the CMS has no
+ * row for it, which is what kept the homepage from ever rendering an empty slot.
  */
 export default function Home() {
-  const { data, error, loading, refetch } = useApi(() => api.catalog.home(), [])
-  const categories = useConfigStore((s) => s.categories)
+  const { data, loading } = useApi(() => api.catalog.home(), [])
 
-  if (error) {
-    return (
-      <Container className="py-24">
-        <ErrorMessage error={error} onRetry={refetch} />
-      </Container>
-    )
-  }
+  const banners = data?.banners ?? {}
+  const homeHero = banners.home_hero
+  const homeCollection = banners.home_complete_collection
+  const homeShopLook = banners.home_shoppable_look
+  const homeNewArrivalsBanner = banners.home_new_arrivals_banner
+  const homeOurStory = banners.home_our_story
+  const homeFabricLibrary = banners.home_fabric_library
+  const homeClosingContent = banners.home_closing_content
 
-  if (loading) {
-    return (
-      <>
-        <div className="h-[78vh] min-h-[480px] animate-pulse bg-sand md:h-[92vh]" aria-hidden="true" />
-        <Container className="pt-14 md:pt-[90px]">
-          <ProductGridSkeleton count={4} />
-        </Container>
-      </>
-    )
-  }
+  const heroImages = homeHero?.images ?? []
+  const shopTheLook = data?.shopTheLook ?? []
+  const newArrivals = data?.newArrivals ?? []
+  const popularAccessories = data?.popularAccessories ?? []
 
-  const {
-    banners = {},
-    shopTheLook = [],
-    newArrivals = [],
-    popularAccessories = [],
-    journalPosts = [],
-  } = data ?? {}
+  // Sliders are built only once the sections they measure actually hold slides.
+  useSliders(['su-banner-5-zoom'], !loading)
+  useSliders(['su-banner-16-zoom', 'product-12-slider'], newArrivals.length > 0)
+  useSliders(['home-accessories-slider'], popularAccessories.length > 0)
+  useSliders(['home-fabric-slider'], !loading)
+
+  // The hero's `data-background` divs are the theme's lazy-background convention; script.js
+  // resolved them on load, before this page's data existed.
+  useEffect(() => {
+    if (!loading) applyDataBackgrounds()
+  }, [loading])
+
+  if (loading) return <Loading full />
 
   return (
     <>
-      <Seo description="Quiet authority for women who move seamlessly from boardroom to dinner." />
 
-      <HeroSection banner={banners.home_hero} />
+      {/* banner-area-start */}
+      <section className="home21-banner">
+        <div className="container-fluid p-0">
+          <div className="swiper-container su-banner-5-zoom">
+            <div className="swiper-wrapper">
+              {heroImages.length > 0 ? heroImages.map((image) => (
+                <div className="swiper-slide" key={image.id}>
+                  <div className="home21-banner-item">
+                    {image.isVideo ? (
+                      <video className="bg home21-banner-video" autoPlay muted playsInline preload="metadata" data-swiper-parallax="1000">
+                        <source src={image.image} type={image.videoMimeType} />
+                      </video>
+                    ) : (
+                      <>
+                      <div className="bg bg-position banner-desktop" data-background={image.image || '/frontend/images/banner-1.jpg'} data-swiper-parallax="1000"></div>
+                      <div className="bg bg-position banner-mobile" data-background={image.mobileImage || image.image || '/frontend/images/mobile-banner-1.jpg'} data-swiper-parallax="1000"></div>
+                      </>
+                    )}
+                    <span className="overly position-absolute"></span>
+                    <div className="container"><div className="row"><div className="col-lg-12"><div className="banner-content">
+                      <h3 className="title mb10">{image.title || homeHero?.title}</h3>
+                      {(image.subtitle || homeHero?.subtitle) && <div className="sub-title mb10">{image.subtitle || homeHero?.subtitle}</div>}
+                      <div className="d-sm-flex align-items-center">
+                        {(image.buttonText || homeHero?.buttonText) && (
+                          <Link className="su-btn-4 rounded-3 su-left-right mb-3 mb-sm-0 mr10" to={image.buttonLink || homeHero?.buttonLink || '/shop'}><span className="mr10 su-text d-inline-block">{image.buttonText || homeHero?.buttonText}</span></Link>
+                        )}
+                      </div>
+                    </div></div></div></div>
+                  </div>
+                </div>
+              )) : (
+                <div className="swiper-slide"><div className="home21-banner-item"><div className="bg bg-position banner-desktop" data-background="/frontend/images/banner-1.jpg"></div></div></div>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+      {/* banner-area-end */}
 
-      <CollectionSection banner={banners.home_complete_collection} categories={categories} />
+      {/* Admin-managed collection tiles */}
+      {(homeCollection?.images?.length ?? 0) > 0 && (
+      <section className="curated-area pt90 pb-0">
+        <div className="container container-1630">
+          <div className="su-section-16-title-top mx-auto text-center">
+            <div className="section-title">
+              <div className="text text-uppercase"><img src="/frontend/images/icon.svg" /></div>
+              <h2 className="title">{homeCollection.title}</h2>
+            </div>
+          </div>
+          <div className="row align-items-center mb-5">
+            {homeCollection.images.map((tile) => (
+            <div className="col-xl-4 col-sm-6" key={tile.id}>
+              <div className="for-blog position-relative">
+                <div className="thumb rounded-3 overflow-hidden mb20 position-relative">
+                  <Link className="su-btn-4-black su-left-right fw400 fz15" to={tile.buttonLink || '/shop'}>
+                    <img src={tile.image} alt={tile.title} className="img-fluid w-100" /></Link>
+                </div>
+                <div className="details text-center">
+                  <h4 className="title fw400 fz20 pe-0 mb-2"><Link to={tile.buttonLink || '/shop'}>{tile.title}</Link></h4>
+                  {tile.subtitle && <h6>{tile.subtitle}</h6>}
+                  <Link className="su-btn-4-black su-left-right fw400 fz15" to={tile.buttonLink || '/shop'}><span className="su-text d-inline-block text-decoration-underline">{tile.buttonText || 'Shop Collection'}</span></Link>
+                </div>
+              </div>
+            </div>
+            ))}
+          </div>
+        </div>
+      </section>
+      )}
 
-      <ProductCarousel
-        title={banners.home_shoppable_look?.title ?? 'Shop the look'}
-        products={shopTheLook}
-        to="/shop"
-      />
+      {/* Shop-Look-area-start */}
+      <section
+        className="shoplook-home43"
+        style={homeShopLook?.images?.[0] ? { backgroundImage: `url('${homeShopLook.images[0].image}')` } : undefined}
+      >
+        <div className="container container-1630">
+          <div className="row">
+            <div className="col-lg-12">
 
-      <ProductCarousel
-        title={banners.home_new_arrivals_banner?.title ?? 'New arrivals'}
-        products={newArrivals}
-        to="/shop"
-      />
+              <ShopTheLook products={shopTheLook} />
 
-      <EditorialSection banner={banners.home_our_story} />
+              <Link to={homeShopLook?.buttonLink || '/collection'} className="shop-look-btn">
+                <i className="flaticon-shopping-bag"></i>
+                <span>{homeShopLook?.buttonText || 'Shop The Look'}</span>
+              </Link>
 
-      <ProductCarousel title="Popular accessories" products={popularAccessories} to="/accessories" />
+            </div>
+          </div>
+        </div>
+      </section>
+      {/* Shop-Look-area-end */}
 
-      <FabricLibrary banner={banners.home_fabric_library} />
+      {/* single-product-area-start */}
+      <section className="home43-shop-look">
+        <div className="container-fluid p-0">
+          <div className="row">
+            <div className="col-lg-6 position-relative">
+              <div className="image-box">
+                <img src={homeNewArrivalsBanner?.images?.[0]?.image ?? '/frontend/images/big-images.jpg'} alt={homeNewArrivalsBanner?.title || 'New arrivals'} className="w-100" />
+              </div>
+            </div>
+            <div className="col-lg-6 align-self-center home43-slider home43-shop-look-slider">
+              <div className="swiper-container su-banner-16-zoom overflow-hidden">
+                <HomeNewArrivals products={newArrivals} />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      {/* single-product-area-end */}
+      {/* collections-area-start */}
+      <section className="home43-banner2 su-product-step pt90">
+        <div className="container container-1630">
+          <div className="row g-4">
+            <div className="col-lg-6 align-self-center">
+              <div className="content-box-home43 text-center">
+                <div className="text-dark1 text-uppercase mb25 wow fadeInUp" data-wow-delay="00ms" data-wow-duration="1500ms"><img src="/frontend/images/icon.svg" /><br /> {homeOurStory?.subtitle || 'Our Story'}</div>
+                <h2 className="title mb25 wow fadeInUp" data-wow-delay="100ms" data-wow-duration="1500ms">{homeOurStory?.title || 'Inspiring women to cherish themselves and our planet'}</h2>
+                <div className="max-text mx-auto mb-40 wow fadeInUp" data-wow-delay="200ms" data-wow-duration="1500ms">{homeOurStory?.description || 'Built on a foundation of environmental consciousness and driven by a sense of self-empowerment, we create timeless products that pay homage to the beauty of femininity.'}</div>
+                <div className="mt30">
+                  <Link className="su-btn-4 su-btn-7-black su-left-right rounded-3" to={homeOurStory?.buttonLink || '/about'}>
+                    <span className="mr10 su-text d-inline-block">{homeOurStory?.buttonText || 'Discover More'}</span>
+                    <span className="su-arrow-angle">
+                      <svg className="su-arrow-svg-top-right" xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 10.00 10.00">
+                        <path d="M1.018 10.009 0 8.991l7.569-7.582H1.723L1.737 0h8.26v8.274H8.574l.013-5.847Z"></path>
+                        <path d="M1.018 10.009 0 8.991l7.569-7.582H1.723L1.737 0h8.26v8.274H8.574l.013-5.847Z"></path>
+                      </svg>
+                    </span>
+                  </Link>
+                </div>
+              </div>
+            </div>
+            <div className="col-lg-6 align-self-center">
+              <div className="img-box-home43">
+                <img src={homeOurStory?.images?.[0]?.image ?? '/frontend/images/our-story.jpg'} alt={homeOurStory?.title || 'Our Story'} />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      {/* collections-area-end */}
 
-      <JournalSection posts={journalPosts} />
+
+      {/* products-area-start */}
+      {newArrivals.length > 0 && (
+      <section className="su-product-15-area pb-0 gap-60 legacy-home-accessories">
+        <div className="container container-1830">
+          <div className="row mb40">
+            <div className="col-ms-8 col-sm-9 align-self-center">
+              <div className="section-title mb-0 style12 text-start">
+                <h2 className="title">Popular accessories</h2>
+              </div>
+            </div>
+            <div className="col-ms-4 col-sm-3 align-self-center">
+              <div className="navigation-12 d-flex justify-content-start justify-content-sm-end mt-3 mt-sm-0">
+                <span className="prev">
+                  <svg width="8" height="14" viewBox="0 0 8 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path fillRule="evenodd" clipRule="evenodd" d="M7.31939 1.01386C7.05091 0.745379 6.61564 0.745379 6.34715 1.01386L0.847146 6.51389C0.578654 6.78238 0.578654 7.21761 0.847146 7.48611L6.34715 12.9861C6.61564 13.2546 7.05091 13.2546 7.31939 12.9861C7.58787 12.7176 7.58787 12.2824 7.31939 12.0139L2.30556 7L7.31939 1.98613C7.58787 1.71765 7.58787 1.28234 7.31939 1.01386Z" fill="currentColor" />
+                  </svg>
+                </span>
+                <span className="next">
+                  <svg width="8" height="14" viewBox="0 0 8 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path fillRule="evenodd" clipRule="evenodd" d="M0.680488 1.01386C0.94897 0.745379 1.38424 0.745379 1.65273 1.01386L7.15273 6.51389C7.42122 6.78238 7.42122 7.21761 7.15273 7.48611L1.65273 12.9861C1.38424 13.2546 0.94897 13.2546 0.680488 12.9861C0.412005 12.7176 0.412005 12.2824 0.680488 12.0139L5.69431 7L0.680488 1.98613C0.412005 1.71765 0.412005 1.28234 0.680488 1.01386Z" fill="currentColor" />
+                  </svg>
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className="swiper-container product-12-slider">
+            <div className="swiper-wrapper">
+              {newArrivals.map((item) => <ProductSliderCard key={item.id} item={item} />)}
+            </div>
+          </div>
+        </div>
+      </section>
+      )}
+      {/* products-area-end */}
+
+      {popularAccessories.length > 0 && (
+      <section className="home-accessories" aria-labelledby="home-accessories-title">
+      <div className="home-editorial-container">
+        <div className="home-slider-head">
+          <h2 id="home-accessories-title">Popular Accessories</h2>
+          <div className="home-slider-arrows">
+            <button className="home-accessories-prev" type="button" aria-label="Previous accessories">‹</button>
+            <button className="home-accessories-next" type="button" aria-label="Next accessories">›</button>
+          </div>
+        </div>
+        <div className="swiper-container home-accessories-slider">
+          <div className="swiper-wrapper">
+            {popularAccessories.map((item) => (
+              <article className="swiper-slide home-accessory-card" key={item.id}>
+                <Link className="home-accessory-card__image" to={item.url}>
+                  <img src={item.image} alt={item.title} loading="lazy" />
+                </Link>
+                <button className="home-accessory-card__wish" type="button" data-wishlist-product={item.id} aria-label={`Add ${item.title} to wishlist`}>♡</button>
+                <h3><Link to={item.url}>{item.title}</Link></h3>
+                <p><PpPrice product={item} /></p>
+                {variantLabel(item) && <span>{variantLabel(item)}</span>}
+              </article>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+      )}
+
+      <section className="home-fabric-library" aria-labelledby="home-fabric-title">
+        <div className="home-editorial-container">
+          <div className="home-slider-head">
+            <h2 id="home-fabric-title">{homeFabricLibrary?.title || 'Fabric Library'}</h2>
+            <div className="home-slider-arrows">
+              <button className="home-fabric-prev" type="button" aria-label="Previous fabric">‹</button>
+              <button className="home-fabric-next" type="button" aria-label="Next fabric">›</button>
+            </div>
+          </div>
+          <div className="swiper-container home-fabric-slider">
+            <div className="swiper-wrapper">
+              {(homeFabricLibrary?.images?.length ?? 0) > 0 ? (
+                homeFabricLibrary.images.map((fabric) => (
+                  <article className="swiper-slide home-fabric-card" tabIndex="0" key={fabric.id}>
+                    <img src={fabric.image} alt={fabric.title} />
+                    <div className="home-fabric-card__overlay"></div>
+                    <div className="home-fabric-card__content">
+                      <h3>{fabric.title}</h3>
+                      {fabric.subtitle && <p>{fabric.subtitle}</p>}
+                    </div>
+                  </article>
+                ))
+              ) : (
+              <>
+              <article className="swiper-slide home-fabric-card" tabIndex="0">
+                <img src="/frontend/images/fabric-1.jpg" alt="" />
+                <div className="home-fabric-card__overlay"></div>
+                <div className="home-fabric-card__content">
+                  <h3>Tencel Cotton Blend</h3>
+                  <p>A modern blend that brings together the natural breathability of cotton and the silky softness of Tencel™. Lightweight, smooth, and exceptionally comfortable, this fabric is designed to move effortlessly through the day. Its fluid drape and moisture-managing properties help keep you feeling fresh, while the cotton base provides the familiarity and ease of a wardrobe staple. The result is a fabric that looks polished, feels luxurious, and performs beautifully from morning to night.</p>
+                </div>
+              </article>
+              <article className="swiper-slide home-fabric-card" tabIndex="0">
+                <img src="/frontend/images/fabric-2.jpg" alt="" />
+                <div className="home-fabric-card__overlay"></div>
+                <div className="home-fabric-card__content">
+                  <h3>Modal Linen</h3>
+                  <p>Our Modal Linen blend reimagines traditional linen for contemporary living. By combining linen's natural breathability with the softness and fluidity of modal, we've created a fabric that retains linen's relaxed character while offering a smoother hand feel and enhanced comfort. Light, airy, and effortlessly elegant, it delivers the sophistication of linen without the stiffness often associated with it, making it ideal for long days, warm weather, and everyday wear.</p>
+                </div>
+              </article>
+              <article className="swiper-slide home-fabric-card" tabIndex="0">
+                <img src="/frontend/images/fabric-3.jpg" alt="" />
+                <div className="home-fabric-card__overlay"></div>
+                <div className="home-fabric-card__content">
+                  <h3>Giza Cotton</h3>
+                  <p>Widely regarded as one of the world's finest cottons, Giza Cotton is prized for its exceptionally long fibers, which create fabrics that are remarkably soft, strong, and refined. The result is a fabric with a smooth finish, superior durability, and a luxurious feel against the skin. Naturally breathable and crafted to maintain its quality over time, Giza Cotton elevates everyday dressing with a level of comfort and sophistication that sets it apart from ordinary cotton.</p>
+                </div>
+              </article>
+              </>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {(homeClosingContent?.images?.length ?? 0) > 0 && (
+      <section className="home43-banner2 su-product-step pt90 pb90">
+        <div className="container container-1630">
+          <div className="row g-4">
+            <div className="col-lg-6 align-self-center">
+              <div className="content-box-home43 text-center">
+                {homeClosingContent.subtitle && <div className="text-dark1 text-uppercase mb25">{homeClosingContent.subtitle}</div>}
+                <h2 className="title mb25">{homeClosingContent.title}</h2>
+                {homeClosingContent.description && <div className="max-text mx-auto mb-40">{homeClosingContent.description}</div>}
+                {homeClosingContent.buttonText && (
+                  <Link className="su-btn-4 su-btn-7-black su-left-right rounded-3" to={homeClosingContent.buttonLink || '/shop'}>
+                    <span className="mr10 su-text d-inline-block">{homeClosingContent.buttonText}</span>
+                  </Link>
+                )}
+              </div>
+            </div>
+            <div className="col-lg-6 align-self-center">
+              <div className="img-box-home43">
+                <img src={homeClosingContent.images[0].image} alt={homeClosingContent.title} />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      )}
+
+      {/* blog-area-start */}
+      {/* <section className="home-journal" aria-labelledby="home-journal-title">
+      <div className="home-journal__container">
+        <div className="home-journal__head">
+          <h2 id="home-journal-title">From the Journal</h2>
+          <Link className="home-journal__view-all" to="/blog">View All</Link>
+          <div className="home-slider-arrows">
+            <button className="home-journal-prev" type="button" aria-label="Previous journal posts">‹</button>
+            <button className="home-journal-next" type="button" aria-label="Next journal posts">›</button>
+          </div>
+        </div>
+        <div className="swiper-container home-journal-slider">
+          <div className="swiper-wrapper">
+            @include('frontend.partials.home-journal')
+          </div>
+        </div>
+      </div>
+    </section> */}
+      {/* blog-area-end */}
     </>
   )
 }

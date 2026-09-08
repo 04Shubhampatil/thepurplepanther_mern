@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard,
@@ -53,6 +53,13 @@ const NAV = [
  * from a phone (the Blade version was desktop-only).
  */
 export default function AdminLayout() {
+  // The admin panel's Tailwind sheet is fetched only when the panel is actually opened.
+  // Keeping it out of the initial bundle means a storefront visitor never downloads it,
+  // and — more importantly — never has its utilities in the same document as the theme.
+  useEffect(() => {
+    import('../admin.css')
+  }, [])
+
   const { user, setUser } = useAuthStore()
   const navigate = useNavigate()
   const location = useLocation()
