@@ -3,6 +3,7 @@ import rateLimit from 'express-rate-limit'
 import * as authController from '../controllers/auth.controller.js'
 import { validate } from '../middleware/validate.middleware.js'
 import { attachUser } from '../middleware/auth.middleware.js'
+import { attachGuestCart } from '../middleware/guest-cart.middleware.js'
 import {
   loginSchema,
   registerSchema,
@@ -28,8 +29,8 @@ const authLimiter = rateLimit({
   message: { success: false, message: 'Too many attempts. Please try again later.' },
 })
 
-router.post('/login', authLimiter, validate(loginSchema), authController.login)
-router.post('/register', authLimiter, validate(registerSchema), authController.register)
+router.post('/login', authLimiter, attachGuestCart, validate(loginSchema), authController.login)
+router.post('/register', authLimiter, attachGuestCart, validate(registerSchema), authController.register)
 router.post('/logout', authController.logout)
 
 router.get('/me', attachUser, authController.me)

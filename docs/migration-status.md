@@ -3,7 +3,7 @@
 Single source of truth for progress. **Nothing is marked COMPLETE until every box in the
 completion criteria is genuinely ticked** — compiling is not completing.
 
-Last updated: 2026-09-08 · Current phase: **4 → 5**
+Last updated: 2026-09-08 · Current phase: **5+7 → 6**
 
 `COMPLETE*` = code complete and tested, with one task blocked on an external input that is
 named in that phase's section. It is not a substitute for COMPLETE and does not unblock a
@@ -41,9 +41,9 @@ Status values: `NOT STARTED` · `IN PROGRESS` · `BLOCKED` · `COMPLETE`
 | 2 | Auth (customer + admin) | COMPLETE* | NOT STARTED | PASS (57) | PASS (rules) |
 | 3 | Catalog | COMPLETE* | NOT STARTED | PASS (71) | PASS (rules) |
 | 4 | CMS / home | COMPLETE* | NOT STARTED | PASS (32) | PASS (rules) |
-| 5 | Cart | NOT STARTED | NOT STARTED | NOT STARTED | NOT STARTED |
+| 5 | Cart | COMPLETE* | NOT STARTED | PASS (79) | PASS (rules) |
 | 6 | Wishlist | NOT STARTED | NOT STARTED | NOT STARTED | NOT STARTED |
-| 7 | Promotions / coupons | NOT STARTED | NOT STARTED | NOT STARTED | NOT STARTED |
+| 7 | Promotions / coupons | COMPLETE* | NOT STARTED | PASS (with cart) | PASS (rules) |
 | 8 | Account | NOT STARTED | NOT STARTED | NOT STARTED | NOT STARTED |
 | 9 | Checkout | NOT STARTED | NOT STARTED | NOT STARTED | NOT STARTED |
 | 10 | Razorpay | NOT STARTED | NOT STARTED | NOT STARTED | NOT STARTED |
@@ -283,6 +283,69 @@ Verified against `FrontendController::blog / blogSingle / support` and the two S
 The `pages` table is **write-only** in the source application: admins can edit four pages but
 no storefront view reads them. `GET /pages/:slug` is exposed so the content is reachable;
 actually rendering it is a product decision, not a migration one.
+
+## Phase 5 + 7 — Cart, shipping and promotions (backend)
+
+**Status: backend COMPLETE and tested. React pages deferred to the frontend pass.**
+
+**Phases 5 and 7 were merged.** `CartService::summary()` depends on both
+`PromotionService` and `ShippingService` — the same dependency Laravel's constructor
+declared. Totals cannot be verified without coupons, so splitting them would have meant
+shipping an unverifiable phase. The audit's reordering clause covers this.
+
+| Task | Status |
+|---|---|
+| `services/shipping.service.js` | COMPLETE |
+| `services/promotion.service.js` — full coupon gauntlet, BOGO, redemptions | COMPLETE |
+| `services/cart.service.js` — port of the 520-line CartService | COMPLETE |
+| `middleware/guest-cart.middleware.js` — signed cookie transport | COMPLETE |
+| Cart CRUD, buy-now, coupon apply/remove, public coupons | COMPLETE |
+| Guest cart merge on login and registration | COMPLETE |
+| Tests — **79**; suite total **261** | COMPLETE |
+| Verify against real data | BLOCKED (dev DB restore) |
+| React cart page | NOT STARTED |
+
+### The rules that decide what customers are charged
+
+All test-pinned, all traced to source:
+
+- **Line identity** = `product|colour|size|package`, lower-cased. Variant normalisation
+  nulls `''`, `'?'` and `'select'` — the placeholders unset `<select>` elements submit.
+  Treating those as real variant names creates lines a customer can never update or remove.
+- **Max quantity** = `min(max_unit_buy or 99, colour stock, size stock)`, matched
+  case-insensitively, and validated against the **accumulated** total on add — not just the
+  increment, or repeated adds walk past the stock limit.
+- **Default variants**: first colour **upper-cased**, first size. The upper-casing matters —
+  colour gallery keys are upper-cased, so a lower-cased default fails to match its gallery.
+- **Packages** apply only to the `accessories` category, priced from the product row.
+  An unknown key falls back to the first package. A stored line keeps its **stored** price,
+  so repricing in admin does not silently change a cart in progress.
+- **Totals pipeline**: subtotal → discount → **shipping quoted on (subtotal − discount)** →
+  free-shipping override → total. Quoting shipping on the raw subtotal is a silent parity
+  break worth ₹60 on every affected order; two tests cover the boundary.
+- **Coupon gauntlet** in Laravel's order, each with its own message: window/usage-limit,
+  members-only, new-customers-only (a **guest is eligible**), once-per-user, scope,
+  min quantity, min cart amount — the last three against the **eligible subset**, not the
+  whole cart.
+- **BOGO is per line**, so a cheap item cannot make an expensive one free. This is the rule
+  that protects margin; a cart-wide grouping would discount a ₹5,000 item against a ₹100 one.
+- A zero discount is an error **unless** the coupon grants free shipping.
+- The applied code is session state, re-validated on every cart read; an invalid one is
+  dropped with its reason surfaced rather than throwing.
+- `recordRedemption` writes the row **and** increments `used_count` together — splitting
+  them lets the counter drift and breaks `usage_limit`.
+
+### Guest cart transport (decision D1, resolved)
+
+Laravel kept the guest cart in the PHP session. `cart_items.user_id` is `NOT NULL` with an
+FK to `users`, so guest rows cannot live there without placeholder users or a schema change
+— both out of scope. The guest cart is therefore a **signed, HTTP-only cookie**.
+
+It is safe because it carries only product ids, quantities and variant keys — no prices, no
+totals. Every price is re-resolved from the database, coupons are re-validated on every
+read, and quantities are re-checked against live stock on mutation and again before an order
+is created. A test confirms an unsigned forged cookie is ignored, and another confirms a
+client-submitted `unit_price` has no effect.
 
 ## Open decisions
 

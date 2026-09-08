@@ -1,5 +1,7 @@
 import * as authService from '../services/auth.service.js'
+import * as cartService from '../services/cart.service.js'
 import { setAuthCookie, clearAuthCookie } from '../utils/auth-token.js'
+import { clearGuestCartCookie } from '../middleware/guest-cart.middleware.js'
 import { ok, asyncHandler } from '../utils/api-response.js'
 import { send } from '../integrations/email/mailer.js'
 import { customerPasswordResetMail } from '../integrations/email/templates/customer-password-reset.js'
@@ -16,9 +18,30 @@ import logger from '../config/logger.js'
  * the API is drop-in compatible if any legacy script is still pointed at it during cutover.
  */
 
+/**
+ * Fold any guest cart into the account, then drop the guest cookie.
+ *
+ * Laravel called CartService::mergeSessionIntoUser on both login and registration. Without
+ * it a customer who fills a cart, then signs in, watches it empty — the single most
+ * visible auth regression there is.
+ *
+ * A merge failure must never fail the sign-in, so it is logged and swallowed.
+ */
+async function mergeGuestCart(req, res, user) {
+  try {
+    if (req.guestCart?.lines?.length) {
+      await cartService.mergeGuestCartIntoUser(user, req.guestCart)
+    }
+  } catch (error) {
+    logger.error({ err: error, userId: String(user.id) }, 'Guest cart merge failed')
+  }
+  clearGuestCartCookie(res)
+}
+
 export const login = asyncHandler(async (req, res) => {
   const user = await authService.loginCustomer(req.body)
   setAuthCookie(res, user)
+  await mergeGuestCart(req, res, user)
 
   return ok(
     res,
@@ -30,6 +53,7 @@ export const login = asyncHandler(async (req, res) => {
 export const register = asyncHandler(async (req, res) => {
   const user = await authService.registerCustomer(req.body)
   setAuthCookie(res, user)
+  await mergeGuestCart(req, res, user)
 
   // TODO(phase 12): Meta CompleteRegistration event. Fire-and-forget, never awaited.
 
