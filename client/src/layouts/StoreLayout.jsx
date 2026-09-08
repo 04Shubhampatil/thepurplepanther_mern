@@ -1,36 +1,35 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import SiteHeader from '../components/layout/SiteHeader.jsx'
 import SiteFooter from '../components/layout/SiteFooter.jsx'
 import MinicartDrawer from '../components/cart/MinicartDrawer.jsx'
-import { bootTheme, initPagePlugins, applyDataBackgrounds } from '../theme/runtime.js'
-import { syncSiteConfig } from '../theme/site.js'
-import { useConfigStore, useCartStore, useAuthStore, useOffersStore } from '../store/index.js'
+import { useScrollToTop } from '../theme/chrome.js'
+import { useReveal } from '../theme/reveal.js'
+import { useConfigStore, useCartStore, useOffersStore } from '../store/index.js'
+import { useUiStore } from '../store/ui.js'
+import '../theme/reveal.css'
 
 /**
  * Storefront shell — the Blade layout every frontend page shared.
  *
- * The DOM here reproduces what Blade emitted around each page: `.wrapper.ovh` holding the
- * preloader, the header, the page, the footer and the scroll-to-top link. The theme's CSS
- * and script.js both select on that structure, so it is layout, not decoration.
+ * `.wrapper.ovh` holding the preloader, the header, the page, the footer and the
+ * scroll-to-top link. The theme's CSS is written against that structure, so it is layout
+ * rather than decoration.
  *
- * BOOT ORDER IS LOAD-BEARING. script.js runs once, and when it runs it takes over `#menu`
- * and reads window.PP_SITE for the logo and account link it builds into the mmenu navbar.
- * So: categories and session first, then PP_SITE, then the theme. Booting earlier gives a
- * mobile menu with a missing accessories link and a permanent "Account" label for someone
- * who is signed in — and mmenu refuses to re-initialise, so it never corrects itself.
+ * There is no theme bootstrap here any more. Blade loaded thirteen vendor scripts and a
+ * 3,479-line script.js; everything that was still doing something on these pages is now
+ * React — the sliders (swiper/react), the mobile menu, the search overlay, the footer
+ * accordion, the sticky header, this scroll-to-top button, and the reveal-on-scroll that
+ * WOW.js was loaded for but never initialised.
  */
 export default function StoreLayout() {
   const loadConfig = useConfigStore((s) => s.load)
   const loadOffers = useOffersStore((s) => s.load)
-  const categoriesLoaded = useConfigStore((s) => s.loaded)
-  const categories = useConfigStore((s) => s.categories)
   const refreshCart = useCartStore((s) => s.refresh)
-  const user = useAuthStore((s) => s.user)
-  const authLoading = useAuthStore((s) => s.loading)
+  const closeAll = useUiStore((s) => s.closeAll)
   const { pathname } = useLocation()
 
-  const [themeReady, setThemeReady] = useState(false)
+  const showScrollTop = useScrollToTop()
 
   useEffect(() => {
     loadConfig()
@@ -38,26 +37,18 @@ export default function StoreLayout() {
     refreshCart()
   }, [loadConfig, loadOffers, refreshCart])
 
+  // A drawer left open across a navigation would cover the page it opened.
   useEffect(() => {
-    syncSiteConfig({ user, categories })
-  }, [user, categories])
-
-  useEffect(() => {
-    if (!categoriesLoaded || authLoading) return
-    bootTheme().then(() => setThemeReady(true))
-  }, [categoriesLoaded, authLoading])
-
-  // Per-route work script.js only ever did once per document.
-  useEffect(() => {
-    if (!themeReady) return
-    applyDataBackgrounds()
-    initPagePlugins()
-  }, [themeReady, pathname])
+    closeAll()
+  }, [pathname, closeAll])
 
   // A full page load always started at the top; client-side navigation must match.
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' })
   }, [pathname])
+
+  // Re-scanned per route: each page brings its own `.wow` elements.
+  useReveal([pathname])
 
   return (
     <div className="wrapper ovh">
@@ -75,7 +66,17 @@ export default function StoreLayout() {
       <Outlet />
 
       <SiteFooter />
-      <a className="scrollToHome" href="#"><i className="fas fa-angle-up"></i></a>
+
+      <a
+        className={`scrollToHome${showScrollTop ? ' show' : ''}`}
+        href="#"
+        onClick={(event) => {
+          event.preventDefault()
+          window.scrollTo({ top: 0, behavior: 'smooth' })
+        }}
+      >
+        <i className="fas fa-angle-up"></i>
+      </a>
 
       <MinicartDrawer />
     </div>

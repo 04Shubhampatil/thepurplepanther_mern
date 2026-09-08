@@ -27,7 +27,7 @@ const SOCIAL = {
   pinterest: 'https://www.pinterest.com/',
 }
 
-/** What site-config.blade.php put on window.PP_SITE for the mmenu navbar. */
+/** The mobile menu's social links — site-config.blade.php's `PP_SITE.social`. */
 const MMENU_SOCIAL = {
   facebook: 'https://www.facebook.com/',
   instagram: 'https://www.instagram.com/',
@@ -69,4 +69,4 @@ export function syncSiteConfig({ user = null, categories = [] } = {}) {
   return window.PP_SITE
 }
 
-export { SOCIAL }
+export { SOCIAL, MMENU_SOCIAL }

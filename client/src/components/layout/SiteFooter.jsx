@@ -7,16 +7,23 @@ import * as api from '../../services/endpoints.js'
 /**
  * frontend/partials/site-footer.blade.php.
  *
- * The accordion on mobile is Bootstrap's collapse, driven by the `data-bs-toggle` /
- * `data-bs-target` pairs below and the bootstrap.min.js loaded in index.html — no React
- * state, because the ids and the `.collapse d-lg-block` combination are what the theme's
- * CSS keys off to keep the columns open on desktop and shut on mobile.
+ * The mobile accordion was Bootstrap's collapse plugin. It is React state now, but the
+ * class combination is unchanged and still doing the work: `.collapse` is closed,
+ * `.collapse.show` is open, and `.d-lg-block` overrides both from the large breakpoint up
+ * so the columns are always open on desktop and the buttons (`.d-lg-none`) are hidden.
+ *
+ * That is why toggling `show` is enough and no height is measured — Bootstrap's CSS is
+ * still loaded and already describes both states.
  *
  * Newsletter signup is the one live part: Blade posted the form and reloaded, so the
  * status line is now filled in from the API response instead.
  */
 export default function SiteFooter() {
   const categories = useConfigStore((s) => s.categories)
+  const [openPanel, setOpenPanel] = useState(null)
+
+  const toggle = (id) => () => setOpenPanel((current) => (current === id ? null : id))
+  const isOpen = (id) => openPanel === id
   const [email, setEmail] = useState('')
   const [status, setStatus] = useState({ message: '', error: false })
 
@@ -60,12 +67,12 @@ export default function SiteFooter() {
               <div className="row">
                 <div className="col-lg-4 col-xl">
                   <div className="footer_qlink_widget dark-bb-md">
-                    <button className="btn fz20 colps-btn w-100 title ps-0 d-lg-none d-flex justify-content-between align-items-center" data-bs-toggle="collapse" data-bs-target="#exploreCollapse" aria-expanded="false" type="button">
+                    <button className="btn fz20 colps-btn w-100 title ps-0 d-lg-none d-flex justify-content-between align-items-center" aria-expanded={isOpen('exploreCollapse')} aria-controls="exploreCollapse" type="button" onClick={toggle('exploreCollapse')}>
                       Category
                       <i className="fa-solid fa-plus icon-toggle"></i>
                     </button>
                     <h6 className="title fz20 d-none d-lg-block">Category</h6>
-                    <div className="collapse d-lg-block" id="exploreCollapse">
+                    <div className={`collapse d-lg-block${isOpen('exploreCollapse') ? ' show' : ''}`} id="exploreCollapse">
                       <ul className="list-unstyled">
                         <li><Link to="/shop">All</Link></li>
                         {categories.length > 0
@@ -83,12 +90,12 @@ export default function SiteFooter() {
                 </div>
                 <div className="col-lg-4 col-xl">
                   <div className="footer_qlink_widget dark-bb-md">
-                    <button className="btn fz20 colps-btn w-100 title ps-0 d-lg-none d-flex justify-content-between align-items-center" data-bs-toggle="collapse" data-bs-target="#careCollapse" aria-expanded="false" type="button">
+                    <button className="btn fz20 colps-btn w-100 title ps-0 d-lg-none d-flex justify-content-between align-items-center" aria-expanded={isOpen('careCollapse')} aria-controls="careCollapse" type="button" onClick={toggle('careCollapse')}>
                       Company
                       <i className="fa-solid fa-plus icon-toggle"></i>
                     </button>
                     <h6 className="title fz20 d-none d-lg-block">Company</h6>
-                    <div className="collapse d-lg-block" id="careCollapse">
+                    <div className={`collapse d-lg-block${isOpen('careCollapse') ? ' show' : ''}`} id="careCollapse">
                       <ul className="list-unstyled">
                         <li><Link to="/">Home</Link></li>
                         <li><Link to="/about">Our Story</Link></li>
@@ -101,12 +108,12 @@ export default function SiteFooter() {
                 </div>
                 <div className="col-lg-4 col-xl">
                   <div className="footer_qlink_widget dark-bb-md">
-                    <button className="btn fz20 colps-btn w-100 title ps-0 d-lg-none d-flex justify-content-between align-items-center" data-bs-toggle="collapse" data-bs-target="#legalCollapse" aria-expanded="false" type="button">
+                    <button className="btn fz20 colps-btn w-100 title ps-0 d-lg-none d-flex justify-content-between align-items-center" aria-expanded={isOpen('legalCollapse')} aria-controls="legalCollapse" type="button" onClick={toggle('legalCollapse')}>
                       Support
                       <i className="fa-solid fa-plus icon-toggle"></i>
                     </button>
                     <h6 className="title fz20 d-none d-lg-block">Support</h6>
-                    <div className="collapse d-lg-block" id="legalCollapse">
+                    <div className={`collapse d-lg-block${isOpen('legalCollapse') ? ' show' : ''}`} id="legalCollapse">
                       <ul className="list-unstyled">
                         <li><Link to="/support/returns">Refund Policy</Link></li>
                         <li><Link to="/support/privacy">Privacy Policy</Link></li>
@@ -120,12 +127,12 @@ export default function SiteFooter() {
             </div>
             <div className="col-xl-3 col-lg-6 col-md-7">
               <div className="mailchimp_widget dark-bb-md">
-                <button className="btn fz20 colps-btn w-100 title ps-0 d-lg-none d-flex justify-content-between align-items-center" data-bs-toggle="collapse" data-bs-target="#newsletterCollapse" aria-expanded="false" type="button">
+                <button className="btn fz20 colps-btn w-100 title ps-0 d-lg-none d-flex justify-content-between align-items-center" aria-expanded={isOpen('newsletterCollapse')} aria-controls="newsletterCollapse" type="button" onClick={toggle('newsletterCollapse')}>
                   Subscribe
                   <i className="fa-solid fa-plus icon-toggle"></i>
                 </button>
                 <h6 className="title fz20 d-none d-lg-block">Subscribe </h6>
-                <div className="collapse d-lg-block mt30" id="newsletterCollapse">
+                <div className={`collapse d-lg-block mt30${isOpen('newsletterCollapse') ? ' show' : ''}`} id="newsletterCollapse">
                   <p className="text mb30 mt30">Sign up for exclusive offers, product drops, events, and more.</p>
                   <form className="footer_mailchimp_form" data-newsletter-form onSubmit={onSubscribe} noValidate>
 

@@ -1,4 +1,3 @@
-import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import PpPrice from '../../components/product/PpPrice.jsx'
 import ProductSliderCard from '../../components/product/ProductSliderCard.jsx'
@@ -6,8 +5,8 @@ import HomeNewArrivals from '../../components/home/HomeNewArrivals.jsx'
 import ShopTheLook from '../../components/home/ShopTheLook.jsx'
 import Loading from '../../components/common/Loading.jsx'
 import { useApi } from '../../hooks/useApi.js'
-import { useSliders } from '../../theme/sliders.js'
-import { applyDataBackgrounds } from '../../theme/runtime.js'
+import HomeHero from '../../components/home/HomeHero.jsx'
+import ThemeSwiper, { SwiperSlide } from '../../components/ui/ThemeSwiper.jsx'
 import { variantLabel } from '../../utils/variant-label.js'
 import * as api from '../../services/endpoints.js'
 
@@ -23,6 +22,40 @@ import * as api from '../../services/endpoints.js'
  * Every banner section falls back to the theme's own copy and imagery when the CMS has no
  * row for it, which is what kept the homepage from ever rendering an empty slot.
  */
+
+/**
+ * The Fabric Library's fallback cards, from the `@else` branch of home.blade.php.
+ *
+ * The copy is the theme's, shown when no CMS banner supplies its own — the section is never
+ * allowed to render empty, which is the same rule every other homepage block follows.
+ */
+const DEFAULT_FABRICS = [
+  {
+    id: 'tencel',
+    image: '/frontend/images/fabric-1.jpg',
+    alt: '',
+    title: 'Tencel Cotton Blend',
+    subtitle:
+      'A modern blend that brings together the natural breathability of cotton and the silky softness of Tencel™. Lightweight, smooth, and exceptionally comfortable, this fabric is designed to move effortlessly through the day. Its fluid drape and moisture-managing properties help keep you feeling fresh, while the cotton base provides the familiarity and ease of a wardrobe staple. The result is a fabric that looks polished, feels luxurious, and performs beautifully from morning to night.',
+  },
+  {
+    id: 'modal-linen',
+    image: '/frontend/images/fabric-2.jpg',
+    alt: '',
+    title: 'Modal Linen',
+    subtitle:
+      "Our Modal Linen blend reimagines traditional linen for contemporary living. By combining linen's natural breathability with the softness and fluidity of modal, we've created a fabric that retains linen's relaxed character while offering a smoother hand feel and enhanced comfort. Light, airy, and effortlessly elegant, it delivers the sophistication of linen without the stiffness often associated with it, making it ideal for long days, warm weather, and everyday wear.",
+  },
+  {
+    id: 'giza',
+    image: '/frontend/images/fabric-3.jpg',
+    alt: '',
+    title: 'Giza Cotton',
+    subtitle:
+      "Widely regarded as one of the world's finest cottons, Giza Cotton is prized for its exceptionally long fibers, which create fabrics that are remarkably soft, strong, and refined. The result is a fabric with a smooth finish, superior durability, and a luxurious feel against the skin. Naturally breathable and crafted to maintain its quality over time, Giza Cotton elevates everyday dressing with a level of comfort and sophistication that sets it apart from ordinary cotton.",
+  },
+]
+
 export default function Home() {
   const { data, loading } = useApi(() => api.catalog.home(), [])
 
@@ -39,18 +72,7 @@ export default function Home() {
   const shopTheLook = data?.shopTheLook ?? []
   const newArrivals = data?.newArrivals ?? []
   const popularAccessories = data?.popularAccessories ?? []
-
-  // Sliders are built only once the sections they measure actually hold slides.
-  useSliders(['su-banner-5-zoom'], !loading)
-  useSliders(['su-banner-16-zoom', 'product-12-slider'], newArrivals.length > 0)
-  useSliders(['home-accessories-slider'], popularAccessories.length > 0)
-  useSliders(['home-fabric-slider'], !loading)
-
-  // The hero's `data-background` divs are the theme's lazy-background convention; script.js
-  // resolved them on load, before this page's data existed.
-  useEffect(() => {
-    if (!loading) applyDataBackgrounds()
-  }, [loading])
+  const fabricCards = homeFabricLibrary?.images?.length ? homeFabricLibrary.images : DEFAULT_FABRICS
 
   if (loading) return <Loading full />
 
@@ -58,42 +80,7 @@ export default function Home() {
     <div className="body_content_wrapper position-relative">
 
       {/* banner-area-start */}
-      <section className="home21-banner">
-        <div className="container-fluid p-0">
-          <div className="swiper-container su-banner-5-zoom">
-            <div className="swiper-wrapper">
-              {heroImages.length > 0 ? heroImages.map((image) => (
-                <div className="swiper-slide" key={image.id}>
-                  <div className="home21-banner-item">
-                    {image.isVideo ? (
-                      <video className="bg home21-banner-video" autoPlay muted playsInline preload="metadata" data-swiper-parallax="1000">
-                        <source src={image.image} type={image.videoMimeType} />
-                      </video>
-                    ) : (
-                      <>
-                      <div className="bg bg-position banner-desktop" data-background={image.image || '/frontend/images/banner-1.jpg'} data-swiper-parallax="1000"></div>
-                      <div className="bg bg-position banner-mobile" data-background={image.mobileImage || image.image || '/frontend/images/mobile-banner-1.jpg'} data-swiper-parallax="1000"></div>
-                      </>
-                    )}
-                    <span className="overly position-absolute"></span>
-                    <div className="container"><div className="row"><div className="col-lg-12"><div className="banner-content">
-                      <h3 className="title mb10">{image.title || homeHero?.title}</h3>
-                      {(image.subtitle || homeHero?.subtitle) && <div className="sub-title mb10">{image.subtitle || homeHero?.subtitle}</div>}
-                      <div className="d-sm-flex align-items-center">
-                        {(image.buttonText || homeHero?.buttonText) && (
-                          <Link className="su-btn-4 rounded-3 su-left-right mb-3 mb-sm-0 mr10" to={image.buttonLink || homeHero?.buttonLink || '/shop'}><span className="mr10 su-text d-inline-block">{image.buttonText || homeHero?.buttonText}</span></Link>
-                        )}
-                      </div>
-                    </div></div></div></div>
-                  </div>
-                </div>
-              )) : (
-                <div className="swiper-slide"><div className="home21-banner-item"><div className="bg bg-position banner-desktop" data-background="/frontend/images/banner-1.jpg"></div></div></div>
-              )}
-            </div>
-          </div>
-        </div>
-      </section>
+      <HomeHero heroImages={heroImages} homeHero={homeHero} />
       {/* banner-area-end */}
 
       {/* Admin-managed collection tiles */}
@@ -159,9 +146,7 @@ export default function Home() {
               </div>
             </div>
             <div className="col-lg-6 align-self-center home43-slider home43-shop-look-slider">
-              <div className="swiper-container su-banner-16-zoom overflow-hidden">
-                <HomeNewArrivals products={newArrivals} />
-              </div>
+              <HomeNewArrivals products={newArrivals} />
             </div>
           </div>
         </div>
@@ -225,11 +210,28 @@ export default function Home() {
               </div>
             </div>
           </div>
-          <div className="swiper-container product-12-slider">
-            <div className="swiper-wrapper">
-              {newArrivals.map((item) => <ProductSliderCard key={item.id} item={item} />)}
-            </div>
-          </div>
+          <ThemeSwiper
+            className="swiper-container product-12-slider"
+            speed={700}
+            spaceBetween={5}
+            loop={newArrivals.length > 4}
+            navigation={{ nextEl: '.next', prevEl: '.prev' }}
+            autoplay={{ delay: 4000 }}
+            breakpoints={{
+              1400: { slidesPerView: 4 },
+              1200: { slidesPerView: 4 },
+              991: { slidesPerView: 3 },
+              768: { slidesPerView: 2 },
+              576: { slidesPerView: 2 },
+              0: { slidesPerView: 1 },
+            }}
+          >
+            {newArrivals.map((item) => (
+              <SwiperSlide key={item.id}>
+                <ProductSliderCard item={item} />
+              </SwiperSlide>
+            ))}
+          </ThemeSwiper>
         </div>
       </section>
       )}
@@ -245,10 +247,20 @@ export default function Home() {
             <button className="home-accessories-next" type="button" aria-label="Next accessories">›</button>
           </div>
         </div>
-        <div className="swiper-container home-accessories-slider">
-          <div className="swiper-wrapper">
+        <ThemeSwiper
+          className="swiper-container home-accessories-slider"
+          slidesPerView={1.25}
+          spaceBetween={12}
+          speed={700}
+          watchOverflow
+          navigation={{ nextEl: '.home-accessories-next', prevEl: '.home-accessories-prev' }}
+          breakpoints={{
+            768: { slidesPerView: 2.4, spaceBetween: 16 },
+            1200: { slidesPerView: 4, spaceBetween: 20 },
+          }}
+        >
             {popularAccessories.map((item) => (
-              <article className="swiper-slide home-accessory-card" key={item.id}>
+              <SwiperSlide className="home-accessory-card" tag="article" key={item.id}>
                 <Link className="home-accessory-card__image" to={item.url}>
                   <img src={item.image} alt={item.title} loading="lazy" />
                 </Link>
@@ -256,10 +268,9 @@ export default function Home() {
                 <h3><Link to={item.url}>{item.title}</Link></h3>
                 <p><PpPrice product={item} /></p>
                 {variantLabel(item) && <span>{variantLabel(item)}</span>}
-              </article>
+              </SwiperSlide>
             ))}
-          </div>
-        </div>
+        </ThemeSwiper>
       </div>
     </section>
       )}
@@ -273,49 +284,29 @@ export default function Home() {
               <button className="home-fabric-next" type="button" aria-label="Next fabric">›</button>
             </div>
           </div>
-          <div className="swiper-container home-fabric-slider">
-            <div className="swiper-wrapper">
-              {(homeFabricLibrary?.images?.length ?? 0) > 0 ? (
-                homeFabricLibrary.images.map((fabric) => (
-                  <article className="swiper-slide home-fabric-card" tabIndex="0" key={fabric.id}>
-                    <img src={fabric.image} alt={fabric.title} />
-                    <div className="home-fabric-card__overlay"></div>
-                    <div className="home-fabric-card__content">
-                      <h3>{fabric.title}</h3>
-                      {fabric.subtitle && <p>{fabric.subtitle}</p>}
-                    </div>
-                  </article>
-                ))
-              ) : (
-              <>
-              <article className="swiper-slide home-fabric-card" tabIndex="0">
-                <img src="/frontend/images/fabric-1.jpg" alt="" />
+          <ThemeSwiper
+            className="swiper-container home-fabric-slider"
+            slidesPerView={1.08}
+            spaceBetween={12}
+            speed={700}
+            watchOverflow
+            navigation={{ nextEl: '.home-fabric-next', prevEl: '.home-fabric-prev' }}
+            breakpoints={{
+              768: { slidesPerView: 1.4, spaceBetween: 20 },
+              1200: { slidesPerView: 2, spaceBetween: 30 },
+            }}
+          >
+            {fabricCards.map((fabric, index) => (
+              <SwiperSlide className="home-fabric-card" tag="article" tabIndex="0" key={fabric.id ?? index}>
+                <img src={fabric.image} alt={fabric.alt ?? fabric.title} />
                 <div className="home-fabric-card__overlay"></div>
                 <div className="home-fabric-card__content">
-                  <h3>Tencel Cotton Blend</h3>
-                  <p>A modern blend that brings together the natural breathability of cotton and the silky softness of Tencel™. Lightweight, smooth, and exceptionally comfortable, this fabric is designed to move effortlessly through the day. Its fluid drape and moisture-managing properties help keep you feeling fresh, while the cotton base provides the familiarity and ease of a wardrobe staple. The result is a fabric that looks polished, feels luxurious, and performs beautifully from morning to night.</p>
+                  <h3>{fabric.title}</h3>
+                  {fabric.subtitle && <p>{fabric.subtitle}</p>}
                 </div>
-              </article>
-              <article className="swiper-slide home-fabric-card" tabIndex="0">
-                <img src="/frontend/images/fabric-2.jpg" alt="" />
-                <div className="home-fabric-card__overlay"></div>
-                <div className="home-fabric-card__content">
-                  <h3>Modal Linen</h3>
-                  <p>Our Modal Linen blend reimagines traditional linen for contemporary living. By combining linen's natural breathability with the softness and fluidity of modal, we've created a fabric that retains linen's relaxed character while offering a smoother hand feel and enhanced comfort. Light, airy, and effortlessly elegant, it delivers the sophistication of linen without the stiffness often associated with it, making it ideal for long days, warm weather, and everyday wear.</p>
-                </div>
-              </article>
-              <article className="swiper-slide home-fabric-card" tabIndex="0">
-                <img src="/frontend/images/fabric-3.jpg" alt="" />
-                <div className="home-fabric-card__overlay"></div>
-                <div className="home-fabric-card__content">
-                  <h3>Giza Cotton</h3>
-                  <p>Widely regarded as one of the world's finest cottons, Giza Cotton is prized for its exceptionally long fibers, which create fabrics that are remarkably soft, strong, and refined. The result is a fabric with a smooth finish, superior durability, and a luxurious feel against the skin. Naturally breathable and crafted to maintain its quality over time, Giza Cotton elevates everyday dressing with a level of comfort and sophistication that sets it apart from ordinary cotton.</p>
-                </div>
-              </article>
-              </>
-              )}
-            </div>
-          </div>
+              </SwiperSlide>
+            ))}
+          </ThemeSwiper>
         </div>
       </section>
 

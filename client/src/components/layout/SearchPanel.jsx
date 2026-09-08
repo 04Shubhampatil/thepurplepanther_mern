@@ -2,25 +2,29 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import PpPrice from '../product/PpPrice.jsx'
 import { useConfigStore } from '../../store/index.js'
+import { useUiStore } from '../../store/ui.js'
 import * as api from '../../services/endpoints.js'
+import { useScrollLock } from '../../theme/chrome.js'
 
 const EMPTY_PROMPT = 'Start typing to search products…'
 
 /**
  * frontend/partials/search-panel.blade.php, with the behaviour of frontend-search.js.
  *
- * The overlay is opened and closed by script.js, which toggles `.show` on `.search-16-wrap`
- * from its delegated `.cart-search-btn` / `.search-close-icon` handlers — that still works
- * unchanged against this markup, so the open/close animation is the theme's own.
+ * `.show` on `.search-16-wrap` is what slides the overlay in — that class is the theme's
+ * and the animation is still the theme's. It used to be toggled by delegated jQuery
+ * handlers in script.js; it now comes from shared state (store/ui.js), because the button
+ * that opens it lives in the header and the panel can be rendered from either the header or
+ * the mobile menu.
  *
- * What moved into React is the QUERY: the 350ms debounce, the two-character floor, the
- * "SEARCHING…" / "TOP RESULTS FOR X" title states and the see-all link are ported from
- * frontend-search.js so the panel behaves identically. The one improvement is that an
- * in-flight request is cancelled with an AbortController rather than jQuery's abort(),
- * which also stops a slow early response from overwriting a newer one.
+ * The QUERY is ported from frontend-search.js: the 350ms debounce, the two-character floor,
+ * the "SEARCHING…" / "TOP RESULTS FOR X" title states and the see-all link. Cancelling
+ * the timer on each keystroke replaces jQuery's `abort()`, and also stops a slow early
+ * response from overwriting a newer one.
  */
 export default function SearchPanel() {
   const categories = useConfigStore((s) => s.categories)
+  const { searchOpen, closeSearch } = useUiStore()
   const navigate = useNavigate()
   const inputRef = useRef(null)
 
@@ -31,9 +35,29 @@ export default function SearchPanel() {
   const [seeAllUrl, setSeeAllUrl] = useState('')
   const [emptyMessage, setEmptyMessage] = useState(EMPTY_PROMPT)
 
-  const close = useCallback(() => {
-    document.querySelector('.search-16-wrap')?.classList.remove('show')
-  }, [])
+  const close = useCallback(() => closeSearch(), [closeSearch])
+
+  // The overlay opens over the page, so the page behind it must not scroll, and Escape
+  // must close it — both were mmenu's job when it owned the overlay.
+  useScrollLock(searchOpen)
+
+  useEffect(() => {
+    if (!searchOpen) return undefined
+
+    // The panel slides in from `visibility: hidden`; focusing on the same frame is a no-op,
+    // so it waits for the transition to have started.
+    const focusTimer = setTimeout(() => inputRef.current?.focus(), 250)
+
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') closeSearch()
+    }
+
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      clearTimeout(focusTimer)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [searchOpen, closeSearch])
 
   useEffect(() => {
     const term = query.trim()
@@ -86,7 +110,7 @@ export default function SearchPanel() {
   }
 
   return (
-    <div className={`search-16-wrap text-start position-fixed top-0 start-0 w-100 h-100${searching ? ' is-searching' : ''}`}>
+    <div className={`search-16-wrap text-start position-fixed top-0 start-0 w-100 h-100${searchOpen ? ' show' : ''}${searching ? ' is-searching' : ''}`}>
       <style>{`
         .search-16-wrap .js-search-loader {
           display: none;
@@ -113,10 +137,10 @@ export default function SearchPanel() {
           to { transform: rotate(360deg); }
         }
       `}</style>
-      <div className="open-search-16-overlay"></div>
+      <div className="open-search-16-overlay" onClick={close}></div>
       <div className="search-box-main h-100 position-relative">
         <div className="search-top">
-          <div className="search-close-icon"><i className="fa-sharp fa-regular fa-xmark"></i></div>
+          <div className="search-close-icon" onClick={close}><i className="fa-sharp fa-regular fa-xmark"></i></div>
           <form action="/shop" method="GET" className="js-frontend-search-form" onSubmit={onSubmit}>
             <div className="search-input-box position-relative">
               <button type="submit" className="s-icon bg-transparent border-0 position-absolute top-50 start-0 translate-middle-y" aria-label="Search">

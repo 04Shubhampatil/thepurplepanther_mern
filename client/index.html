@@ -46,23 +46,21 @@
   <!-- End Meta Pixel Code -->
 
   <!--
-    The vendor libraries the theme is built on, loaded HERE rather than before </body> so
-    that window.jQuery, window.Swiper and the plugins all exist before React's first render
-    commits. src/theme/ then runs the theme's own script.js once the markup is in the DOM.
+    NO VENDOR SCRIPTS.
+
+    The Blade pages loaded thirteen of them — jQuery, Popper, Bootstrap, Bootstrap Select,
+    mmenu, lazysizes, Magnific Popup, Odometer, jQuery Appear, Swiper, jQuery Countdown,
+    Jarallax and WOW — plus a 3,479-line script.js. Every behaviour they provided is React
+    now: sliders are swiper/react, the mobile menu and search overlay are components over
+    shared state, the footer accordion is state, images use loading="lazy", and reveals use
+    IntersectionObserver.
+
+    Four of those libraries were dead weight on this storefront even in Laravel: nothing
+    used Bootstrap Select, Odometer, jQuery Countdown or Magnific Popup, and WOW was loaded
+    but never initialised.
+
+    The STYLESHEETS above stay. They are the design.
   -->
-  <script src="/frontend/js/jquery.js"></script>
-  <script src="/frontend/js/popper.min.js"></script>
-  <script src="/frontend/js/bootstrap.min.js"></script>
-  <script src="/frontend/js/bootstrap-select.min.js"></script>
-  <script src="/frontend/js/mmenu.js"></script>
-  <script src="/frontend/js/lazysize.min.js"></script>
-  <script src="/frontend/js/jquery.magnific-popup.min.js"></script>
-  <script src="/frontend/js/jquery.odometer.min.js"></script>
-  <script src="/frontend/js/jquery.appear.js"></script>
-  <script src="/frontend/js/swiper-bundle.min.js"></script>
-  <script src="/frontend/js/jquery.countdown.js"></script>
-  <script src="/frontend/js/jarallax.js"></script>
-  <script src="/frontend/js/wow.min.js"></script>
 </head>
 
 <body class="home21-type">

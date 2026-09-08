@@ -1,0 +1,48 @@
+/*
+ * The two rules WOW.js used to write inline.
+ *
+ * The animations themselves (fadeInUp and friends) are already in the theme's style.css —
+ * only the hold-until-seen part is missing, because that is what the library did in
+ * JavaScript. `animation-name: none` rather than `visibility: hidden` keeps the element in
+ * the layout at its final position, so nothing reflows when it reveals.
+ *
+ * Anyone who prefers no motion gets none: the animation is skipped entirely rather than
+ * played faster, and the element is simply shown.
+ */
+.wow {
+  animation-name: none;
+  visibility: hidden;
+}
+
+.wow.is-revealed {
+  visibility: visible;
+  animation-name: inherit;
+}
+
+/*
+ * `animation-name: inherit` cannot re-assert the class-based name, so each animation the
+ * markup uses is re-declared here for the revealed state. These are the only ones the
+ * ported pages ask for.
+ */
+.wow.fadeInUp.is-revealed {
+  animation-name: fadeInUp;
+}
+
+.wow.fadeInDown.is-revealed {
+  animation-name: fadeInDown;
+}
+
+.wow.fadeIn.is-revealed {
+  animation-name: fadeIn;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wow,
+  .wow.is-revealed,
+  .wow.fadeInUp.is-revealed,
+  .wow.fadeInDown.is-revealed,
+  .wow.fadeIn.is-revealed {
+    visibility: visible;
+    animation-name: none;
+  }
+}
