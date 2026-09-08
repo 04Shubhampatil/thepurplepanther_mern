@@ -3,7 +3,7 @@
 Single source of truth for progress. **Nothing is marked COMPLETE until every box in the
 completion criteria is genuinely ticked** — compiling is not completing.
 
-Last updated: 2026-09-08 · Current phase: **6+8 → 9**
+Last updated: 2026-09-08 · Current phase: **9+10 → 12**
 
 `COMPLETE*` = code complete and tested, with one task blocked on an external input that is
 named in that phase's section. It is not a substitute for COMPLETE and does not unblock a
@@ -45,9 +45,9 @@ Status values: `NOT STARTED` · `IN PROGRESS` · `BLOCKED` · `COMPLETE`
 | 6 | Wishlist | COMPLETE* | NOT STARTED | PASS (with account) | PASS (rules) |
 | 7 | Promotions / coupons | COMPLETE* | NOT STARTED | PASS (with cart) | PASS (rules) |
 | 8 | Account | COMPLETE* | NOT STARTED | PASS (54) | PASS (rules) |
-| 9 | Checkout | NOT STARTED | NOT STARTED | NOT STARTED | NOT STARTED |
-| 10 | Razorpay | NOT STARTED | NOT STARTED | NOT STARTED | NOT STARTED |
-| 11 | Email | NOT STARTED | n/a | NOT STARTED | NOT STARTED |
+| 9 | Checkout | COMPLETE* | NOT STARTED | PASS (52) | PASS (rules) |
+| 10 | Razorpay | COMPLETE* | NOT STARTED | PASS (with checkout) | PASS (rules) |
+| 11 | Email | COMPLETE* | n/a | PASS | PASS (subjects) |
 | 12 | Meta CAPI + catalog | NOT STARTED | NOT STARTED | NOT STARTED | NOT STARTED |
 | 13 | Admin panel | NOT STARTED | NOT STARTED | NOT STARTED | NOT STARTED |
 | 14 | Final integration | NOT STARTED | NOT STARTED | NOT STARTED | NOT STARTED |
@@ -399,6 +399,73 @@ Review ownership is checked on `user_id` alone, but the list also matches on ema
 with a NULL `user_id` therefore appears in "My Reviews" and cannot be deleted. Preserved, and
 surfaced to the UI as `canDelete` so the frontend hides the control rather than offering an
 action that 403s.
+
+## Phase 9 + 10 + 11 — Checkout, Razorpay, order emails (backend)
+
+**Status: backend COMPLETE and tested.** Email (11) is included because checkout sends the
+confirmation, and Razorpay (10) is inseparable from the flow that uses it.
+
+| Task | Status |
+|---|---|
+| `services/payment.service.js` — Razorpay create + signature verification | COMPLETE |
+| `services/checkout.service.js` — order creation and completion | COMPLETE |
+| `integrations/email/templates/order-emails.js` — all four order mails | COMPLETE |
+| Order confirmation endpoint with paid-only gate | COMPLETE |
+| Tests — **52**; suite total **367** | COMPLETE |
+| Verify against real data | BLOCKED (dev DB restore) |
+| React checkout page | NOT STARTED |
+
+### The security boundary
+
+`verifyPaymentSignature` is the only thing between a forged callback and an order marked
+paid, so it is tested against **real HMAC signatures** computed with the test secret, not
+mocked:
+
+```
+expected = HMAC_SHA256(razorpay_order_id + "|" + razorpay_payment_id, KEY_SECRET)
+```
+
+compared with `timingSafeEqual` (PHP's `hash_equals`). Tests cover: a valid signature, one
+made with the wrong secret, one for a different order or payment id, **operands swapped**
+(which still produces a valid-looking hash), malformed input, and a signature genuinely
+valid for a *different* Razorpay order being replayed against this one.
+
+The verify endpoint accepts only the order id and three Razorpay identifiers — there is no
+field through which a client can assert that payment succeeded.
+
+### Order lifecycle
+
+1. Order created as `pending` / `payment_status='pending'` **before** payment, so an
+   abandoned payment leaves a recoverable row rather than losing the order.
+2. Razorpay order created **outside** the database transaction — a slow external call must
+   not hold locks. If it fails the order stays pending.
+3. Only a verified signature promotes to `paid` + `placed`.
+4. Completion is **idempotent**: an already-paid order returns immediately without
+   re-recording the redemption, re-clearing the cart, or sending a second email.
+5. The cart is cleared only **after** payment is confirmed.
+6. The coupon redemption and `used_count` increment happen inside the completion
+   transaction.
+
+### Rules preserved
+
+- Totals computed server-side; a client-supplied `payable_amount` is ignored.
+- Country forced to `India`.
+- Guest checkout creates a real account, and **refuses** if the email is already
+  registered — otherwise anyone could place orders against another person's account.
+- The generated guest password reaches the customer only in the confirmation email; it is
+  held between `place` and `verify` in a short-lived signed cookie.
+- `order_items.mrp` = unit price and `saving` = 0 (audit R5), reproduced deliberately.
+- Order number format `ORD` + 9 alphanumerics + 3 digits, retried on collision.
+- Email is fire-and-forget, so SMTP latency is off the payment path and a mail failure can
+  never fail a paid order (fixes audit R8).
+
+### Deliberate additions
+
+Rate limiting on `place` (creates a row and calls Razorpay on every request) and on
+`verify` (repeated attempts against one order with different signatures is what a forgery
+attempt looks like). Successful verifications are not counted, so a customer retrying after
+a network blip is never locked out of confirming an order they have paid for. Laravel had
+no limit on either.
 
 ## Open decisions
 

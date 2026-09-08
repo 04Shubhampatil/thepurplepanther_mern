@@ -108,6 +108,11 @@ export function orderPayload(order) {
     date: formatDate(order.orderedAt ?? order.createdAt),
     status: statusLabel(status),
     statusKey: status,
+    // `status` is normalised for display (pending -> placed), so the raw values are
+    // carried too. Callers that gate on whether payment actually happened — the order
+    // confirmation page in particular — must use these, not statusKey.
+    rawStatus: order.status,
+    paymentStatus: order.paymentStatus,
     total: toNumber(order.payableAmount),
     totalFormatted: format(order.payableAmount),
     subtotal: toNumber(order.subtotal),

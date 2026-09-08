@@ -5,6 +5,8 @@ import catalogRoutes from './catalog.routes.js'
 import cmsRoutes from './cms.routes.js'
 import cartRoutes from './cart.routes.js'
 import accountRoutes from './account.routes.js'
+import checkoutRoutes from './checkout.routes.js'
+import orderRoutes from './order.routes.js'
 import adminRoutes from './admin/index.js'
 import { publicConfig } from '../config/env.js'
 import { ok } from '../utils/api-response.js'
@@ -31,11 +33,11 @@ router.use('/', catalogRoutes) // phase 3 — products, taxonomy, search, home
 router.use('/', cmsRoutes) // phase 4 — blog, banners, pages
 router.use('/cart', cartRoutes) // phase 5 + 7 — cart, coupons
 router.use('/account', accountRoutes) // phase 6 + 8 - wishlist, account
+router.use('/checkout', checkoutRoutes) // phase 9 + 10 - checkout, Razorpay
+router.use('/orders', orderRoutes) // phase 9
 router.use('/admin', adminRoutes) // phase 2 (auth only); rest in phase 13
 
 // -- added in later phases -------------------------------------------------
-// router.use('/checkout', checkoutRoutes)      // phase 9-10
-// router.use('/orders', orderRoutes)           // phase 9
 // router.use('/catalog', catalogFeedRoutes)    // phase 12
 
 export default router
