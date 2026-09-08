@@ -135,13 +135,32 @@ name, and the name ends in `_dev` / `_test` / `_local`.
 | D2 | Auth token transport | HTTP-only cookie holding a JWT (brief's preference) | proposed |
 | D3 | Legacy 301s in proxy or React | Reverse proxy — real 301s for crawlers | proposed |
 | D4 | `products.accessory_packages` JSON mapping | `Json? @db.LongText`, fallback to string + manual parse | verify in phase 1 |
-| D5 | Password hash compatibility | Verify Node bcrypt accepts Laravel `$2y$` hashes | **verify in phase 2** |
+| D5 | Password hash compatibility | Normalise `$2y$` → `$2b$` before comparing | **RESOLVED — fix implemented** |
 
-**D5 is the highest-risk unknown.** Laravel writes `$2y$` bcrypt hashes. The `bcrypt` npm
-package must verify them without a rewrite, or every existing customer is locked out. Phase 2
-starts with a spike that tests a real hash from the dump against `bcrypt.compare`. If it fails,
-the fallback is to normalise the `$2y$` prefix to `$2b$` at comparison time (the algorithms are
-identical; only the prefix differs). **No user may be forced to reset a password.**
+### D5 — resolved in phase 1, and it was a real defect
+
+Tested rather than assumed, and the assumption would have been wrong. The `bcrypt` npm
+package **does not accept Laravel's `$2y$` prefix**. Given the same algorithm, cost, salt and
+digest:
+
+```
+$2a$ -> true      $2b$ -> true      $2y$ -> false
+```
+
+It returns `false` — it does not throw. A naive port would have failed every pre-existing
+customer's login with "these credentials do not match our records", indistinguishable from a
+wrong password, with nothing in the logs. Total silent lockout at cutover.
+
+**Fix:** `server/src/utils/password.js` rewrites the 4-character version prefix before
+comparison. Cost, salt and digest are untouched, so nothing is weakened — `$2a$`, `$2b$` and
+`$2y$` are the same algorithm; the prefix is a historical marker from the 2011 PHP
+crypt_blowfish fix. New hashes are written as `$2b$`, which PHP's `password_verify()` also
+accepts, so a password changed in the new app still works in Laravel during the parallel run
+and after a rollback.
+
+**No customer needs a password reset.** 15 tests in `tests/password-hash.test.js` cover it,
+including one that pins the upstream `bcrypt` behaviour so the regression cannot be
+reintroduced by "simplifying" the utility.
 
 ---
 

@@ -207,6 +207,7 @@ stripped to digits; country `'india' → 'in'`. Field map:
 | R6 | LOW | `app/Http/Controllers/BannerController.php` (non-admin) is **dead code** — routes import `Admin\BannerController`; nothing references the root one. Do not migrate it. |
 | R7 | LOW | `cart_items` has no unique constraint on its logical key `(user_id, product_id, color, size, package_key)`; de-duplication is enforced only in application code. Concurrent add-to-cart can create duplicate lines. |
 | R8 | LOW | `QUEUE_CONNECTION=sync` means all 5 transactional emails send **inline**. Gmail SMTP latency is therefore on the checkout critical path. Node should move these off the request path. |
+| R9 | **HIGH — migration hazard, already fixed** | The `bcrypt` npm package **silently rejects Laravel's `$2y$` hashes**, returning `false` rather than throwing (`$2a$`→true, `$2b$`→true, `$2y$`→false). A direct port would have locked out every existing customer at cutover, with the failure presenting as a wrong password. Fixed in phase 1 by `server/src/utils/password.js`, which normalises the version prefix before comparison. See `migration-status.md` D5. |
 
 ---
 
