@@ -165,18 +165,42 @@ The only build-time variable in `client/.env` is `VITE_API_BASE_URL`.
 
 ---
 
-## 11. Credential rotation — required before cutover
+## 11. Credential rotation — REQUIRED before cutover
 
-The audited archive **contains a populated `.env`**. Every secret in it must be treated as
-exposed and rotated before the new app goes live:
+The audited archive **contains a populated `.env`**, and its contents were subsequently
+pasted into a chat transcript. Every secret below must be treated as exposed and rotated
+before the new app goes live. The Razorpay **live** secret is the urgent one — it can
+authorise real payments.
 
-- [ ] MySQL password for `u375273201_purple_panthdb`
-- [ ] `RAZORPAY_KEY_SECRET` (regenerate in Razorpay dashboard)
-- [ ] Gmail app password (`MAIL_PASSWORD`)
-- [ ] `META_CAPI_ACCESS_TOKEN`
-- [ ] AWS keys — or better, delete the IAM user, since S3 is unused
-- [ ] Generate a new `META_CATALOG_FEED_TOKEN` (never previously set)
-- [ ] Generate fresh `JWT_SECRET` and `SESSION_SECRET`
+Rotate in this order:
+
+- [ ] **`RAZORPAY_KEY_SECRET` (live)** — Razorpay dashboard → Settings → API Keys.
+      Highest priority: this secret authorises live payment capture.
+- [ ] **`MAIL_PASSWORD`** — the Gmail app password for `Info@thepurplepanther.in`.
+      Revoke the old app password in the Google account, do not just replace it.
+- [ ] **`META_CAPI_ACCESS_TOKEN`** — Meta Events Manager → dataset 3592270860927181.
+- [ ] **`DB_PASSWORD`** for `u375273201_purple_pantser` — Hostinger hPanel → Databases.
+      Update the Laravel `.env` at the same time, or the live site breaks.
+- [ ] **`APP_KEY`** (Laravel) — it encrypts session cookies. Rotating it signs everyone
+      out, so do it during the maintenance window, not before.
+- [ ] Generate a new `META_CATALOG_FEED_TOKEN` — never previously set, which is why the
+      feed is public (R1). Already generated into `server/.env`.
+- [ ] Generate fresh `JWT_SECRET` and `SESSION_SECRET` for the Node app.
+- [ ] AWS keys are **blank** in the live file, so there is nothing to rotate — confirmed
+      unused, matching the audit.
+
+### What the live file confirmed
+
+Values read from the production `.env`, which resolve two open questions from the audit:
+
+| Finding | Detail |
+|---|---|
+| `APP_URL` | `https://thepurplepanther.in` in production. The `http://127.0.0.1:8000` seen in the archived copy was a stale local edit — **audit R3 does not affect live**, though it does mean the archived file is not a reliable deployment reference. |
+| `ASSET_URL` | Same origin, so media resolves at `https://thepurplepanther.in/storage`. |
+| AWS | All four values blank — S3 is definitively unused, as the audit concluded. |
+| Pusher / Redis | All blank; `BROADCAST_DRIVER=log`. Legacy, confirmed. |
+| `META_CATALOG_*` | **Absent entirely** — confirms R1: the catalog feed has no token and is publicly downloadable right now. |
+| Razorpay | **Live keys active**, with test keys retained as comments. |
 
 `.gitignore` must exclude `.env`, `.env.*` (except `.env.example`), and
 `*.sql` dumps before the first commit.

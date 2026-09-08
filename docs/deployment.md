@@ -14,7 +14,25 @@ cutover reversible — nothing is migrated, copied or transformed.
 
 ---
 
-## 0. Prerequisites
+## 0. Hosting note — where the database lives
+
+The production `.env` has `DB_HOST=localhost`. That is the **hosting server's** localhost,
+not a developer machine: Hostinger binds MySQL to the local interface, so the production
+database is not reachable from anywhere else.
+
+Two consequences:
+
+1. **The Node API must run on the same host as the database**, or MySQL must be opened to
+   the API's address (and firewalled to it). Plan this before cutover.
+2. **Production credentials cannot restore a local dev database.** Local work needs a
+   *local* MySQL user; the dump is restored into `purple_panther_dev` on your own machine.
+   The two are unrelated, and conflating them is how a development run ends up writing to
+   live orders.
+
+`scripts/database/restore-dev.js` enforces the separation: it refuses any non-local host,
+the production database name, and any name not ending in `_dev` / `_test` / `_local`.
+
+## 0b. Prerequisites
 
 | Requirement | Notes |
 |---|---|
