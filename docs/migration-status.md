@@ -3,7 +3,7 @@
 Single source of truth for progress. **Nothing is marked COMPLETE until every box in the
 completion criteria is genuinely ticked** — compiling is not completing.
 
-Last updated: 2026-09-08 · Current phase: **13 done → React frontend**
+Last updated: 2026-09-08 · Current phase: **14 — final integration. Backend and frontend complete; blocked on a database connection.**
 
 `COMPLETE*` = code complete and tested, with one task blocked on an external input that is
 named in that phase's section. It is not a substitute for COMPLETE and does not unblock a
@@ -38,19 +38,19 @@ Status values: `NOT STARTED` · `IN PROGRESS` · `BLOCKED` · `COMPLETE`
 | # | Feature | Backend | Frontend | Tests | Laravel comparison |
 |---|---|---|---|---|---|
 | 1 | Backend foundation | COMPLETE* | n/a | PASS (22) | n/a |
-| 2 | Auth (customer + admin) | COMPLETE* | NOT STARTED | PASS (57) | PASS (rules) |
-| 3 | Catalog | COMPLETE* | NOT STARTED | PASS (71) | PASS (rules) |
-| 4 | CMS / home | COMPLETE* | NOT STARTED | PASS (32) | PASS (rules) |
-| 5 | Cart | COMPLETE* | NOT STARTED | PASS (79) | PASS (rules) |
-| 6 | Wishlist | COMPLETE* | NOT STARTED | PASS (with account) | PASS (rules) |
-| 7 | Promotions / coupons | COMPLETE* | NOT STARTED | PASS (with cart) | PASS (rules) |
-| 8 | Account | COMPLETE* | NOT STARTED | PASS (54) | PASS (rules) |
-| 9 | Checkout | COMPLETE* | NOT STARTED | PASS (52) | PASS (rules) |
-| 10 | Razorpay | COMPLETE* | NOT STARTED | PASS (with checkout) | PASS (rules) |
+| 2 | Auth (customer + admin) | COMPLETE* | COMPLETE* | PASS (57) | PASS (rules) |
+| 3 | Catalog | COMPLETE* | COMPLETE* | PASS (71) | PASS (rules) |
+| 4 | CMS / home | COMPLETE* | COMPLETE* | PASS (32) | PASS (rules) |
+| 5 | Cart | COMPLETE* | COMPLETE* | PASS (79) | PASS (rules) |
+| 6 | Wishlist | COMPLETE* | COMPLETE* | PASS (with account) | PASS (rules) |
+| 7 | Promotions / coupons | COMPLETE* | COMPLETE* | PASS (with cart) | PASS (rules) |
+| 8 | Account | COMPLETE* | COMPLETE* | PASS (54) | PASS (rules) |
+| 9 | Checkout | COMPLETE* | COMPLETE* | PASS (52) | PASS (rules) |
+| 10 | Razorpay | COMPLETE* | COMPLETE* | PASS (with checkout) | PASS (rules) |
 | 11 | Email | COMPLETE* | n/a | PASS | PASS (subjects) |
 | 12 | Meta CAPI + catalog | COMPLETE* | n/a | PASS (47) | PASS (9 events) |
-| 13 | Admin panel | COMPLETE* | NOT STARTED | PASS (66) | PASS (rules) |
-| 14 | Final integration | NOT STARTED | NOT STARTED | NOT STARTED | NOT STARTED |
+| 13 | Admin panel | COMPLETE* | COMPLETE* | PASS (66) | PASS (rules) |
+| 14 | Final integration | COMPLETE* | COMPLETE* | PASS (495) | BLOCKED (needs DB) |
 
 ---
 
@@ -594,6 +594,69 @@ unchanged, the duplication is not.
 `orders/statuses` and `orders/bulk` are all declared **before** their resource's `/:id`.
 Banner update accepts **POST as well as PATCH**, because Laravel used POST to work around
 Hostinger's ModSecurity blocking PUT.
+
+## Phase 14 — Final integration
+
+**Status: code COMPLETE. Blocked on one thing: a working `DATABASE_URL`.**
+
+| Task | Status |
+|---|---|
+| React frontend — storefront + admin | COMPLETE |
+| Theme served unchanged at `/frontend` | COMPLETE |
+| Vite dev proxy (keeps cookies first-party) | COMPLETE |
+| `scripts/verification/verify-schema.js` | COMPLETE |
+| `scripts/verification/verify-data.js` | COMPLETE |
+| `docs/deployment.md` — build, cutover, rollback | COMPLETE |
+| `README.md` | COMPLETE |
+| Client build | PASSES |
+| Tests — 480 server + 15 client = **495** | PASS |
+| **Run the stack end to end** | **BLOCKED** |
+| Verify schema against a live database | BLOCKED |
+| Verify data / orphans | BLOCKED |
+| Staging journey tests (brief §47) | BLOCKED |
+
+### The blocker, precisely
+
+`server/.env` has `DATABASE_URL=mysql://root:CHANGE_ME@localhost:3306/purple_panther_dev`.
+
+The API boots, validates its environment, then exits with
+`Could not connect to the database — check DATABASE_URL` after a 10-second pool timeout.
+That is the intended behaviour: a misconfigured deploy fails at boot rather than on a
+customer's first request.
+
+**To unblock:** replace `CHANGE_ME` in both `DATABASE_URL` and `DATABASE_URL_DEV` with the
+local MySQL password, then:
+
+```
+cd server && npm run db:restore
+node ../scripts/verification/verify-schema.js
+node ../scripts/verification/verify-data.js
+npm run dev
+```
+
+### What is proven, and what is not
+
+**Proven:** 495 tests covering business rules, query shapes, authorisation, the payment
+signature (against real HMACs), coupon and BOGO maths, the totals pipeline, the order
+status machine, variant stock handling, and the route exclusion list. The client builds and
+the API loads.
+
+**Not yet proven:** that the hand-written Prisma schema matches the live database
+column-for-column, and that the queries return what the tests assume. The two verification
+scripts exist to answer exactly that and take under a minute to run.
+
+This distinction is deliberate and should not be glossed: a suite that mocks its data layer
+cannot prove SQL.
+
+### Known limitation — SEO
+
+Page metadata is set client-side after mount. Crawlers that execute JavaScript will index
+it; those that do not will see the shell. Laravel rendered `products.seo_title` and
+`meta_description` server-side.
+
+Given the brief's position that **SEO regressions are unacceptable** (§37), SSR or
+prerendering for product and category pages is recorded as a **pre-cutover** task (I8), not
+a post-cutover nicety.
 
 ## Open decisions
 
