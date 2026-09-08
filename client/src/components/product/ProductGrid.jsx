@@ -1,24 +1,33 @@
 import ProductCard from './ProductCard.jsx'
+import { ProductGridSkeleton } from '../ui/Skeleton.jsx'
 
-export default function ProductGrid({ products = [], onWishlist = null, wishlistIds = [], empty = 'No products found.' }) {
-  if (!products.length) {
-    return (
-      <p className="pp-empty" style={{ padding: '40px 0', opacity: 0.7 }}>
-        {empty}
-      </p>
-    )
+/**
+ * Responsive product grid: 2 columns on mobile, 3 on tablet, 4 on desktop — matching the
+ * live site rather than shrinking a desktop layout.
+ */
+export default function ProductGrid({
+  products = [],
+  loading = false,
+  skeletonCount = 8,
+  empty = 'No products found.',
+  columns = 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4',
+  eagerCount = 4,
+}) {
+  if (loading && products.length === 0) return <ProductGridSkeleton count={skeletonCount} />
+
+  if (products.length === 0) {
+    return <p className="py-16 text-center text-body">{empty}</p>
   }
 
   return (
-    <div className="row">
-      {products.map((product) => (
-        <div className="col-lg-3 col-md-4 col-sm-6 col-6" key={product.id}>
-          <ProductCard
-            product={product}
-            onWishlist={onWishlist}
-            inWishlist={wishlistIds.includes(String(product.id))}
-          />
-        </div>
+    <div className={`grid gap-x-4 gap-y-10 md:gap-x-6 ${columns}`}>
+      {products.map((product, index) => (
+        <ProductCard
+          key={product.id}
+          product={product}
+          index={index}
+          eager={index < eagerCount}
+        />
       ))}
     </div>
   )

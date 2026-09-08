@@ -2,16 +2,10 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import * as api from '../../services/endpoints.js'
 import { useAuthStore } from '../../store/index.js'
-
-/** Star rating display. */
-function Stars({ rating }) {
-  return (
-    <span aria-label={`${rating} out of 5`} style={{ color: '#e0a800' }}>
-      {'★'.repeat(Math.round(rating))}
-      {'☆'.repeat(5 - Math.round(rating))}
-    </span>
-  )
-}
+import Rating from '../../components/product/Rating.jsx'
+import Button from '../../components/ui/Button.jsx'
+import Alert from '../../components/ui/Alert.jsx'
+import { Field, Input, Textarea, Select } from '../../components/ui/Field.jsx'
 
 /**
  * Reviews and the submission form.
@@ -45,7 +39,12 @@ export default function ReviewSection({ product, slug, onSubmitted }) {
     try {
       await api.catalog.submitReview(slug, values)
       setStatus({ ok: true, message: 'Thank you! Your review has been submitted.' })
-      reset({ rating: 5, comment: '', reviewer_name: values.reviewer_name, reviewer_email: values.reviewer_email })
+      reset({
+        rating: 5,
+        comment: '',
+        reviewer_name: values.reviewer_name,
+        reviewer_email: values.reviewer_email,
+      })
       onSubmitted?.()
     } catch (error) {
       // Surface per-field messages from the server rather than a single banner.
@@ -59,122 +58,128 @@ export default function ReviewSection({ product, slug, onSubmitted }) {
   }
 
   return (
-    <section className="pp-section pp-reviews" id="write-review">
-      <h2>Reviews</h2>
+    <section id="write-review" className="border-t border-line pt-12 md:pt-16">
+      <h2 className="pp-heading">Reviews</h2>
 
-      <div className="row">
-        <div className="col-md-4">
-          <div className="pp-reviews__summary">
-            <p style={{ fontSize: 40, margin: 0 }}>{reviews.average || 0}</p>
-            <Stars rating={reviews.average || 0} />
-            <p style={{ opacity: 0.7 }}>
-              {reviews.count} review{reviews.count === 1 ? '' : 's'}
-            </p>
+      <div className="mt-8 grid gap-10 md:grid-cols-[280px_1fr] md:gap-14">
+        <div className="h-fit border border-line p-6">
+          <p className="text-[40px] font-semibold leading-none text-ink">{reviews.average || 0}</p>
+          <Rating value={reviews.average || 0} size={17} className="mt-2" />
+          <p className="mt-1 text-[13px] text-body">
+            {reviews.count} review{reviews.count === 1 ? '' : 's'}
+          </p>
 
-            {[5, 4, 3, 2, 1].map((star) => (
-              <div key={star} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ width: 42 }}>{star} star</span>
-                <div style={{ flex: 1, height: 8, background: '#eee' }}>
-                  <div
-                    style={{
-                      width: `${reviews.breakdown?.[star]?.percent ?? 0}%`,
-                      height: '100%',
-                      background: '#3a1651',
-                    }}
-                  />
-                </div>
-                <span style={{ width: 28, textAlign: 'right' }}>
-                  {reviews.breakdown?.[star]?.count ?? 0}
-                </span>
-              </div>
-            ))}
-          </div>
+          <ul className="mt-5 space-y-2">
+            {[5, 4, 3, 2, 1].map((star) => {
+              const percent = reviews.breakdown?.[star]?.percent ?? 0
+              const count = reviews.breakdown?.[star]?.count ?? 0
+
+              return (
+                <li key={star} className="flex items-center gap-3 text-[13px] text-body">
+                  <span className="w-12 shrink-0">{star} star</span>
+                  <span className="h-1.5 flex-1 bg-line">
+                    <span
+                      className="block h-full bg-brand"
+                      style={{ width: `${percent}%` }}
+                      aria-hidden="true"
+                    />
+                  </span>
+                  <span className="w-6 shrink-0 text-right">{count}</span>
+                </li>
+              )
+            })}
+          </ul>
         </div>
 
-        <div className="col-md-8">
+        <div className="min-w-0">
           {reviews.items?.length > 0 ? (
-            <ul style={{ listStyle: 'none', padding: 0 }}>
+            <ul>
               {reviews.items.map((review) => (
-                <li key={review.id} style={{ padding: '16px 0', borderBottom: '1px solid #eee' }}>
-                  <Stars rating={review.rating} />
-                  <strong style={{ marginLeft: 10 }}>{review.reviewerName}</strong>
-                  {review.comment && <p style={{ marginTop: 6 }}>{review.comment}</p>}
+                <li key={review.id} className="border-b border-line py-5 first:pt-0">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Rating value={review.rating} />
+                    <span className="text-[14px] font-semibold text-ink">
+                      {review.reviewerName}
+                    </span>
+                  </div>
+                  {review.comment && <p className="mt-2 text-body">{review.comment}</p>}
                 </li>
               ))}
             </ul>
           ) : (
-            <p style={{ opacity: 0.7 }}>No reviews yet. Be the first to write one.</p>
+            <p className="text-body">No reviews yet. Be the first to write one.</p>
           )}
 
-          <form onSubmit={handleSubmit(onSubmit)} noValidate style={{ marginTop: 24 }}>
-            <h3>Write a review</h3>
+          <form onSubmit={handleSubmit(onSubmit)} noValidate className="mt-10 max-w-xl">
+            <h3 className="pp-eyebrow text-ink">Write a review</h3>
 
-            <div className="form-group">
-              <label htmlFor="review-rating">Rating</label>
-              <select
-                id="review-rating"
-                className="form-control"
-                {...register('rating', { valueAsNumber: true })}
+            <div className="mt-5 space-y-5">
+              <Field label="Rating" htmlFor="review-rating">
+                <Select id="review-rating" {...register('rating', { valueAsNumber: true })}>
+                  {[5, 4, 3, 2, 1].map((n) => (
+                    <option key={n} value={n}>
+                      {n} star{n === 1 ? '' : 's'}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+
+              <div className="grid gap-5 sm:grid-cols-2">
+                <Field
+                  label="Your name"
+                  htmlFor="review-name"
+                  required
+                  error={errors.reviewer_name?.message}
+                >
+                  <Input
+                    id="review-name"
+                    autoComplete="name"
+                    error={errors.reviewer_name}
+                    {...register('reviewer_name', { required: 'Please enter your name.' })}
+                  />
+                </Field>
+
+                <Field
+                  label="Your email"
+                  htmlFor="review-email"
+                  required
+                  error={errors.reviewer_email?.message}
+                >
+                  <Input
+                    id="review-email"
+                    type="email"
+                    autoComplete="email"
+                    error={errors.reviewer_email}
+                    {...register('reviewer_email', {
+                      required: 'Please enter a valid email address.',
+                    })}
+                  />
+                </Field>
+              </div>
+
+              <Field
+                label="Your review"
+                htmlFor="review-comment"
+                required
+                error={errors.comment?.message}
               >
-                {[5, 4, 3, 2, 1].map((n) => (
-                  <option key={n} value={n}>
-                    {n} star{n === 1 ? '' : 's'}
-                  </option>
-                ))}
-              </select>
+                <Textarea
+                  id="review-comment"
+                  rows={4}
+                  error={errors.comment}
+                  {...register('comment', {
+                    required: 'Please write a review.',
+                    minLength: { value: 10, message: 'Please write at least 10 characters.' },
+                  })}
+                />
+              </Field>
+
+              {status && <Alert tone={status.ok ? 'success' : 'error'}>{status.message}</Alert>}
+
+              <Button type="submit" size="sm" loading={isSubmitting}>
+                {isSubmitting ? 'Submitting…' : 'Submit review'}
+              </Button>
             </div>
-
-            <div className="form-group">
-              <label htmlFor="review-name">Your name</label>
-              <input
-                id="review-name"
-                className="form-control"
-                {...register('reviewer_name', { required: 'Please enter your name.' })}
-                aria-invalid={Boolean(errors.reviewer_name)}
-              />
-              {errors.reviewer_name && (
-                <p style={{ color: '#b00' }}>{errors.reviewer_name.message}</p>
-              )}
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="review-email">Your email</label>
-              <input
-                id="review-email"
-                type="email"
-                className="form-control"
-                {...register('reviewer_email', { required: 'Please enter a valid email address.' })}
-                aria-invalid={Boolean(errors.reviewer_email)}
-              />
-              {errors.reviewer_email && (
-                <p style={{ color: '#b00' }}>{errors.reviewer_email.message}</p>
-              )}
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="review-comment">Your review</label>
-              <textarea
-                id="review-comment"
-                rows="4"
-                className="form-control"
-                {...register('comment', {
-                  required: 'Please write a review.',
-                  minLength: { value: 10, message: 'Please write at least 10 characters.' },
-                })}
-                aria-invalid={Boolean(errors.comment)}
-              />
-              {errors.comment && <p style={{ color: '#b00' }}>{errors.comment.message}</p>}
-            </div>
-
-            {status && (
-              <p role="status" style={{ color: status.ok ? '#146c43' : '#b00' }}>
-                {status.message}
-              </p>
-            )}
-
-            <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-              {isSubmitting ? 'Submitting…' : 'Submit review'}
-            </button>
           </form>
         </div>
       </div>

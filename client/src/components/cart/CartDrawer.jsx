@@ -1,16 +1,20 @@
 import { Link } from 'react-router-dom'
+import { AnimatePresence, motion } from 'motion/react'
+import { Trash2, ShoppingBag } from 'lucide-react'
+import Drawer from '../ui/Drawer.jsx'
+import Image from '../ui/Image.jsx'
+import Button from '../ui/Button.jsx'
 import { useCartStore } from '../../store/index.js'
-import Money from '../common/Money.jsx'
 
 /**
- * Slide-out cart, replacing the jQuery drawer in site-drawers.js.
+ * Cart panel.
  *
- * Totals come straight from the server's summary; nothing here adds anything up.
+ * Every figure shown is the server's pre-formatted string. Nothing here adds anything up:
+ * the server is the single source of truth for money, so what the customer sees cannot
+ * disagree with what checkout charges.
  */
 export default function CartDrawer() {
   const { cart, drawerOpen, closeDrawer, remove, loading } = useCartStore()
-
-  if (!drawerOpen) return null
 
   const removeLine = (item) =>
     remove(item.productId, {
@@ -19,69 +23,93 @@ export default function CartDrawer() {
       package_key: item.packageKey,
     })
 
+  const footer =
+    cart.items.length > 0 ? (
+      <div className="space-y-3">
+        <dl className="space-y-2 text-[14px]">
+          <div className="flex justify-between">
+            <dt className="text-body">Subtotal</dt>
+            <dd className="text-ink">{cart.subtotalFormatted}</dd>
+          </div>
+
+          {cart.discount.amount > 0 && (
+            <div className="flex justify-between text-brand">
+              <dt>Discount{cart.discount.code ? ` (${cart.discount.code})` : ''}</dt>
+              <dd>− {cart.discount.amountFormatted}</dd>
+            </div>
+          )}
+
+          <div className="flex justify-between">
+            <dt className="text-body">Delivery</dt>
+            <dd className="text-ink">{cart.shipping.amountFormatted}</dd>
+          </div>
+
+          <div className="flex justify-between border-t border-line pt-2 text-[16px] font-semibold">
+            <dt className="text-ink">Total</dt>
+            <dd className="text-ink">{cart.totalFormatted}</dd>
+          </div>
+        </dl>
+
+        <div className="flex gap-3 pt-1">
+          <Button to="/cart" variant="outline" size="sm" className="flex-1" onClick={closeDrawer}>
+            View cart
+          </Button>
+          <Button to="/checkout" size="sm" className="flex-1" onClick={closeDrawer}>
+            Checkout
+          </Button>
+        </div>
+      </div>
+    ) : null
+
   return (
-    <>
-      <div
-        className="pp-drawer__backdrop"
-        onClick={closeDrawer}
-        aria-hidden="true"
-        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', zIndex: 1040 }}
-      />
-
-      <aside
-        className="pp-drawer pp-drawer--cart is-open"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Shopping cart"
-        style={{
-          position: 'fixed',
-          top: 0,
-          right: 0,
-          bottom: 0,
-          width: 'min(420px, 100%)',
-          background: '#fff',
-          zIndex: 1050,
-          display: 'flex',
-          flexDirection: 'column',
-        }}
-      >
-        <header
-          className="pp-drawer__head"
-          style={{ display: 'flex', justifyContent: 'space-between', padding: 20 }}
-        >
-          <h2 style={{ margin: 0, fontSize: 18 }}>Your cart ({cart.count})</h2>
-          <button type="button" onClick={closeDrawer} aria-label="Close cart">
-            ×
-          </button>
-        </header>
-
-        <div className="pp-drawer__body" style={{ flex: 1, overflowY: 'auto', padding: '0 20px' }}>
-          {cart.items.length === 0 ? (
-            <p style={{ opacity: 0.7, padding: '40px 0', textAlign: 'center' }}>
-              Your cart is empty.
-            </p>
-          ) : (
-            cart.items.map((item) => (
-              <div
+    <Drawer
+      open={drawerOpen}
+      onClose={closeDrawer}
+      title={`Your cart (${cart.count})`}
+      footer={footer}
+    >
+      {cart.items.length === 0 ? (
+        <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
+          <ShoppingBag size={32} strokeWidth={1.2} aria-hidden="true" className="text-body/50" />
+          <p className="mt-4 text-body">Your cart is empty.</p>
+          <Button to="/shop" variant="outline" size="sm" className="mt-6" onClick={closeDrawer}>
+            Continue shopping
+          </Button>
+        </div>
+      ) : (
+        <ul className="divide-y divide-line px-6">
+          <AnimatePresence initial={false}>
+            {cart.items.map((item) => (
+              <motion.li
                 key={item.lineKey}
-                className="pp-drawer__line"
-                style={{ display: 'flex', gap: 12, padding: '14px 0', borderBottom: '1px solid #eee' }}
+                layout
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.25 }}
+                className="flex gap-4 overflow-hidden py-4"
               >
-                <img src={item.image} alt="" width="64" height="85" loading="lazy" />
+                <Link to={item.url} onClick={closeDrawer} className="w-[72px] shrink-0">
+                  <Image src={item.image} alt="" ratio="product" />
+                </Link>
 
-                <div style={{ flex: 1 }}>
-                  <Link to={item.url} onClick={closeDrawer}>
+                <div className="min-w-0 flex-1">
+                  <Link
+                    to={item.url}
+                    onClick={closeDrawer}
+                    className="line-clamp-2 text-[14px] text-ink transition-colors hover:text-brand"
+                  >
                     {item.title}
                   </Link>
 
                   {(item.color || item.size || item.packageLabel) && (
-                    <p style={{ fontSize: 12, opacity: 0.7, margin: '4px 0' }}>
+                    <p className="mt-1 text-[12px] text-body">
                       {[item.color, item.size, item.packageLabel].filter(Boolean).join(' / ')}
                     </p>
                   )}
 
-                  <p style={{ margin: 0, fontSize: 13 }}>
-                    {item.quantity} × <Money formatted={item.unitPriceFormatted} />
+                  <p className="mt-1 text-[13px] text-ink">
+                    {item.quantity} × {item.unitPriceFormatted}
                   </p>
                 </div>
 
@@ -89,57 +117,16 @@ export default function CartDrawer() {
                   type="button"
                   onClick={() => removeLine(item)}
                   disabled={loading}
-                  aria-label={`Remove ${item.title}`}
+                  aria-label={`Remove ${item.title} from cart`}
+                  className="h-fit p-1.5 text-body transition-colors hover:text-brand disabled:opacity-40"
                 >
-                  ×
+                  <Trash2 size={16} strokeWidth={1.5} aria-hidden="true" />
                 </button>
-              </div>
-            ))
-          )}
-        </div>
-
-        {cart.items.length > 0 && (
-          <footer className="pp-drawer__foot" style={{ padding: 20, borderTop: '1px solid #eee' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>Subtotal</span>
-              <Money formatted={cart.subtotalFormatted} />
-            </div>
-
-            {cart.discount.amount > 0 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Discount{cart.discount.code ? ` (${cart.discount.code})` : ''}</span>
-                <span>− <Money formatted={cart.discount.amountFormatted} /></span>
-              </div>
-            )}
-
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>Delivery</span>
-              <Money formatted={cart.shipping.amountFormatted} />
-            </div>
-
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                fontWeight: 700,
-                marginTop: 8,
-              }}
-            >
-              <span>Total</span>
-              <Money formatted={cart.totalFormatted} />
-            </div>
-
-            <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-              <Link to="/cart" className="btn btn-outline-dark" onClick={closeDrawer} style={{ flex: 1 }}>
-                View cart
-              </Link>
-              <Link to="/checkout" className="btn btn-primary" onClick={closeDrawer} style={{ flex: 1 }}>
-                Checkout
-              </Link>
-            </div>
-          </footer>
-        )}
-      </aside>
-    </>
+              </motion.li>
+            ))}
+          </AnimatePresence>
+        </ul>
+      )}
+    </Drawer>
   )
 }

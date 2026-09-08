@@ -1,42 +1,85 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { AnimatePresence, motion } from 'motion/react'
+import { Check, AlertCircle, Truck, RotateCcw, ChevronDown } from 'lucide-react'
 import { useApi } from '../../hooks/useApi.js'
 import * as api from '../../services/endpoints.js'
-import { useCartStore, useRecentStore, useAuthStore } from '../../store/index.js'
-import ProductGrid from '../../components/product/ProductGrid.jsx'
-import Money from '../../components/common/Money.jsx'
-import Loading from '../../components/common/Loading.jsx'
-import ErrorMessage from '../../components/common/ErrorMessage.jsx'
+import { useCartStore, useRecentStore } from '../../store/index.js'
+import ProductGallery from '../../components/product/ProductGallery.jsx'
+import ProductVariants from '../../components/product/ProductVariants.jsx'
+import ProductQuantity from '../../components/product/ProductQuantity.jsx'
+import WishlistButton from '../../components/product/WishlistButton.jsx'
+import ProductCarousel from '../../components/home/ProductCarousel.jsx'
+import Button from '../../components/ui/Button.jsx'
+import Container from '../../components/ui/Container.jsx'
+import Badge from '../../components/ui/Badge.jsx'
 import Seo from '../../components/common/Seo.jsx'
+import ErrorMessage from '../../components/common/ErrorMessage.jsx'
+import { Skeleton } from '../../components/ui/Skeleton.jsx'
 import NotFound from '../NotFound.jsx'
 import ReviewSection from './ReviewSection.jsx'
+
+/** Collapsible detail panel — replaces the theme's accordion. */
+function Accordion({ title, children, defaultOpen = false }) {
+  const [open, setOpen] = useState(defaultOpen)
+
+  return (
+    <div className="border-b border-line">
+      <h3>
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className="flex w-full items-center justify-between py-4 text-left text-[13px] font-semibold uppercase tracking-[0.1em] text-ink transition-colors hover:text-brand"
+        >
+          {title}
+          <ChevronDown
+            size={16}
+            strokeWidth={1.5}
+            aria-hidden="true"
+            className={`transition-transform duration-300 ${open ? 'rotate-180' : ''}`}
+          />
+        </button>
+      </h3>
+
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+            className="overflow-hidden"
+          >
+            <div className="pb-5 text-body">{children}</div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
 
 /**
  * Product detail.
  *
- * The variant rules here mirror the server's cart service, because a mismatch shows up as
- * "add to cart" failing with a 422 the customer cannot act on:
- *   - the first colour and size are pre-selected, matching resolveVariants()
- *   - the maximum quantity is min(max_unit_buy, colour stock, size stock)
- *   - accessory packages are chosen by KEY only; the price is always the server's
- *
- * The client still never decides the price. It selects, the server prices.
+ * The variant rules mirror the server's cart service, because a mismatch surfaces as
+ * add-to-cart failing with a 422 the customer cannot act on:
+ *   · the first colour (upper-cased) and size are pre-selected
+ *   · max quantity is min(max_unit_buy, colour stock, size stock)
+ *   · packs are chosen by key only — the price is always the server's
  */
 export default function ProductDetail() {
   const { slug } = useParams()
   const navigate = useNavigate()
   const { add, openDrawer, loading: cartLoading } = useCartStore()
   const { ids: recentIds, push: pushRecent, exclude } = useRecentStore()
-  const user = useAuthStore((s) => s.user)
 
   const [color, setColor] = useState(null)
   const [size, setSize] = useState(null)
   const [packageKey, setPackageKey] = useState(null)
   const [quantity, setQuantity] = useState(1)
-  const [activeImage, setActiveImage] = useState(0)
   const [feedback, setFeedback] = useState(null)
 
-  // The recently-viewed list is sent as ids; the server resolves and re-orders them.
   const recentQuery = useMemo(() => exclude(slug).join(','), [recentIds, slug])
 
   const { data, error, loading, refetch } = useApi(
@@ -46,15 +89,13 @@ export default function ProductDetail() {
 
   const product = data?.product
 
-  // Pre-select the first colour and size, matching CartService::resolveVariants — so the
-  // displayed price and stock correspond to what will actually be added.
   useEffect(() => {
     if (!product) return
     setColor(product.colors?.[0]?.name ? String(product.colors[0].name).toUpperCase() : null)
     setSize(product.sizes?.[0]?.name ?? null)
     setPackageKey(product.accessoryPackages?.[0]?.key ?? null)
     setQuantity(1)
-    setActiveImage(0)
+    setFeedback(null)
     pushRecent(product.id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [product?.id])
@@ -80,13 +121,32 @@ export default function ProductDetail() {
   }, [product, color, size])
 
   if (error?.status === 404) return <NotFound />
-  if (loading && !data) return <Loading full />
-  if (error) return <ErrorMessage error={error} onRetry={refetch} />
-  if (!product) return <NotFound />
+
+  if (error) {
+    return (
+      <Container className="py-24">
+        <ErrorMessage error={error} onRetry={refetch} />
+      </Container>
+    )
+  }
+
+  if (loading || !product) {
+    return (
+      <Container className="py-10">
+        <div className="grid gap-10 md:grid-cols-2">
+          <Skeleton className="aspect-[3/4] w-full" />
+          <div className="space-y-4 py-4">
+            <Skeleton className="h-8 w-3/4" />
+            <Skeleton className="h-6 w-1/3" />
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-12 w-full" />
+          </div>
+        </div>
+      </Container>
+    )
+  }
 
   const outOfStock = maxQuantity < 1
-  const selectedPackage = product.accessoryPackages?.find((p) => p.key === packageKey) ?? null
-
   const payload = () => ({
     product_id: product.id,
     quantity,
@@ -116,255 +176,171 @@ export default function ProductDetail() {
     }
   }
 
-  const handleWishlist = async () => {
-    if (!user) {
-      navigate('/login', { state: { from: `/product/${slug}` } })
-      return
-    }
-    try {
-      await api.account.addToWishlist(product.id)
-      setFeedback({ ok: true, message: 'Added to wishlist.' })
-    } catch (err) {
-      setFeedback({ ok: false, message: err.message })
-    }
-  }
-
   return (
-    <div className="container pp-product">
+    <>
       <Seo
         title={product.seo?.title ?? product.title}
         description={product.seo?.description ?? product.shortDescription}
         keywords={product.seo?.keywords}
       />
 
-      <div className="row" style={{ padding: '32px 0' }}>
-        {/* gallery */}
-        <div className="col-md-6">
-          <div className="pp-product__gallery">
-            <img
-              src={product.gallery?.[activeImage] ?? product.image}
-              alt={product.title}
-              style={{ width: '100%', display: 'block' }}
-            />
+      <Container className="pt-8 md:pt-12">
+        <div className="grid gap-8 md:grid-cols-2 md:gap-12 lg:gap-16">
+          <ProductGallery images={product.gallery} title={product.title} />
 
-            {product.gallery?.length > 1 && (
-              <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
-                {product.gallery.map((src, index) => (
-                  <button
-                    key={`${src}-${index}`}
-                    type="button"
-                    onClick={() => setActiveImage(index)}
-                    aria-label={`View image ${index + 1}`}
-                    aria-current={index === activeImage}
-                    style={{
-                      border: index === activeImage ? '2px solid #3a1651' : '1px solid #ddd',
-                      padding: 0,
-                      background: 'none',
-                    }}
-                  >
-                    <img src={src} alt="" width="72" height="96" loading="lazy" />
-                  </button>
-                ))}
-              </div>
+          <div className="md:py-4">
+            {product.category && (
+              <p className="pp-eyebrow mb-3 text-body">{product.category.title}</p>
             )}
-          </div>
-        </div>
 
-        {/* details */}
-        <div className="col-md-6">
-          <h1>{product.title}</h1>
+            <h1 className="pp-heading">{product.title}</h1>
 
-          <div className="pp-product__price" style={{ margin: '12px 0' }}>
-            <Money formatted={product.priceFormatted} className="pp-price" />
-            {product.discountPercent > 0 && (
-              <>
-                <del style={{ marginLeft: 10, opacity: 0.6 }}>
-                  <Money formatted={product.mrpFormatted} />
-                </del>
-                <span style={{ marginLeft: 10, color: '#3a1651' }}>
-                  {product.discountPercent}% OFF
-                </span>
-              </>
-            )}
-          </div>
-
-          {product.shortDescription && <p>{product.shortDescription}</p>}
-
-          {product.colors?.length > 0 && (
-            <fieldset style={{ margin: '18px 0', border: 0, padding: 0 }}>
-              <legend style={{ fontSize: 14, fontWeight: 600 }}>Colour</legend>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {product.colors.map((option) => {
-                  const value = String(option.name).toUpperCase()
-                  const disabled = Number(option.quantity) < 1
-                  return (
-                    <button
-                      key={option.id}
-                      type="button"
-                      onClick={() => setColor(value)}
-                      disabled={disabled}
-                      aria-pressed={color === value}
-                      title={disabled ? `${option.name} — out of stock` : option.name}
-                      style={{
-                        padding: '6px 14px',
-                        border: color === value ? '2px solid #3a1651' : '1px solid #ccc',
-                        opacity: disabled ? 0.4 : 1,
-                        background: '#fff',
-                      }}
-                    >
-                      {option.name}
-                    </button>
-                  )
-                })}
-              </div>
-            </fieldset>
-          )}
-
-          {product.sizes?.length > 0 && (
-            <fieldset style={{ margin: '18px 0', border: 0, padding: 0 }}>
-              <legend style={{ fontSize: 14, fontWeight: 600 }}>Size</legend>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {product.sizes.map((option) => {
-                  const disabled = Number(option.quantity) < 1
-                  return (
-                    <button
-                      key={option.id}
-                      type="button"
-                      onClick={() => setSize(option.name)}
-                      disabled={disabled}
-                      aria-pressed={size === option.name}
-                      style={{
-                        padding: '6px 14px',
-                        border: size === option.name ? '2px solid #3a1651' : '1px solid #ccc',
-                        opacity: disabled ? 0.4 : 1,
-                        background: '#fff',
-                      }}
-                    >
-                      {option.name}
-                    </button>
-                  )
-                })}
-              </div>
-            </fieldset>
-          )}
-
-          {product.accessoryPackages?.length > 0 && (
-            <fieldset style={{ margin: '18px 0', border: 0, padding: 0 }}>
-              <legend style={{ fontSize: 14, fontWeight: 600 }}>Pack</legend>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {product.accessoryPackages.map((option) => (
-                  <button
-                    key={option.key}
-                    type="button"
-                    onClick={() => setPackageKey(option.key)}
-                    aria-pressed={packageKey === option.key}
-                    style={{
-                      padding: '8px 14px',
-                      border: packageKey === option.key ? '2px solid #3a1651' : '1px solid #ccc',
-                      background: '#fff',
-                    }}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-              {/* Shown for reference only — the server re-resolves the price on add. */}
-              {selectedPackage && (
-                <p style={{ marginTop: 8, fontSize: 13, opacity: 0.75 }}>
-                  {selectedPackage.label} — ₹ {Number(selectedPackage.price).toFixed(2)}
-                </p>
+            <div className="mt-4 flex flex-wrap items-baseline gap-3">
+              <span className="text-[22px] font-medium text-ink">{product.priceFormatted}</span>
+              {product.discountPercent > 0 && (
+                <>
+                  <del className="text-[15px] text-body/70">{product.mrpFormatted}</del>
+                  <Badge>{product.discountPercent}% off</Badge>
+                </>
               )}
-            </fieldset>
-          )}
+            </div>
 
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center', margin: '18px 0' }}>
-            <label htmlFor="pp-qty">Quantity</label>
-            <input
-              id="pp-qty"
-              type="number"
-              min="1"
-              max={Math.max(1, maxQuantity)}
-              value={quantity}
-              disabled={outOfStock}
-              onChange={(e) =>
-                setQuantity(Math.max(1, Math.min(maxQuantity, Number(e.target.value) || 1)))
-              }
-              style={{ width: 80 }}
-              className="form-control"
-            />
-            {maxQuantity > 0 && maxQuantity < 10 && (
-              <span style={{ fontSize: 13, opacity: 0.7 }}>Only {maxQuantity} left</span>
+            {product.shortDescription && (
+              <p className="mt-5 max-w-lg text-body">{product.shortDescription}</p>
             )}
+
+            <ProductVariants
+              product={product}
+              color={color}
+              size={size}
+              packageKey={packageKey}
+              onColor={setColor}
+              onSize={setSize}
+              onPackage={setPackageKey}
+            />
+
+            <div className="mt-7 flex flex-wrap items-center gap-4">
+              <ProductQuantity
+                value={quantity}
+                onChange={setQuantity}
+                max={Math.max(1, maxQuantity)}
+                disabled={outOfStock}
+              />
+
+              {maxQuantity > 0 && maxQuantity <= 5 && (
+                <p className="text-[13px] text-brand">Only {maxQuantity} left</p>
+              )}
+            </div>
+
+            <AnimatePresence>
+              {feedback && (
+                <motion.p
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  role="alert"
+                  className={`mt-4 flex items-center gap-2 text-[13px] ${
+                    feedback.ok ? 'text-brand' : 'text-red-700'
+                  }`}
+                >
+                  {feedback.ok ? (
+                    <Check size={15} strokeWidth={2} aria-hidden="true" />
+                  ) : (
+                    <AlertCircle size={15} strokeWidth={2} aria-hidden="true" />
+                  )}
+                  {feedback.message}
+                </motion.p>
+              )}
+            </AnimatePresence>
+
+            <div className="mt-6 flex flex-wrap items-center gap-3">
+              <Button
+                onClick={handleAdd}
+                disabled={outOfStock || cartLoading}
+                loading={cartLoading}
+                className="flex-1 sm:flex-none"
+              >
+                {outOfStock ? 'Out of stock' : 'Add to cart'}
+              </Button>
+
+              <Button
+                variant="outline"
+                onClick={handleBuyNow}
+                disabled={outOfStock || cartLoading}
+                className="flex-1 sm:flex-none"
+              >
+                Buy now
+              </Button>
+
+              <WishlistButton
+                productId={product.id}
+                productTitle={product.title}
+                className="!size-[52px] border border-line !bg-white"
+              />
+            </div>
+
+            <ul className="mt-8 space-y-2.5 text-[13px] text-body">
+              <li className="flex items-center gap-2.5">
+                <Truck size={16} strokeWidth={1.5} aria-hidden="true" className="text-brand" />
+                Free delivery on qualifying orders
+              </li>
+              <li className="flex items-center gap-2.5">
+                <RotateCcw size={16} strokeWidth={1.5} aria-hidden="true" className="text-brand" />
+                7-day returns on unused items
+              </li>
+            </ul>
+
+            <div className="mt-8">
+              {product.features && (
+                <Accordion title="Description" defaultOpen>
+                  <div dangerouslySetInnerHTML={{ __html: product.features }} />
+                </Accordion>
+              )}
+
+              {product.informationItems?.length > 0 && (
+                <Accordion title="Information">
+                  <dl className="space-y-3">
+                    {product.informationItems.map((item, i) => (
+                      <div key={i}>
+                        {item.title && <dt className="text-ink">{item.title}</dt>}
+                        {item.content && <dd className="mt-0.5">{item.content}</dd>}
+                      </div>
+                    ))}
+                  </dl>
+                </Accordion>
+              )}
+
+              {product.specifications?.length > 0 && (
+                <Accordion title="Specifications">
+                  <dl className="divide-y divide-line">
+                    {product.specifications.map((row, i) => (
+                      <div key={i} className="flex justify-between gap-6 py-2.5">
+                        <dt className="text-ink">{row.label ?? row.title}</dt>
+                        <dd className="text-right">{row.value ?? row.content}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </Accordion>
+              )}
+
+              {product.showSizeGuide && product.sizeGuideContent && (
+                <Accordion title="Size guide">
+                  <div dangerouslySetInnerHTML={{ __html: product.sizeGuideContent }} />
+                </Accordion>
+              )}
+            </div>
           </div>
-
-          {feedback && (
-            <p role="alert" style={{ color: feedback.ok ? '#146c43' : '#b00', margin: '8px 0' }}>
-              {feedback.message}
-            </p>
-          )}
-
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={handleAdd}
-              disabled={outOfStock || cartLoading}
-            >
-              {outOfStock ? 'Out of stock' : 'Add to cart'}
-            </button>
-            <button
-              type="button"
-              className="btn btn-outline-dark"
-              onClick={handleBuyNow}
-              disabled={outOfStock || cartLoading}
-            >
-              Buy now
-            </button>
-            <button type="button" className="btn btn-link" onClick={handleWishlist}>
-              ♥ Wishlist
-            </button>
-          </div>
-
-          {product.showSizeGuide && product.sizeGuideContent && (
-            <details style={{ marginTop: 24 }}>
-              <summary>Size guide</summary>
-              <div dangerouslySetInnerHTML={{ __html: product.sizeGuideContent }} />
-            </details>
-          )}
         </div>
-      </div>
+      </Container>
 
-      {product.specifications?.length > 0 && (
-        <section className="pp-section">
-          <h2>Specifications</h2>
-          <table className="table">
-            <tbody>
-              {product.specifications.map((row, index) => (
-                <tr key={index}>
-                  <th scope="row">{row.label ?? row.title}</th>
-                  <td>{row.value ?? row.content}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-      )}
+      <Container>
+        <ReviewSection product={product} slug={slug} onSubmitted={refetch} />
+      </Container>
 
-      <ReviewSection product={product} slug={slug} onSubmitted={refetch} />
+      <ProductCarousel title="You may also like" products={data.related ?? []} />
+      <ProductCarousel title="Recently viewed" products={data.recentlyViewed ?? []} />
 
-      {data.related?.length > 0 && (
-        <section className="pp-section">
-          <h2>You may also like</h2>
-          <ProductGrid products={data.related} />
-        </section>
-      )}
-
-      {data.recentlyViewed?.length > 0 && (
-        <section className="pp-section">
-          <h2>Recently viewed</h2>
-          <ProductGrid products={data.recentlyViewed} />
-        </section>
-      )}
-    </div>
+      <div className="pb-16" />
+    </>
   )
 }

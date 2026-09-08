@@ -1,17 +1,22 @@
-import { Link } from 'react-router-dom'
 import Seo from '../components/common/Seo.jsx'
+import Button from '../components/ui/Button.jsx'
+import Container from '../components/ui/Container.jsx'
 
 export default function NotFound() {
   return (
-    <div className="container" style={{ padding: '80px 0', textAlign: 'center' }}>
+    <Container className="py-24 text-center md:py-32">
       <Seo title="Page not found" noIndex />
-      <h1>Page not found</h1>
-      <p style={{ marginTop: 12, opacity: 0.7 }}>
+      <p className="pp-eyebrow text-brand">404</p>
+      <h1 className="pp-heading mt-3">Page not found</h1>
+      <p className="mx-auto mt-3 max-w-md text-body">
         The page you are looking for does not exist or has moved.
       </p>
-      <Link to="/" className="btn btn-primary" style={{ marginTop: 20 }}>
-        Back to home
-      </Link>
-    </div>
+      <div className="mt-8 flex justify-center gap-3">
+        <Button to="/">Back to home</Button>
+        <Button to="/shop" variant="outline">
+          Shop all
+        </Button>
+      </div>
+    </Container>
   )
 }

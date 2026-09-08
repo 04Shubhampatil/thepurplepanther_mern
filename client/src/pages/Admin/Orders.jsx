@@ -1,17 +1,32 @@
 import { useState } from 'react'
+import { Search } from 'lucide-react'
 import { useApi } from '../../hooks/useApi.js'
 import * as api from '../../services/endpoints.js'
 import Loading from '../../components/common/Loading.jsx'
 import ErrorMessage from '../../components/common/ErrorMessage.jsx'
 import Pagination from '../../components/common/Pagination.jsx'
+import Modal from '../../components/ui/Modal.jsx'
+import Alert from '../../components/ui/Alert.jsx'
 import { formatDate } from '../../utils/format.js'
+import {
+  AdminPage,
+  Table,
+  Th,
+  Td,
+  EmptyRow,
+  AdminButton,
+  Pill,
+  CONTROL,
+} from '../../components/admin/AdminUI.jsx'
+
+const STATUSES = ['pending', 'placed', 'packed', 'shipped', 'delivered', 'cancelled']
 
 /**
  * Order management.
  *
  * The status dropdown is populated from the SERVER's `nextOptions` for that order, so the
  * UI can only ever offer a legal transition — and the server refuses anything else
- * regardless. `delivered` and `cancelled` are terminal, so their dropdowns are empty.
+ * regardless. `delivered` and `cancelled` are terminal, so their option lists are empty.
  */
 export default function Orders() {
   const [page, setPage] = useState(1)
@@ -22,7 +37,8 @@ export default function Orders() {
   const [notice, setNotice] = useState(null)
 
   const { data, error, loading, refetch } = useApi(
-    () => api.admin.orders.list({ page, search: search || undefined, status: status || undefined }),
+    () =>
+      api.admin.orders.list({ page, search: search || undefined, status: status || undefined }),
     [page, search, status],
   )
 
@@ -35,12 +51,17 @@ export default function Orders() {
     setStatusData(statuses)
   }
 
+  const closeOrder = () => {
+    setSelected(null)
+    setStatusData(null)
+  }
+
   const changeStatus = async (nextStatus) => {
     setNotice(null)
     try {
       await api.admin.orders.updateStatus(selected.id, { status: nextStatus })
       setNotice(`Order ${selected.orderNumber} updated. The customer has been emailed.`)
-      setSelected(null)
+      closeOrder()
       refetch()
     } catch (err) {
       setNotice(err.message)
@@ -63,192 +84,201 @@ export default function Orders() {
 
   const money = (value) => `₹ ${Number(value).toFixed(2)}`
 
-  return (
-    <div>
-      <h1 style={{ fontSize: 24 }}>Orders</h1>
+  const statusTone = (value) => {
+    if (value === 'delivered') return 'good'
+    if (value === 'cancelled') return 'bad'
+    if (value === 'pending') return 'warn'
+    return 'brand'
+  }
 
+  return (
+    <AdminPage title="Orders">
       {notice && (
-        <div className="alert alert-info" role="status">
+        <Alert tone="info" className="mb-5">
           {notice}
-        </div>
+        </Alert>
       )}
 
-      <div style={{ display: 'flex', gap: 12, margin: '16px 0' }}>
-        <input
-          className="form-control"
-          placeholder="Search by order number, name, email…"
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value)
-            setPage(1)
-          }}
-          style={{ maxWidth: 320 }}
-          aria-label="Search orders"
-        />
+      <div className="mb-6 flex flex-wrap gap-3">
+        <div className="relative w-full max-w-sm">
+          <Search
+            size={16}
+            strokeWidth={1.5}
+            aria-hidden="true"
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-body"
+          />
+          <label htmlFor="order-search" className="sr-only">
+            Search orders
+          </label>
+          <input
+            id="order-search"
+            type="search"
+            placeholder="Search by order number, name, email…"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value)
+              setPage(1)
+            }}
+            className={`${CONTROL} w-full pl-9`}
+          />
+        </div>
 
-        <select
-          className="form-control"
-          value={status}
-          onChange={(e) => {
-            setStatus(e.target.value)
-            setPage(1)
-          }}
-          style={{ maxWidth: 180 }}
-          aria-label="Filter by status"
-        >
-          <option value="">All statuses</option>
-          {['pending', 'placed', 'packed', 'shipped', 'delivered', 'cancelled'].map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
+        <div>
+          <label htmlFor="order-status" className="sr-only">
+            Filter by status
+          </label>
+          <select
+            id="order-status"
+            value={status}
+            onChange={(e) => {
+              setStatus(e.target.value)
+              setPage(1)
+            }}
+            className={`${CONTROL} w-[180px] capitalize`}
+          >
+            <option value="">All statuses</option>
+            {STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
-      <table className="table">
-        <thead>
-          <tr>
-            <th scope="col">Order</th>
-            <th scope="col">Customer</th>
-            <th scope="col">Date</th>
-            <th scope="col">Payment</th>
-            <th scope="col">Status</th>
-            <th scope="col">Total</th>
-            <th scope="col"><span className="sr-only">Actions</span></th>
+      <Table
+        caption="Orders"
+        head={
+          <>
+            <Th>Order</Th>
+            <Th>Customer</Th>
+            <Th>Date</Th>
+            <Th>Payment</Th>
+            <Th>Status</Th>
+            <Th className="text-right">Total</Th>
+            <Th className="text-right">
+              <span className="sr-only">Actions</span>
+            </Th>
+          </>
+        }
+      >
+        {(data?.items ?? []).map((order) => (
+          <tr key={order.id}>
+            <Td className="whitespace-nowrap font-semibold">{order.orderNumber}</Td>
+            <Td>
+              {order.userName}
+              <span className="mt-0.5 block break-all text-[12px] text-body">
+                {order.userEmail}
+              </span>
+            </Td>
+            <Td className="whitespace-nowrap">{formatDate(order.orderedAt)}</Td>
+            <Td>
+              <Pill tone={order.paymentStatus === 'paid' ? 'good' : 'warn'}>
+                {order.paymentStatus}
+              </Pill>
+            </Td>
+            <Td>
+              <Pill tone={statusTone(order.status)}>{order.statusLabel}</Pill>
+            </Td>
+            <Td className="whitespace-nowrap text-right">{money(order.payableAmount)}</Td>
+            <Td className="text-right">
+              <AdminButton onClick={() => openOrder(order)}>
+                Manage
+                <span className="sr-only"> order {order.orderNumber}</span>
+              </AdminButton>
+            </Td>
           </tr>
-        </thead>
-        <tbody>
-          {(data?.items ?? []).map((order) => (
-            <tr key={order.id}>
-              <td>{order.orderNumber}</td>
-              <td>
-                {order.userName}
-                <br />
-                <small style={{ opacity: 0.7 }}>{order.userEmail}</small>
-              </td>
-              <td>{formatDate(order.orderedAt)}</td>
-              <td>
-                <span className={order.paymentStatus === 'paid' ? 'pp-badge' : ''}>
-                  {order.paymentStatus}
-                </span>
-              </td>
-              <td>{order.statusLabel}</td>
-              <td>{money(order.payableAmount)}</td>
-              <td>
-                <button type="button" onClick={() => openOrder(order)}>
-                  Manage
-                </button>
-              </td>
-            </tr>
-          ))}
+        ))}
 
-          {data?.items?.length === 0 && (
-            <tr>
-              <td colSpan="7" style={{ opacity: 0.6 }}>
-                No orders found.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+        {data?.items?.length === 0 && <EmptyRow colSpan={7}>No orders found.</EmptyRow>}
+      </Table>
 
       <Pagination pagination={data?.pagination} onPage={setPage} />
 
-      {selected && statusData && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label={`Manage order ${selected.orderNumber}`}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1050,
-          }}
-        >
-          <div
-            style={{
-              background: '#fff',
-              padding: 24,
-              width: 'min(680px, 94vw)',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <h2 style={{ fontSize: 20 }}>Order {selected.orderNumber}</h2>
-              <button type="button" onClick={() => setSelected(null)} aria-label="Close">
-                ×
-              </button>
-            </div>
-
-            <p style={{ opacity: 0.75 }}>
+      <Modal
+        open={Boolean(selected && statusData)}
+        onClose={closeOrder}
+        title={selected ? `Order ${selected.orderNumber}` : ''}
+      >
+        {selected && statusData && (
+          <div className="space-y-7">
+            <p className="text-[14px] text-body">
               {selected.shippingName} · {selected.shippingPhone} · {selected.shippingEmail}
             </p>
 
-            <h3 style={{ fontSize: 16 }}>Items</h3>
-            <ul style={{ paddingLeft: 18 }}>
-              {selected.items.map((item) => (
-                <li key={item.id}>
-                  {item.productTitle} × {item.quantity} — {money(item.totalPrice)}
-                </li>
-              ))}
-            </ul>
-
-            <h3 style={{ fontSize: 16 }}>Status</h3>
-            <p>
-              Current: <strong>{statusData.statusLabel}</strong>
-            </p>
-
-            {statusData.options.length > 0 ? (
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {statusData.options.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    className="btn btn-outline-dark"
-                    onClick={() => changeStatus(option.value)}
-                  >
-                    Mark {option.label}
-                  </button>
+            <section>
+              <h3 className="pp-eyebrow text-ink">Items</h3>
+              <ul className="mt-3 divide-y divide-line border-y border-line">
+                {selected.items.map((item) => (
+                  <li key={item.id} className="flex justify-between gap-4 py-2.5 text-[14px]">
+                    <span className="text-ink">
+                      {item.productTitle}
+                      <span className="text-body"> × {item.quantity}</span>
+                    </span>
+                    <span className="shrink-0 text-ink">{money(item.totalPrice)}</span>
+                  </li>
                 ))}
-              </div>
-            ) : (
-              <p style={{ opacity: 0.7 }}>
-                This order is {statusData.statusLabel.toLowerCase()} and cannot be changed further.
+              </ul>
+            </section>
+
+            <section>
+              <h3 className="pp-eyebrow text-ink">Status</h3>
+              <p className="mt-2 text-[14px] text-body">
+                Current:{' '}
+                <strong className="font-semibold text-ink">{statusData.statusLabel}</strong>
               </p>
-            )}
 
-            <h3 style={{ fontSize: 16, marginTop: 20 }}>Expected delivery</h3>
-            <input
-              type="date"
-              className="form-control"
-              defaultValue={
-                statusData.expectedDeliveryDate
-                  ? new Date(statusData.expectedDeliveryDate).toISOString().slice(0, 10)
-                  : ''
-              }
-              onBlur={(e) => e.target.value && setDeliveryDate(e.target.value)}
-              style={{ maxWidth: 220 }}
-              aria-label="Expected delivery date"
-            />
+              {statusData.options.length > 0 ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {statusData.options.map((option) => (
+                    <AdminButton key={option.value} onClick={() => changeStatus(option.value)}>
+                      Mark {option.label}
+                    </AdminButton>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-2 text-[14px] text-body">
+                  This order is {statusData.statusLabel.toLowerCase()} and cannot be changed
+                  further.
+                </p>
+              )}
+            </section>
 
-            <h3 style={{ fontSize: 16, marginTop: 20 }}>History</h3>
-            <ul style={{ paddingLeft: 18 }}>
-              {statusData.logs.map((log) => (
-                <li key={log.id}>
-                  <strong>{log.title}</strong> — {log.description}
-                  <br />
-                  <small style={{ opacity: 0.6 }}>{formatDate(log.loggedAt)}</small>
-                </li>
-              ))}
-            </ul>
+            <section>
+              <h3 className="pp-eyebrow text-ink">Expected delivery</h3>
+              <label htmlFor="order-delivery-date" className="sr-only">
+                Expected delivery date
+              </label>
+              <input
+                id="order-delivery-date"
+                type="date"
+                defaultValue={
+                  statusData.expectedDeliveryDate
+                    ? new Date(statusData.expectedDeliveryDate).toISOString().slice(0, 10)
+                    : ''
+                }
+                onBlur={(e) => e.target.value && setDeliveryDate(e.target.value)}
+                className={`${CONTROL} mt-3 w-[220px]`}
+              />
+            </section>
+
+            <section>
+              <h3 className="pp-eyebrow text-ink">History</h3>
+              <ul className="mt-3 space-y-3">
+                {statusData.logs.map((log) => (
+                  <li key={log.id} className="border-l-2 border-line pl-4 text-[14px]">
+                    <strong className="font-semibold text-ink">{log.title}</strong>
+                    <span className="text-body"> — {log.description}</span>
+                    <span className="mt-0.5 block text-[12px] text-body">
+                      {formatDate(log.loggedAt)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </Modal>
+    </AdminPage>
   )
 }

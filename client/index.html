@@ -4,29 +4,25 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" href="/favicon.ico" />
+    <meta name="theme-color" content="#3a1651" />
 
     <title>The Purple Panther</title>
     <meta name="description" content="The Purple Panther — beyond ordinary." />
 
     <!--
-      The existing theme, served unchanged from the API at /frontend (see server/src/app.js).
-      Keeping ONE copy at the original path means every relative url() inside these
-      stylesheets resolves exactly as it did under Laravel, so the visual design is
-      preserved rather than re-implemented. The migration brief's first goal is functional
-      parity, not a redesign (§35).
+      No legacy stylesheets.
+
+      The Laravel theme loaded Bootstrap, Font Awesome, Flaticon, animate.css, Swiper CSS,
+      Magnific Popup, style.css, custom.css, custome-css.css, site-drawers.css,
+      journal.css and beyond-ordinary.css — roughly 2.3MB of CSS plus 8.7MB of icon fonts.
+      All of it is replaced by Tailwind, lucide-react and Motion. Styles are imported
+      through src/index.css so Vite can process and tree-shake them.
+
+      The theme's IMAGE assets are still served from the API at /frontend, because those
+      are real product and editorial photography, not styling.
     -->
-    <link rel="stylesheet" href="/frontend/css/bootstrap.min.css" />
-    <link rel="stylesheet" href="/frontend/css/font-awesome.css" />
-    <link rel="stylesheet" href="/frontend/css/flaticon.css" />
-    <link rel="stylesheet" href="/frontend/css/animate.css" />
-    <link rel="stylesheet" href="/frontend/css/swiper-bundle.min.css" />
-    <link rel="stylesheet" href="/frontend/css/magnific-popup.css" />
-    <link rel="stylesheet" href="/frontend/css/style.css" />
-    <link rel="stylesheet" href="/frontend/css/custom.css" />
-    <link rel="stylesheet" href="/frontend/css/custome-css.css" />
-    <link rel="stylesheet" href="/frontend/css/site-drawers.css" />
-    <link rel="stylesheet" href="/frontend/css/journal.css" />
-    <link rel="stylesheet" href="/frontend/css/beyond-ordinary.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   </head>
   <body>
     <div id="root"></div>

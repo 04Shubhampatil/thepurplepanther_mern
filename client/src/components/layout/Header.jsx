@@ -1,107 +1,140 @@
-import { useState } from 'react'
-import { Link, NavLink, useNavigate } from 'react-router-dom'
-import { useAuthStore, useCartStore, useConfigStore } from '../../store/index.js'
-import SearchBox from './SearchBox.jsx'
+import { useEffect, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { motion } from 'motion/react'
+import { Menu, Search, User, Heart, ShoppingBag } from 'lucide-react'
+import Container from '../ui/Container.jsx'
+import MobileMenu from './MobileMenu.jsx'
+import SearchDrawer from './SearchDrawer.jsx'
+import { useAuthStore, useCartStore } from '../../store/index.js'
 
-/** Site header: navigation, search, account and the cart count. */
-export default function Header() {
-  const { user, logout } = useAuthStore()
+/**
+ * Site header.
+ *
+ * Layout mirrors the live site exactly: MENU + search on the left, the wordmark centred,
+ * account / wishlist / cart on the right. Navigation lives in a slide-out panel on every
+ * breakpoint, which is how the original behaves — it is not a mobile-only pattern.
+ *
+ * The header is transparent over the homepage hero and becomes solid once scrolled, so
+ * the wordmark stays legible against the video.
+ */
+export default function Header({ transparent = false }) {
+  const { user } = useAuthStore()
   const { cart, openDrawer } = useCartStore()
-  const categories = useConfigStore((s) => s.categories)
   const [menuOpen, setMenuOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
   const navigate = useNavigate()
 
-  const handleLogout = async () => {
-    await logout()
-    navigate('/')
-  }
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 40)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
+  const overlay = transparent && !scrolled
+  const tone = overlay ? 'text-white' : 'text-ink'
+
+  const iconButton =
+    'grid size-10 place-items-center transition-colors duration-200 hover:text-brand ' +
+    (overlay ? 'hover:text-white/70' : '')
 
   return (
-    <header className="pp-header">
-      <div className="container">
-        <div
-          className="pp-header__inner"
-          style={{ display: 'flex', alignItems: 'center', gap: 16 }}
-        >
-          <button
-            type="button"
-            className="pp-header__toggle d-lg-none"
-            aria-label="Toggle navigation"
-            aria-expanded={menuOpen}
-            onClick={() => setMenuOpen((v) => !v)}
-          >
-            <i className="fa fa-bars" aria-hidden="true" />
-          </button>
+    <>
+      <motion.header
+        initial={false}
+        animate={{
+          backgroundColor: overlay ? 'rgba(255,255,255,0)' : 'rgba(255,255,255,1)',
+          borderBottomColor: overlay ? 'rgba(230,226,221,0)' : 'rgba(230,226,221,1)',
+        }}
+        transition={{ duration: 0.3 }}
+        className={`sticky top-0 z-50 border-b ${tone}`}
+      >
+        <Container>
+          <div className="flex h-16 items-center justify-between gap-4 md:h-20">
+            {/* left */}
+            <div className="flex flex-1 items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setMenuOpen(true)}
+                className={`${iconButton} -ml-2 flex w-auto items-center gap-2 px-2`}
+                aria-label="Open menu"
+                aria-expanded={menuOpen}
+              >
+                <Menu size={20} strokeWidth={1.5} aria-hidden="true" />
+                <span className="hidden text-[12px] font-semibold uppercase tracking-[0.14em] sm:inline">
+                  Menu
+                </span>
+              </button>
 
-          <Link to="/" className="pp-header__logo" aria-label="The Purple Panther — home">
-            {/* logo-new.svg is what the Blade header used; logo.png does not exist. */}
-            <img src="/frontend/images/logo-new.svg" alt="The Purple Panther" height="44" />
-          </Link>
+              <button
+                type="button"
+                onClick={() => setSearchOpen(true)}
+                className={iconButton}
+                aria-label="Search products"
+              >
+                <Search size={20} strokeWidth={1.5} aria-hidden="true" />
+              </button>
+            </div>
 
-          <nav className={`pp-header__nav ${menuOpen ? 'is-open' : ''}`} aria-label="Main">
-            <ul style={{ display: 'flex', gap: 20, listStyle: 'none', margin: 0, padding: 0 }}>
-              <li>
-                <NavLink to="/shop" onClick={() => setMenuOpen(false)}>
-                  Shop
-                </NavLink>
-              </li>
-
-              {categories.slice(0, 6).map((category) => (
-                <li key={category.id}>
-                  {/* Clean category URL, preserved from Laravel: /accessories, /shirts, … */}
-                  <NavLink to={`/${category.slug}`} onClick={() => setMenuOpen(false)}>
-                    {category.title}
-                  </NavLink>
-                </li>
-              ))}
-
-              <li>
-                <NavLink to="/blog" onClick={() => setMenuOpen(false)}>
-                  Journal
-                </NavLink>
-              </li>
-              <li>
-                <NavLink to="/about" onClick={() => setMenuOpen(false)}>
-                  About
-                </NavLink>
-              </li>
-            </ul>
-          </nav>
-
-          <div
-            className="pp-header__actions"
-            style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 14 }}
-          >
-            <button type="button" aria-label="Search" onClick={() => setSearchOpen((v) => !v)}>
-              <i className="fa fa-search" aria-hidden="true" />
-            </button>
-
-            {user ? (
-              <div className="pp-header__account" style={{ display: 'flex', gap: 12 }}>
-                <Link to="/account/overview">{user.firstName || 'Account'}</Link>
-                <button type="button" onClick={handleLogout}>
-                  Sign out
-                </button>
-              </div>
-            ) : (
-              <Link to="/login">Sign in</Link>
-            )}
-
-            <button
-              type="button"
-              className="pp-header__cart"
-              onClick={openDrawer}
-              aria-label={`Cart, ${cart.count} item${cart.count === 1 ? '' : 's'}`}
+            {/* wordmark */}
+            <Link
+              to="/"
+              className="shrink-0 text-center"
+              aria-label="The Purple Panther — home"
             >
-              <i className="fa fa-shopping-bag" aria-hidden="true" />
-              {cart.count > 0 && <span className="pp-header__cart-count">{cart.count}</span>}
-            </button>
-          </div>
-        </div>
+              <span
+                className={`font-alt text-[15px] font-bold uppercase leading-none tracking-[0.22em] md:text-[17px] ${
+                  overlay ? 'text-white' : 'text-brand'
+                }`}
+              >
+                Purple Panther
+              </span>
+            </Link>
 
-        {searchOpen && <SearchBox onClose={() => setSearchOpen(false)} />}
-      </div>
-    </header>
+            {/* right */}
+            <div className="flex flex-1 items-center justify-end gap-1">
+              <button
+                type="button"
+                onClick={() => navigate(user ? '/account/overview' : '/login')}
+                className={iconButton}
+                aria-label={user ? 'Your account' : 'Sign in'}
+              >
+                <User size={20} strokeWidth={1.5} aria-hidden="true" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => navigate(user ? '/account/wishlist' : '/login')}
+                className={`${iconButton} hidden sm:grid`}
+                aria-label="Wishlist"
+              >
+                <Heart size={20} strokeWidth={1.5} aria-hidden="true" />
+              </button>
+
+              <button
+                type="button"
+                onClick={openDrawer}
+                className={`${iconButton} relative`}
+                aria-label={`Cart, ${cart.count} item${cart.count === 1 ? '' : 's'}`}
+              >
+                <ShoppingBag size={20} strokeWidth={1.5} aria-hidden="true" />
+                {cart.count > 0 && (
+                  <span
+                    className="absolute right-1 top-1 grid size-[18px] place-items-center rounded-full bg-brand text-[10px] font-semibold text-white"
+                    aria-hidden="true"
+                  >
+                    {cart.count}
+                  </span>
+                )}
+              </button>
+            </div>
+          </div>
+        </Container>
+      </motion.header>
+
+      <MobileMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
+      <SearchDrawer open={searchOpen} onClose={() => setSearchOpen(false)} />
+    </>
   )
 }

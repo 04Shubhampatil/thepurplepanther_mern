@@ -1,6 +1,12 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
+import { motion, AnimatePresence } from 'motion/react'
+import { Plus, Pencil, Trash2, Star } from 'lucide-react'
 import * as api from '../../services/endpoints.js'
+import Button from '../../components/ui/Button.jsx'
+import Badge from '../../components/ui/Badge.jsx'
+import Alert from '../../components/ui/Alert.jsx'
+import { Field, Input, Checkbox } from '../../components/ui/Field.jsx'
 
 const BLANK = {
   name: '',
@@ -90,114 +96,160 @@ export default function AddressBook({ addresses, onChange }) {
     await refresh()
   }
 
-  const field = (name, label, required = false) => (
-    <div className="form-group">
-      <label htmlFor={`ad-${name}`}>{label}</label>
-      <input
-        id={`ad-${name}`}
-        className="form-control"
-        {...register(name, required ? { required: `${label} is required.` } : {})}
-      />
-      {errors[name] && <p style={{ color: '#b00', fontSize: 13 }}>{errors[name].message}</p>}
-    </div>
-  )
+  const field = (name, label, required = false, className = '') => {
+    const id = `ad-${name}`
+    return (
+      <Field
+        label={label}
+        htmlFor={id}
+        required={required}
+        error={errors[name]?.message}
+        className={className}
+      >
+        <Input
+          id={id}
+          error={errors[name]}
+          {...register(name, required ? { required: `${label} is required.` } : {})}
+        />
+      </Field>
+    )
+  }
+
+  const action =
+    'inline-flex items-center gap-1.5 text-[12px] uppercase tracking-[0.08em] text-body transition-colors hover:text-brand'
 
   return (
     <section>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2>Addresses</h2>
-        <button type="button" className="btn btn-outline-dark" onClick={startCreate}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="pp-heading">Addresses</h2>
+        <Button type="button" variant="outline" size="sm" onClick={startCreate}>
+          <Plus size={15} strokeWidth={1.5} aria-hidden="true" />
           Add address
-        </button>
+        </Button>
       </div>
 
       {failure && (
-        <div className="alert alert-danger" role="alert">
+        <Alert tone="error" className="mt-5">
           {failure}
-        </div>
+        </Alert>
       )}
 
-      {editing && (
-        <form
-          onSubmit={handleSubmit(onSubmit)}
-          noValidate
-          style={{ border: '1px solid #eee', padding: 16, margin: '16px 0' }}
-        >
-          <h3 style={{ fontSize: 16 }}>{editing === 'new' ? 'New address' : 'Edit address'}</h3>
+      <AnimatePresence initial={false}>
+        {editing && (
+          <motion.form
+            key="address-form"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
+            onSubmit={handleSubmit(onSubmit)}
+            noValidate
+            className="overflow-hidden"
+          >
+            <div className="mt-6 border border-line p-5">
+              <h3 className="pp-eyebrow text-ink">
+                {editing === 'new' ? 'New address' : 'Edit address'}
+              </h3>
 
-          {field('name', 'Full name', true)}
-          {field('address_line1', 'Address', true)}
-          {field('address_line2', 'Apartment, suite (optional)')}
+              <div className="mt-5 space-y-5">
+                {field('name', 'Full name', true)}
+                {field('address_line1', 'Address', true)}
+                {field('address_line2', 'Apartment, suite (optional)')}
 
-          <div className="row">
-            <div className="col-sm-4">{field('city', 'City', true)}</div>
-            <div className="col-sm-4">{field('state', 'State')}</div>
-            <div className="col-sm-4">{field('pincode', 'Pincode', true)}</div>
-          </div>
+                <div className="grid gap-5 sm:grid-cols-3">
+                  {field('city', 'City', true)}
+                  {field('state', 'State')}
+                  {field('pincode', 'Pincode', true)}
+                </div>
 
-          <div className="row">
-            <div className="col-sm-6">{field('country', 'Country', true)}</div>
-            <div className="col-sm-6">{field('phone', 'Phone')}</div>
-          </div>
+                <div className="grid gap-5 sm:grid-cols-2">
+                  {field('country', 'Country', true)}
+                  {field('phone', 'Phone')}
+                </div>
 
-          {field('label', 'Label (Home, Work…)')}
+                {field('label', 'Label (Home, Work…)')}
 
-          <div className="form-check">
-            <input
-              id="ad-default"
-              type="checkbox"
-              className="form-check-input"
-              {...register('is_default')}
-            />
-            <label htmlFor="ad-default" className="form-check-label">
-              Use as my default address
-            </label>
-          </div>
+                <Checkbox
+                  id="ad-default"
+                  label="Use as my default address"
+                  {...register('is_default')}
+                />
+              </div>
 
-          <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
-            <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-              {isSubmitting ? 'Saving…' : 'Save address'}
-            </button>
-            <button type="button" className="btn btn-link" onClick={() => setEditing(null)}>
-              Cancel
-            </button>
-          </div>
-        </form>
-      )}
+              <div className="mt-6 flex flex-wrap items-center gap-3">
+                <Button type="submit" size="sm" loading={isSubmitting}>
+                  {isSubmitting ? 'Saving…' : 'Save address'}
+                </Button>
+                <button
+                  type="button"
+                  onClick={() => setEditing(null)}
+                  className="text-[13px] text-body underline underline-offset-2 transition-colors hover:text-brand"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </motion.form>
+        )}
+      </AnimatePresence>
 
       {addresses.length === 0 && !editing ? (
-        <p style={{ opacity: 0.7 }}>You have not saved any addresses yet.</p>
+        <p className="mt-6 text-body">You have not saved any addresses yet.</p>
       ) : (
-        <div className="row">
+        <ul className="mt-6 grid gap-5 md:grid-cols-2">
           {addresses.map((address) => (
-            <div className="col-md-6" key={address.id}>
-              <article style={{ border: '1px solid #eee', padding: 16, marginBottom: 16 }}>
-                {address.default && <span className="pp-badge">Default</span>}
-                <strong style={{ display: 'block' }}>{address.name}</strong>
-                <p style={{ margin: '6px 0', opacity: 0.85 }}>
-                  {[address.line1, address.line2, address.city, address.state, address.postcode, address.country]
+            <li key={address.id}>
+              <article className="flex h-full flex-col border border-line p-5">
+                {address.default && (
+                  <Badge tone="outline" className="mb-3 self-start">
+                    Default
+                  </Badge>
+                )}
+
+                <p className="text-[14px] font-semibold text-ink">{address.name}</p>
+                <address className="mt-1.5 flex-1 not-italic text-body">
+                  {[
+                    address.line1,
+                    address.line2,
+                    address.city,
+                    address.state,
+                    address.postcode,
+                    address.country,
+                  ]
                     .filter(Boolean)
                     .join(', ')}
-                </p>
-                {address.phone && <p style={{ margin: 0, opacity: 0.7 }}>{address.phone}</p>}
+                  {address.phone && (
+                    <>
+                      <br />
+                      {address.phone}
+                    </>
+                  )}
+                </address>
 
-                <div style={{ display: 'flex', gap: 12, marginTop: 10 }}>
-                  <button type="button" onClick={() => startEdit(address)}>
+                <div className="mt-4 flex flex-wrap items-center gap-4 border-t border-line pt-4">
+                  <button type="button" onClick={() => startEdit(address)} className={action}>
+                    <Pencil size={13} strokeWidth={1.5} aria-hidden="true" />
                     Edit
+                    <span className="sr-only"> address for {address.name}</span>
                   </button>
+
                   {!address.default && (
-                    <button type="button" onClick={() => makeDefault(address)}>
+                    <button type="button" onClick={() => makeDefault(address)} className={action}>
+                      <Star size={13} strokeWidth={1.5} aria-hidden="true" />
                       Make default
                     </button>
                   )}
-                  <button type="button" onClick={() => remove(address)}>
+
+                  <button type="button" onClick={() => remove(address)} className={action}>
+                    <Trash2 size={13} strokeWidth={1.5} aria-hidden="true" />
                     Delete
+                    <span className="sr-only"> address for {address.name}</span>
                   </button>
                 </div>
               </article>
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </section>
   )

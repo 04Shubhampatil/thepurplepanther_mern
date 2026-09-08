@@ -3,12 +3,19 @@ import { useForm } from 'react-hook-form'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../../store/index.js'
 import Seo from '../../components/common/Seo.jsx'
+import Button from '../../components/ui/Button.jsx'
+import Alert from '../../components/ui/Alert.jsx'
+import { Field, Input } from '../../components/ui/Field.jsx'
+import AuthCard from './AuthCard.jsx'
 
 export default function Login() {
   const login = useAuthStore((s) => s.login)
   const navigate = useNavigate()
   const location = useLocation()
   const [failure, setFailure] = useState(null)
+
+  // ResetPassword sends the customer here with a confirmation to show.
+  const notice = location.state?.notice ?? null
 
   const {
     register,
@@ -34,54 +41,69 @@ export default function Login() {
   }
 
   return (
-    <div className="container" style={{ padding: '48px 0', maxWidth: 460 }}>
+    <AuthCard
+      title="Sign in"
+      footer={
+        <>
+          <p>
+            <Link
+              to="/forgot-password"
+              className="text-ink underline underline-offset-2 transition-colors hover:text-brand"
+            >
+              Forgotten your password?
+            </Link>
+          </p>
+          <p>
+            New here?{' '}
+            <Link
+              to="/signup"
+              className="text-ink underline underline-offset-2 transition-colors hover:text-brand"
+            >
+              Create an account
+            </Link>
+          </p>
+        </>
+      }
+    >
       <Seo title="Sign in" noIndex />
-      <h1>Sign in</h1>
 
-      {failure && (
-        <div className="alert alert-danger" role="alert">
-          {failure}
-        </div>
+      {notice && (
+        <Alert tone="success" className="mb-5">
+          {notice}
+        </Alert>
       )}
 
-      <form onSubmit={handleSubmit(onSubmit)} noValidate>
-        <div className="form-group">
-          <label htmlFor="login-email">Email</label>
-          <input
+      {failure && (
+        <Alert tone="error" className="mb-5">
+          {failure}
+        </Alert>
+      )}
+
+      <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
+        <Field label="Email" htmlFor="login-email" required error={errors.email?.message}>
+          <Input
             id="login-email"
             type="email"
             autoComplete="email"
-            className="form-control"
-            aria-invalid={Boolean(errors.email)}
+            error={errors.email}
             {...register('email', { required: 'Please enter your email address.' })}
           />
-          {errors.email && <p style={{ color: '#b00' }}>{errors.email.message}</p>}
-        </div>
+        </Field>
 
-        <div className="form-group">
-          <label htmlFor="login-password">Password</label>
-          <input
+        <Field label="Password" htmlFor="login-password" required error={errors.password?.message}>
+          <Input
             id="login-password"
             type="password"
             autoComplete="current-password"
-            className="form-control"
-            aria-invalid={Boolean(errors.password)}
+            error={errors.password}
             {...register('password', { required: 'Please enter your password.' })}
           />
-          {errors.password && <p style={{ color: '#b00' }}>{errors.password.message}</p>}
-        </div>
+        </Field>
 
-        <button type="submit" className="btn btn-primary" disabled={isSubmitting} style={{ width: '100%' }}>
+        <Button type="submit" size="sm" loading={isSubmitting} className="w-full">
           {isSubmitting ? 'Signing in…' : 'Sign in'}
-        </button>
+        </Button>
       </form>
-
-      <p style={{ marginTop: 16 }}>
-        <Link to="/forgot-password">Forgotten your password?</Link>
-      </p>
-      <p>
-        New here? <Link to="/signup">Create an account</Link>
-      </p>
-    </div>
+    </AuthCard>
   )
 }

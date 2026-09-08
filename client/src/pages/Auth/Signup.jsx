@@ -3,6 +3,10 @@ import { useForm } from 'react-hook-form'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/index.js'
 import Seo from '../../components/common/Seo.jsx'
+import Button from '../../components/ui/Button.jsx'
+import Alert from '../../components/ui/Alert.jsx'
+import { Field, Input } from '../../components/ui/Field.jsx'
+import AuthCard from './AuthCard.jsx'
 
 export default function Signup() {
   const registerUser = useAuthStore((s) => s.register)
@@ -33,87 +37,88 @@ export default function Signup() {
   }
 
   return (
-    <div className="container" style={{ padding: '48px 0', maxWidth: 460 }}>
+    <AuthCard
+      title="Create an account"
+      footer={
+        <p>
+          Already have an account?{' '}
+          <Link
+            to="/login"
+            className="text-ink underline underline-offset-2 transition-colors hover:text-brand"
+          >
+            Sign in
+          </Link>
+        </p>
+      }
+    >
       <Seo title="Create an account" noIndex />
-      <h1>Create an account</h1>
 
       {failure && (
-        <div className="alert alert-danger" role="alert">
+        <Alert tone="error" className="mb-5">
           {failure}
-        </div>
+        </Alert>
       )}
 
-      <form onSubmit={handleSubmit(onSubmit)} noValidate>
-        <div className="form-group">
-          <label htmlFor="su-name">Full name</label>
-          <input
+      <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
+        <Field label="Full name" htmlFor="su-name" required error={errors.name?.message}>
+          <Input
             id="su-name"
             autoComplete="name"
-            className="form-control"
-            aria-invalid={Boolean(errors.name)}
+            error={errors.name}
             {...register('name', { required: 'Please enter your name.' })}
           />
-          {errors.name && <p style={{ color: '#b00' }}>{errors.name.message}</p>}
-        </div>
+        </Field>
 
-        <div className="form-group">
-          <label htmlFor="su-email">Email</label>
-          <input
+        <Field label="Email" htmlFor="su-email" required error={errors.email?.message}>
+          <Input
             id="su-email"
             type="email"
             autoComplete="email"
-            className="form-control"
-            aria-invalid={Boolean(errors.email)}
+            error={errors.email}
             {...register('email', { required: 'Please enter your email address.' })}
           />
-          {errors.email && <p style={{ color: '#b00' }}>{errors.email.message}</p>}
-        </div>
+        </Field>
 
-        <div className="form-group">
-          <label htmlFor="su-password">Password</label>
-          <input
+        <Field
+          label="Password"
+          htmlFor="su-password"
+          required
+          hint="At least 6 characters."
+          error={errors.password?.message}
+        >
+          <Input
             id="su-password"
             type="password"
             autoComplete="new-password"
-            className="form-control"
-            aria-invalid={Boolean(errors.password)}
+            error={errors.password}
             {...register('password', {
               required: 'Please choose a password.',
               minLength: { value: 6, message: 'Password must be at least 6 characters.' },
             })}
           />
-          {errors.password && <p style={{ color: '#b00' }}>{errors.password.message}</p>}
-        </div>
+        </Field>
 
-        <div className="form-group">
-          <label htmlFor="su-confirm">Confirm password</label>
-          <input
+        <Field
+          label="Confirm password"
+          htmlFor="su-confirm"
+          required
+          error={errors.password_confirmation?.message}
+        >
+          <Input
             id="su-confirm"
             type="password"
             autoComplete="new-password"
-            className="form-control"
+            error={errors.password_confirmation}
             {...register('password_confirmation', {
               validate: (value) => value === watch('password') || 'Passwords do not match.',
             })}
           />
-          {errors.password_confirmation && (
-            <p style={{ color: '#b00' }}>{errors.password_confirmation.message}</p>
-          )}
-        </div>
+        </Field>
 
-        <button
-          type="submit"
-          className="btn btn-primary"
-          disabled={isSubmitting}
-          style={{ width: '100%' }}
-        >
+        <Button type="submit" size="sm" loading={isSubmitting} className="w-full">
           {isSubmitting ? 'Creating account…' : 'Create account'}
-        </button>
+        </Button>
       </form>
-
-      <p style={{ marginTop: 16 }}>
-        Already have an account? <Link to="/login">Sign in</Link>
-      </p>
-    </div>
+    </AuthCard>
   )
 }

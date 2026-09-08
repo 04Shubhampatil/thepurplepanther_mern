@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import * as api from '../../services/endpoints.js'
+import Button from '../../components/ui/Button.jsx'
+import Alert from '../../components/ui/Alert.jsx'
+import { Field, Input, Checkbox } from '../../components/ui/Field.jsx'
 
 /**
  * Account information.
@@ -53,124 +56,122 @@ export default function ProfileForm({ customer, onSaved }) {
 
   return (
     <section>
-      <h2>Account information</h2>
+      <h2 className="pp-heading">Account information</h2>
 
       {failure && (
-        <div className="alert alert-danger" role="alert">
+        <Alert tone="error" className="mt-5">
           {failure}
-        </div>
+        </Alert>
       )}
 
-      <form onSubmit={handleSubmit(onSubmit)} noValidate>
-        <div className="row">
-          <div className="col-sm-6 form-group">
-            <label htmlFor="pf-first">First name</label>
-            <input
+      <form onSubmit={handleSubmit(onSubmit)} noValidate className="mt-6 max-w-2xl space-y-5">
+        <div className="grid gap-5 sm:grid-cols-2">
+          <Field label="First name" htmlFor="pf-first" required error={errors.first_name?.message}>
+            <Input
               id="pf-first"
-              className="form-control"
+              autoComplete="given-name"
+              error={errors.first_name}
               {...register('first_name', { required: 'Please enter your first name.' })}
             />
-            {errors.first_name && <p style={{ color: '#b00' }}>{errors.first_name.message}</p>}
-          </div>
+          </Field>
 
-          <div className="col-sm-6 form-group">
-            <label htmlFor="pf-last">Last name</label>
-            <input id="pf-last" className="form-control" {...register('last_name')} />
-          </div>
+          <Field label="Last name" htmlFor="pf-last">
+            <Input id="pf-last" autoComplete="family-name" {...register('last_name')} />
+          </Field>
         </div>
 
-        <div className="form-group">
-          <label htmlFor="pf-email">Email</label>
-          <input
+        <Field label="Email" htmlFor="pf-email" required error={errors.email?.message}>
+          <Input
             id="pf-email"
             type="email"
-            className="form-control"
+            autoComplete="email"
+            error={errors.email}
             {...register('email', { required: 'Please enter your email address.' })}
           />
-          {errors.email && <p style={{ color: '#b00' }}>{errors.email.message}</p>}
+        </Field>
+
+        <div className="grid gap-5 sm:grid-cols-2">
+          <Field label="Phone" htmlFor="pf-phone">
+            <Input id="pf-phone" type="tel" autoComplete="tel" {...register('phone')} />
+          </Field>
+
+          <Field label="Date of birth" htmlFor="pf-dob" error={errors.birth_date?.message}>
+            <Input
+              id="pf-dob"
+              type="date"
+              error={errors.birth_date}
+              {...register('birth_date')}
+            />
+          </Field>
         </div>
 
-        <div className="row">
-          <div className="col-sm-6 form-group">
-            <label htmlFor="pf-phone">Phone</label>
-            <input id="pf-phone" type="tel" className="form-control" {...register('phone')} />
-          </div>
+        <Checkbox
+          id="pf-marketing"
+          label="Send me news and offers"
+          {...register('marketing_opt_in')}
+        />
 
-          <div className="col-sm-6 form-group">
-            <label htmlFor="pf-dob">Date of birth</label>
-            <input id="pf-dob" type="date" className="form-control" {...register('birth_date')} />
-            {errors.birth_date && <p style={{ color: '#b00' }}>{errors.birth_date.message}</p>}
-          </div>
-        </div>
+        <fieldset className="mt-8 border border-line p-5">
+          <legend className="pp-eyebrow px-2 text-ink">Change password</legend>
+          <p className="text-[13px] text-body">Leave blank to keep your current password.</p>
 
-        <div className="form-check" style={{ margin: '12px 0' }}>
-          <input
-            id="pf-marketing"
-            type="checkbox"
-            className="form-check-input"
-            {...register('marketing_opt_in')}
-          />
-          <label htmlFor="pf-marketing" className="form-check-label">
-            Send me news and offers
-          </label>
-        </div>
+          <div className="mt-5 space-y-5">
+            <Field
+              label="New password"
+              htmlFor="pf-new"
+              hint="At least 6 characters."
+              error={errors.new_password?.message}
+            >
+              <Input
+                id="pf-new"
+                type="password"
+                autoComplete="new-password"
+                error={errors.new_password}
+                {...register('new_password', {
+                  minLength: { value: 6, message: 'New password must be at least 6 characters.' },
+                })}
+              />
+            </Field>
 
-        <fieldset style={{ marginTop: 24, border: '1px solid #eee', padding: 16 }}>
-          <legend style={{ fontSize: 16 }}>Change password</legend>
-          <p style={{ fontSize: 13, opacity: 0.75 }}>Leave blank to keep your current password.</p>
+            <Field
+              label="Confirm new password"
+              htmlFor="pf-confirm"
+              error={errors.new_password_confirmation?.message}
+            >
+              <Input
+                id="pf-confirm"
+                type="password"
+                autoComplete="new-password"
+                error={errors.new_password_confirmation}
+                {...register('new_password_confirmation', {
+                  validate: (value) =>
+                    !newPassword || value === newPassword || 'New passwords do not match.',
+                })}
+              />
+            </Field>
 
-          <div className="form-group">
-            <label htmlFor="pf-new">New password</label>
-            <input
-              id="pf-new"
-              type="password"
-              autoComplete="new-password"
-              className="form-control"
-              {...register('new_password', {
-                minLength: { value: 6, message: 'New password must be at least 6 characters.' },
-              })}
-            />
-            {errors.new_password && <p style={{ color: '#b00' }}>{errors.new_password.message}</p>}
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="pf-confirm">Confirm new password</label>
-            <input
-              id="pf-confirm"
-              type="password"
-              autoComplete="new-password"
-              className="form-control"
-              {...register('new_password_confirmation', {
-                validate: (value) =>
-                  !newPassword || value === newPassword || 'New passwords do not match.',
-              })}
-            />
-            {errors.new_password_confirmation && (
-              <p style={{ color: '#b00' }}>{errors.new_password_confirmation.message}</p>
-            )}
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="pf-current">Current password</label>
-            <input
-              id="pf-current"
-              type="password"
-              autoComplete="current-password"
-              className="form-control"
-              {...register('current_password', {
-                validate: (value) =>
-                  !newPassword || Boolean(value) || 'Please enter your current password.',
-              })}
-            />
-            {errors.current_password && (
-              <p style={{ color: '#b00' }}>{errors.current_password.message}</p>
-            )}
+            <Field
+              label="Current password"
+              htmlFor="pf-current"
+              error={errors.current_password?.message}
+            >
+              <Input
+                id="pf-current"
+                type="password"
+                autoComplete="current-password"
+                error={errors.current_password}
+                {...register('current_password', {
+                  validate: (value) =>
+                    !newPassword || Boolean(value) || 'Please enter your current password.',
+                })}
+              />
+            </Field>
           </div>
         </fieldset>
 
-        <button type="submit" className="btn btn-primary" disabled={isSubmitting} style={{ marginTop: 16 }}>
+        <Button type="submit" size="sm" loading={isSubmitting}>
           {isSubmitting ? 'Saving…' : 'Save changes'}
-        </button>
+        </Button>
       </form>
     </section>
   )

@@ -3,6 +3,10 @@ import { useForm } from 'react-hook-form'
 import { Link } from 'react-router-dom'
 import * as api from '../../services/endpoints.js'
 import Seo from '../../components/common/Seo.jsx'
+import Button from '../../components/ui/Button.jsx'
+import Alert from '../../components/ui/Alert.jsx'
+import { Field, Input } from '../../components/ui/Field.jsx'
+import AuthCard from './AuthCard.jsx'
 
 /**
  * Forgot password.
@@ -37,45 +41,43 @@ export default function ForgotPassword() {
   }
 
   return (
-    <div className="container" style={{ padding: '48px 0', maxWidth: 460 }}>
+    <AuthCard
+      title="Reset your password"
+      intro="Enter your email address and we will send you a link to choose a new password."
+      footer={
+        <p>
+          <Link
+            to="/login"
+            className="text-ink underline underline-offset-2 transition-colors hover:text-brand"
+          >
+            Back to sign in
+          </Link>
+        </p>
+      }
+    >
       <Seo title="Reset your password" noIndex />
-      <h1>Reset your password</h1>
-      <p style={{ opacity: 0.8 }}>
-        Enter your email address and we will send you a link to choose a new password.
-      </p>
 
       {status && (
-        <div className={`alert ${status.ok ? 'alert-success' : 'alert-danger'}`} role="alert">
+        <Alert tone={status.ok ? 'success' : 'error'} className="mb-5">
           {status.message}
-        </div>
+        </Alert>
       )}
 
-      <form onSubmit={handleSubmit(onSubmit)} noValidate>
-        <div className="form-group">
-          <label htmlFor="fp-email">Email</label>
-          <input
+      <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
+        <Field label="Email" htmlFor="fp-email" required error={errors.email?.message}>
+          <Input
             id="fp-email"
             type="email"
             autoComplete="email"
-            className="form-control"
+            error={errors.email}
             {...register('email', { required: 'Please enter your email address.' })}
           />
-          {errors.email && <p style={{ color: '#b00' }}>{errors.email.message}</p>}
-        </div>
+        </Field>
 
-        <button
-          type="submit"
-          className="btn btn-primary"
-          disabled={isSubmitting}
-          style={{ width: '100%' }}
-        >
+        <Button type="submit" size="sm" loading={isSubmitting} className="w-full">
           {isSubmitting ? 'Sending…' : 'Send reset link'}
-        </button>
+        </Button>
       </form>
-
-      <p style={{ marginTop: 16 }}>
-        <Link to="/login">Back to sign in</Link>
-      </p>
-    </div>
+    </AuthCard>
   )
 }

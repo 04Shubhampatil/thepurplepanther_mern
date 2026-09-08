@@ -1,73 +1,75 @@
 import { Link } from 'react-router-dom'
-import Money from '../common/Money.jsx'
+import { motion } from 'motion/react'
+import Image from '../ui/Image.jsx'
+import Badge from '../ui/Badge.jsx'
+import WishlistButton from './WishlistButton.jsx'
 
 /**
  * Product grid card.
  *
- * Every price shown comes pre-formatted from the API. The card never computes a discount
- * or a total — `discountPercent` already accounts for the offer-over-computed precedence
- * rule that lives in the server's presenter.
+ * Prices arrive pre-formatted from the server and are rendered as given — the client
+ * never formats currency, so there is one implementation and it cannot drift from what
+ * checkout charges.
+ *
+ * `discountPercent` likewise comes from the server, which already applies the rule that an
+ * attached offer takes precedence over the computed MRP difference.
  */
-export default function ProductCard({ product, onWishlist = null, inWishlist = false }) {
+export default function ProductCard({ product, index = 0, showWishlist = true, eager = false }) {
   if (!product) return null
 
-  const outOfStock =
-    (product.colors?.length || product.sizes?.length) &&
-    [...(product.colors ?? []), ...(product.sizes ?? [])].every((v) => Number(v.quantity) === 0)
+  const variants = [...(product.colors ?? []), ...(product.sizes ?? [])]
+  const outOfStock = variants.length > 0 && variants.every((v) => Number(v.quantity) === 0)
 
   return (
-    <div className="pp-product-card">
-      <div className="pp-product-card__media" style={{ position: 'relative' }}>
-        <Link to={product.url} aria-label={product.title}>
-          <img
+    <motion.article
+      initial={{ opacity: 0, y: 16 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-60px' }}
+      transition={{ duration: 0.45, delay: Math.min(index, 7) * 0.05 }}
+      className="group flex flex-col"
+    >
+      <div className="relative">
+        <Link to={product.url} tabIndex={-1} aria-hidden="true">
+          <Image
             src={product.image}
+            hoverSrc={product.hoverImage !== product.image ? product.hoverImage : null}
             alt={product.title}
-            loading="lazy"
-            width="600"
-            height="800"
-            style={{ width: '100%', height: 'auto', display: 'block' }}
-            onMouseOver={(e) => {
-              if (product.hoverImage) e.currentTarget.src = product.hoverImage
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.src = product.image
-            }}
+            ratio="product"
+            eager={eager}
+            sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
           />
         </Link>
 
-        {product.discountPercent > 0 && (
-          <span className="pp-badge pp-badge--sale">{product.discountPercent}% OFF</span>
-        )}
-        {product.isNewArrival && <span className="pp-badge pp-badge--new">New</span>}
-        {outOfStock && <span className="pp-badge pp-badge--oos">Out of stock</span>}
+        <div className="pointer-events-none absolute left-3 top-3 flex flex-col items-start gap-1.5">
+          {product.discountPercent > 0 && <Badge>{product.discountPercent}% off</Badge>}
+          {product.isNewArrival && <Badge tone="light">New</Badge>}
+          {outOfStock && <Badge tone="muted">Out of stock</Badge>}
+        </div>
 
-        {onWishlist && (
-          <button
-            type="button"
-            className="pp-product-card__wishlist"
-            aria-label={inWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
-            aria-pressed={inWishlist}
-            onClick={() => onWishlist(product)}
-          >
-            <i className={inWishlist ? 'fa fa-heart' : 'fa fa-heart-o'} aria-hidden="true" />
-          </button>
+        {showWishlist && (
+          <div className="absolute right-3 top-3 opacity-0 transition-opacity duration-200 focus-within:opacity-100 group-hover:opacity-100">
+            <WishlistButton productId={product.id} productTitle={product.title} />
+          </div>
         )}
       </div>
 
-      <div className="pp-product-card__body">
-        <h3 className="pp-product-card__title">
-          <Link to={product.url}>{product.title}</Link>
+      <div className="mt-3.5 flex flex-col gap-1">
+        <h3 className="text-[14px] leading-snug text-ink">
+          <Link
+            to={product.url}
+            className="line-clamp-2 transition-colors duration-200 hover:text-brand"
+          >
+            {product.title}
+          </Link>
         </h3>
 
-        <div className="pp-product-card__price">
-          <Money formatted={product.priceFormatted} className="pp-price" />
+        <p className="flex items-baseline gap-2 text-[14px]">
+          <span className="font-medium text-ink">{product.priceFormatted}</span>
           {product.discountPercent > 0 && (
-            <del className="pp-price pp-price--mrp" style={{ marginLeft: 8, opacity: 0.6 }}>
-              <Money formatted={product.mrpFormatted} />
-            </del>
+            <del className="text-[13px] text-body/70">{product.mrpFormatted}</del>
           )}
-        </div>
+        </p>
       </div>
-    </div>
+    </motion.article>
   )
 }

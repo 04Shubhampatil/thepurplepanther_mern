@@ -4,6 +4,9 @@ import { useNavigate } from 'react-router-dom'
 import * as api from '../../services/endpoints.js'
 import { useAuthStore } from '../../store/index.js'
 import Seo from '../../components/common/Seo.jsx'
+import Button from '../../components/ui/Button.jsx'
+import Alert from '../../components/ui/Alert.jsx'
+import { Field, Input } from '../../components/ui/Field.jsx'
 
 /**
  * Admin sign-in.
@@ -34,58 +37,49 @@ export default function AdminLogin() {
   }
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: '#f3eef6',
-      }}
-    >
+    <div className="grid min-h-screen place-items-center bg-brand-tint px-4 py-12">
       <Seo title="Admin sign in" noIndex />
 
-      <div style={{ width: 'min(400px, 92vw)', background: '#fff', padding: 32, border: '1px solid #e4d8ea' }}>
-        <h1 style={{ fontSize: 22, marginBottom: 20 }}>Admin sign in</h1>
+      <div className="w-full max-w-[400px] border border-brand/15 bg-white p-8">
+        <p className="font-alt text-[13px] font-bold uppercase tracking-[0.2em] text-brand">
+          Purple Panther
+        </p>
+        <h1 className="mt-2 text-[22px] font-semibold text-ink">Admin sign in</h1>
 
         {failure && (
-          <div className="alert alert-danger" role="alert">
+          <Alert tone="error" className="mt-5">
             {failure}
-          </div>
+          </Alert>
         )}
 
-        <form onSubmit={handleSubmit(onSubmit)} noValidate>
-          <div className="form-group">
-            <label htmlFor="al-username">Username or email</label>
-            <input
+        <form onSubmit={handleSubmit(onSubmit)} noValidate className="mt-6 space-y-5">
+          <Field
+            label="Username or email"
+            htmlFor="al-username"
+            required
+            error={errors.username?.message}
+          >
+            <Input
               id="al-username"
               autoComplete="username"
-              className="form-control"
+              error={errors.username}
               {...register('username', { required: 'Please enter your username or email.' })}
             />
-            {errors.username && <p style={{ color: '#b00' }}>{errors.username.message}</p>}
-          </div>
+          </Field>
 
-          <div className="form-group">
-            <label htmlFor="al-password">Password</label>
-            <input
+          <Field label="Password" htmlFor="al-password" required error={errors.password?.message}>
+            <Input
               id="al-password"
               type="password"
               autoComplete="current-password"
-              className="form-control"
+              error={errors.password}
               {...register('password', { required: 'Please enter your password.' })}
             />
-            {errors.password && <p style={{ color: '#b00' }}>{errors.password.message}</p>}
-          </div>
+          </Field>
 
-          <button
-            type="submit"
-            className="btn btn-primary"
-            disabled={isSubmitting}
-            style={{ width: '100%' }}
-          >
+          <Button type="submit" size="sm" loading={isSubmitting} className="w-full">
             {isSubmitting ? 'Signing in…' : 'Sign in'}
-          </button>
+          </Button>
         </form>
       </div>
     </div>

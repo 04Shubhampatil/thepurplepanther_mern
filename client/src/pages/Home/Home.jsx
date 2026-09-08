@@ -1,124 +1,85 @@
-import { Link } from 'react-router-dom'
 import { useApi } from '../../hooks/useApi.js'
 import * as api from '../../services/endpoints.js'
-import ProductGrid from '../../components/product/ProductGrid.jsx'
-import Loading from '../../components/common/Loading.jsx'
-import ErrorMessage from '../../components/common/ErrorMessage.jsx'
+import { useConfigStore } from '../../store/index.js'
 import Seo from '../../components/common/Seo.jsx'
-import BannerMedia from '../../components/common/BannerMedia.jsx'
+import ErrorMessage from '../../components/common/ErrorMessage.jsx'
+import { ProductGridSkeleton } from '../../components/ui/Skeleton.jsx'
+import Container from '../../components/ui/Container.jsx'
+import HeroSection from '../../components/home/HeroSection.jsx'
+import CollectionSection from '../../components/home/CollectionSection.jsx'
+import ProductCarousel from '../../components/home/ProductCarousel.jsx'
+import EditorialSection from '../../components/home/EditorialSection.jsx'
+import FabricLibrary from '../../components/home/FabricLibrary.jsx'
+import JournalSection from '../../components/home/JournalSection.jsx'
 
 /**
  * Homepage.
  *
- * One request. The server applies all of Laravel's fallback chains — curated shop-the-look
- * → featured → any; new arrivals → any; popular accessories → the accessories category —
- * so no section can render empty and the client does not need to know the rules.
+ * Section order matches the live site exactly:
+ *   hero → complete collection → shop the look → our story → popular accessories
+ *        → fabric library → journal
+ *
+ * One request. The server applies every fallback chain (curated → featured → any), so no
+ * section can render empty and the client does not need to know the rules.
  */
 export default function Home() {
   const { data, error, loading, refetch } = useApi(() => api.catalog.home(), [])
+  const categories = useConfigStore((s) => s.categories)
 
-  if (loading) return <Loading full />
-  if (error) return <ErrorMessage error={error} onRetry={refetch} />
+  if (error) {
+    return (
+      <Container className="py-24">
+        <ErrorMessage error={error} onRetry={refetch} />
+      </Container>
+    )
+  }
 
-  const { banners = {}, shopTheLook = [], newArrivals = [], popularAccessories = [], journalPosts = [] } =
-    data ?? {}
+  if (loading) {
+    return (
+      <>
+        <div className="h-[78vh] min-h-[480px] animate-pulse bg-sand md:h-[92vh]" aria-hidden="true" />
+        <Container className="pt-14 md:pt-[90px]">
+          <ProductGridSkeleton count={4} />
+        </Container>
+      </>
+    )
+  }
 
-  const hero = banners.home_hero
-  const heroSlide = hero?.images?.[0]
+  const {
+    banners = {},
+    shopTheLook = [],
+    newArrivals = [],
+    popularAccessories = [],
+    journalPosts = [],
+  } = data ?? {}
 
   return (
     <>
-      <Seo
-        title={null}
-        description="The Purple Panther — beyond ordinary. Discover our latest collection."
+      <Seo description="Quiet authority for women who move seamlessly from boardroom to dinner." />
+
+      <HeroSection banner={banners.home_hero} />
+
+      <CollectionSection banner={banners.home_complete_collection} categories={categories} />
+
+      <ProductCarousel
+        title={banners.home_shoppable_look?.title ?? 'Shop the look'}
+        products={shopTheLook}
+        to="/shop"
       />
 
-      {heroSlide && (
-        <section className="pp-hero">
-          {/* The live hero is an .mp4, so this must handle video as well as images. */}
-          <BannerMedia
-            src={heroSlide.image}
-            mobileSrc={heroSlide.mobileImage}
-            alt={heroSlide.title ?? hero.title ?? ''}
-            eager
-          />
-          <div className="pp-hero__content container">
-            {(heroSlide.title || hero.title) && <h1>{heroSlide.title ?? hero.title}</h1>}
-            {(heroSlide.subtitle || hero.subtitle) && <p>{heroSlide.subtitle ?? hero.subtitle}</p>}
-            {heroSlide.buttonLink && (
-              <Link to={heroSlide.buttonLink} className="btn btn-primary">
-                {heroSlide.buttonText || 'Shop now'}
-              </Link>
-            )}
-          </div>
-        </section>
-      )}
+      <ProductCarousel
+        title={banners.home_new_arrivals_banner?.title ?? 'New arrivals'}
+        products={newArrivals}
+        to="/shop"
+      />
 
-      {shopTheLook.length > 0 && (
-        <section className="pp-section container">
-          <h2>{banners.home_shoppable_look?.title ?? 'Shop the look'}</h2>
-          <ProductGrid products={shopTheLook} />
-        </section>
-      )}
+      <EditorialSection banner={banners.home_our_story} />
 
-      {newArrivals.length > 0 && (
-        <section className="pp-section container">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-            <h2>{banners.home_new_arrivals_banner?.title ?? 'New arrivals'}</h2>
-            <Link to="/shop">View all</Link>
-          </div>
-          <ProductGrid products={newArrivals} />
-        </section>
-      )}
+      <ProductCarousel title="Popular accessories" products={popularAccessories} to="/accessories" />
 
-      {banners.home_our_story?.images?.[0] && (
-        <section className="pp-section pp-story">
-          <BannerMedia
-            src={banners.home_our_story.images[0].image}
-            mobileSrc={banners.home_our_story.images[0].mobileImage}
-            alt={banners.home_our_story.title ?? 'Our story'}
-          />
-          <div className="container">
-            <h2>{banners.home_our_story.title}</h2>
-            {banners.home_our_story.description && <p>{banners.home_our_story.description}</p>}
-            {banners.home_our_story.buttonLink && (
-              <Link to={banners.home_our_story.buttonLink} className="btn btn-outline-dark">
-                {banners.home_our_story.buttonText || 'Read more'}
-              </Link>
-            )}
-          </div>
-        </section>
-      )}
+      <FabricLibrary banner={banners.home_fabric_library} />
 
-      {popularAccessories.length > 0 && (
-        <section className="pp-section container">
-          <h2>Popular accessories</h2>
-          <ProductGrid products={popularAccessories} />
-        </section>
-      )}
-
-      {journalPosts.length > 0 && (
-        <section className="pp-section container">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-            <h2>From the journal</h2>
-            <Link to="/blog">All stories</Link>
-          </div>
-
-          <div className="row">
-            {journalPosts.map((post) => (
-              <div className="col-md-3 col-sm-6" key={post.id}>
-                <article className="pp-journal-card">
-                  <Link to={`/blog/${post.slug}`}>
-                    <img src={post.image} alt="" loading="lazy" style={{ width: '100%' }} />
-                    <h3>{post.title}</h3>
-                  </Link>
-                  {post.excerpt && <p style={{ opacity: 0.75 }}>{post.excerpt}</p>}
-                </article>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
+      <JournalSection posts={journalPosts} />
     </>
   )
 }

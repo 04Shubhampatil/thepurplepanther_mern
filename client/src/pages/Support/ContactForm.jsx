@@ -2,6 +2,9 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import * as api from '../../services/endpoints.js'
 import { useAuthStore } from '../../store/index.js'
+import Button from '../../components/ui/Button.jsx'
+import Alert from '../../components/ui/Alert.jsx'
+import { Field, Input, Textarea } from '../../components/ui/Field.jsx'
 
 /** Contact form. Rate limited server-side, so a spam burst is refused rather than stored. */
 export default function ContactForm({ subject = '' }) {
@@ -40,58 +43,53 @@ export default function ContactForm({ subject = '' }) {
   }
 
   return (
-    <section style={{ marginTop: 40, borderTop: '1px solid #eee', paddingTop: 24 }}>
-      <h2 style={{ fontSize: 19 }}>Still need help?</h2>
+    <section className="mt-12 max-w-2xl border-t border-line pt-8">
+      <h2 className="text-[19px] font-semibold text-ink">Still need help?</h2>
 
       {status && (
-        <div className={`alert ${status.ok ? 'alert-success' : 'alert-danger'}`} role="status">
+        <Alert tone={status.ok ? 'success' : 'error'} className="mt-4">
           {status.message}
-        </div>
+        </Alert>
       )}
 
-      <form onSubmit={handleSubmit(onSubmit)} noValidate>
-        <div className="row">
-          <div className="col-sm-6 form-group">
-            <label htmlFor="cf-name">Your name</label>
-            <input
+      <form onSubmit={handleSubmit(onSubmit)} noValidate className="mt-5 space-y-5">
+        <div className="grid gap-5 sm:grid-cols-2">
+          <Field label="Your name" htmlFor="cf-name" required error={errors.name?.message}>
+            <Input
               id="cf-name"
-              className="form-control"
+              autoComplete="name"
+              error={errors.name}
               {...register('name', { required: 'Please enter your name.' })}
             />
-            {errors.name && <p style={{ color: '#b00', fontSize: 13 }}>{errors.name.message}</p>}
-          </div>
+          </Field>
 
-          <div className="col-sm-6 form-group">
-            <label htmlFor="cf-email">Your email</label>
-            <input
+          <Field label="Your email" htmlFor="cf-email" required error={errors.email?.message}>
+            <Input
               id="cf-email"
               type="email"
-              className="form-control"
+              autoComplete="email"
+              error={errors.email}
               {...register('email', { required: 'Please enter a valid email address.' })}
             />
-            {errors.email && <p style={{ color: '#b00', fontSize: 13 }}>{errors.email.message}</p>}
-          </div>
+          </Field>
         </div>
 
-        <div className="form-group">
-          <label htmlFor="cf-subject">Subject</label>
-          <input id="cf-subject" className="form-control" {...register('subject')} />
-        </div>
+        <Field label="Subject" htmlFor="cf-subject">
+          <Input id="cf-subject" {...register('subject')} />
+        </Field>
 
-        <div className="form-group">
-          <label htmlFor="cf-message">Message</label>
-          <textarea
+        <Field label="Message" htmlFor="cf-message" required error={errors.message?.message}>
+          <Textarea
             id="cf-message"
-            rows="5"
-            className="form-control"
+            rows={5}
+            error={errors.message}
             {...register('message', { required: 'Please enter a message.' })}
           />
-          {errors.message && <p style={{ color: '#b00', fontSize: 13 }}>{errors.message.message}</p>}
-        </div>
+        </Field>
 
-        <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+        <Button type="submit" size="sm" loading={isSubmitting}>
           {isSubmitting ? 'Sending…' : 'Send message'}
-        </button>
+        </Button>
       </form>
     </section>
   )

@@ -3,9 +3,23 @@ import { useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { useApi } from '../../hooks/useApi.js'
 import * as api from '../../services/endpoints.js'
+import { Plus, Search, Pencil, Trash2, Check, X } from 'lucide-react'
 import Loading from '../../components/common/Loading.jsx'
 import ErrorMessage from '../../components/common/ErrorMessage.jsx'
 import Pagination from '../../components/common/Pagination.jsx'
+import Alert from '../../components/ui/Alert.jsx'
+import Button from '../../components/ui/Button.jsx'
+import { Field, Input, Textarea, Select as SelectControl, Checkbox } from '../../components/ui/Field.jsx'
+import {
+  AdminPage,
+  Table,
+  Th,
+  Td,
+  EmptyRow,
+  AdminButton,
+  Pill,
+  CONTROL,
+} from '../../components/admin/AdminUI.jsx'
 import Contacts from './Contacts.jsx'
 
 /**
@@ -247,10 +261,9 @@ export default function Resource() {
 
   if (!config) {
     return (
-      <div>
-        <h1 style={{ fontSize: 24 }}>Not found</h1>
-        <p style={{ opacity: 0.7 }}>No admin screen exists for “{resource}”.</p>
-      </div>
+      <AdminPage title="Not found">
+        <p className="text-body">No admin screen exists for “{resource}”.</p>
+      </AdminPage>
     )
   }
 
@@ -319,154 +332,193 @@ export default function Resource() {
     refetch()
   }
 
-  return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1 style={{ fontSize: 24 }}>{config.label}s</h1>
-        <button type="button" className="btn btn-primary" onClick={startCreate}>
-          Add {config.label.toLowerCase()}
-        </button>
-      </div>
+  const singular = config.label.toLowerCase()
 
-      {notice && (
-        <div className="alert alert-info" role="status">
-          {notice}
+  /** One control per declared field, chosen by its `type`. */
+  const renderField = (field) => {
+    const id = `f-${field.name}`
+
+    if (field.type === CHECK) {
+      return (
+        <div key={field.name} className="flex items-end pb-2">
+          <Checkbox id={id} label={field.label} {...register(field.name)} />
         </div>
+      )
+    }
+
+    return (
+      <Field
+        key={field.name}
+        label={field.label}
+        htmlFor={id}
+        required={field.required}
+        error={errors[field.name]?.message}
+      >
+        {field.type === TEXTAREA ? (
+          <Textarea id={id} rows={4} error={errors[field.name]} {...register(field.name)} />
+        ) : field.type === SELECT ? (
+          <SelectControl id={id} error={errors[field.name]} {...register(field.name)}>
+            <option value="">— none —</option>
+            {(
+              field.options ??
+              (selectSource?.[field.source] ?? []).map((o) => [o.id, o.title ?? o.name])
+            ).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </SelectControl>
+        ) : (
+          <Input
+            id={id}
+            type={field.type}
+            error={errors[field.name]}
+            {...register(
+              field.name,
+              field.required ? { required: `${field.label} is required.` } : {},
+            )}
+          />
+        )}
+      </Field>
+    )
+  }
+
+  return (
+    <AdminPage
+      title={`${config.label}s`}
+      actions={
+        <Button type="button" size="sm" onClick={startCreate}>
+          <Plus size={15} strokeWidth={1.5} aria-hidden="true" />
+          Add {singular}
+        </Button>
+      }
+    >
+      {notice && (
+        <Alert tone="info" className="mb-5">
+          {notice}
+        </Alert>
       )}
 
-      <input
-        className="form-control"
-        placeholder="Search…"
-        value={search}
-        onChange={(e) => {
-          setSearch(e.target.value)
-          setPage(1)
-        }}
-        style={{ maxWidth: 320, margin: '16px 0' }}
-        aria-label={`Search ${config.label.toLowerCase()}s`}
-      />
+      <div className="relative mb-6 w-full max-w-xs">
+        <Search
+          size={16}
+          strokeWidth={1.5}
+          aria-hidden="true"
+          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-body"
+        />
+        <label htmlFor="resource-search" className="sr-only">
+          Search {singular}s
+        </label>
+        <input
+          id="resource-search"
+          type="search"
+          placeholder="Search…"
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value)
+            setPage(1)
+          }}
+          className={`${CONTROL} w-full pl-9`}
+        />
+      </div>
 
       {editing && (
-        <form
-          onSubmit={handleSubmit(onSubmit)}
-          noValidate
-          style={{ border: '1px solid #eee', padding: 20, marginBottom: 20 }}
-        >
-          <h2 style={{ fontSize: 18 }}>
-            {editing === 'new' ? `New ${config.label.toLowerCase()}` : `Edit ${config.label.toLowerCase()}`}
+        <form onSubmit={handleSubmit(onSubmit)} noValidate className="mb-8 border border-line p-5">
+          <h2 className="text-[17px] font-semibold text-ink">
+            {editing === 'new' ? `New ${singular}` : `Edit ${singular}`}
           </h2>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14 }}>
-            {config.fields.map((field) => (
-              <div key={field.name} className="form-group">
-                <label htmlFor={`f-${field.name}`}>{field.label}</label>
-
-                {field.type === CHECK && (
-                  <input id={`f-${field.name}`} type="checkbox" {...register(field.name)} />
-                )}
-
-                {field.type === TEXTAREA && (
-                  <textarea id={`f-${field.name}`} rows="4" className="form-control" {...register(field.name)} />
-                )}
-
-                {field.type === SELECT && (
-                  <select id={`f-${field.name}`} className="form-control" {...register(field.name)}>
-                    <option value="">— none —</option>
-                    {(field.options ?? (selectSource?.[field.source] ?? []).map((o) => [o.id, o.title ?? o.name])).map(
-                      ([value, label]) => (
-                        <option key={value} value={value}>
-                          {label}
-                        </option>
-                      ),
-                    )}
-                  </select>
-                )}
-
-                {![CHECK, TEXTAREA, SELECT].includes(field.type) && (
-                  <input
-                    id={`f-${field.name}`}
-                    type={field.type}
-                    className="form-control"
-                    {...register(field.name, field.required ? { required: `${field.label} is required.` } : {})}
-                  />
-                )}
-
-                {errors[field.name] && (
-                  <p style={{ color: '#b00', fontSize: 13 }}>{errors[field.name].message}</p>
-                )}
-              </div>
-            ))}
+          <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {config.fields.map(renderField)}
 
             {config.image && (
-              <div className="form-group">
-                <label htmlFor="f-image">Image</label>
+              <Field label="Image" htmlFor="f-image">
                 <input
                   id="f-image"
                   type="file"
                   accept="image/*"
-                  className="form-control"
                   onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                  className="w-full border border-line bg-white p-2 text-[13px] text-ink file:mr-3 file:border-0 file:bg-sand file:px-3 file:py-1.5 file:text-[13px] file:text-ink"
                 />
-              </div>
+              </Field>
             )}
           </div>
 
-          <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
-            <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            <Button type="submit" size="sm" loading={isSubmitting}>
               {isSubmitting ? 'Saving…' : 'Save'}
-            </button>
-            <button type="button" className="btn btn-link" onClick={() => setEditing(null)}>
+            </Button>
+            <button
+              type="button"
+              onClick={() => setEditing(null)}
+              className="text-[13px] text-body underline underline-offset-2 transition-colors hover:text-brand"
+            >
               Cancel
             </button>
           </div>
         </form>
       )}
 
-      <table className="table">
-        <thead>
-          <tr>
+      <Table
+        caption={`${config.label}s`}
+        head={
+          <>
             {config.columns.map(([key, label]) => (
-              <th scope="col" key={key}>
-                {label}
-              </th>
+              <Th key={key}>{label}</Th>
             ))}
-            <th scope="col">Active</th>
-            <th scope="col"><span className="sr-only">Actions</span></th>
-          </tr>
-        </thead>
-        <tbody>
-          {(data?.items ?? []).map((item) => (
-            <tr key={item.id}>
-              {config.columns.map(([key]) => (
-                <td key={key}>{String(item[key] ?? '—')}</td>
-              ))}
-              <td>
-                <button type="button" onClick={() => toggle(item)}>
-                  {item.isActive ? 'Yes' : 'No'}
-                </button>
-              </td>
-              <td>
-                <button type="button" onClick={() => startEdit(item)}>
-                  Edit
-                </button>{' '}
-                <button type="button" onClick={() => remove(item)}>
-                  Delete
-                </button>
-              </td>
-            </tr>
-          ))}
+            <Th>Active</Th>
+            <Th className="text-right">
+              <span className="sr-only">Actions</span>
+            </Th>
+          </>
+        }
+      >
+        {(data?.items ?? []).map((item) => (
+          <tr key={item.id}>
+            {config.columns.map(([key], index) => (
+              <Td key={key} className={index === 0 ? 'font-medium' : undefined}>
+                {String(item[key] ?? '—')}
+              </Td>
+            ))}
 
-          {data?.items?.length === 0 && (
-            <tr>
-              <td colSpan={config.columns.length + 2} style={{ opacity: 0.6 }}>
-                Nothing here yet.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+            <Td>
+              <button
+                type="button"
+                onClick={() => toggle(item)}
+                aria-label={`${item.isActive ? 'Deactivate' : 'Activate'} this ${singular}`}
+              >
+                <Pill tone={item.isActive ? 'good' : 'neutral'}>
+                  {item.isActive ? (
+                    <Check size={13} strokeWidth={2} aria-hidden="true" className="mr-1" />
+                  ) : (
+                    <X size={13} strokeWidth={2} aria-hidden="true" className="mr-1" />
+                  )}
+                  {item.isActive ? 'Yes' : 'No'}
+                </Pill>
+              </button>
+            </Td>
+
+            <Td className="text-right">
+              <div className="flex justify-end gap-2">
+                <AdminButton onClick={() => startEdit(item)}>
+                  <Pencil size={14} strokeWidth={1.5} aria-hidden="true" />
+                  Edit
+                </AdminButton>
+                <AdminButton variant="danger" onClick={() => remove(item)}>
+                  <Trash2 size={14} strokeWidth={1.5} aria-hidden="true" />
+                  Delete
+                </AdminButton>
+              </div>
+            </Td>
+          </tr>
+        ))}
+
+        {data?.items?.length === 0 && (
+          <EmptyRow colSpan={config.columns.length + 2}>Nothing here yet.</EmptyRow>
+        )}
+      </Table>
 
       <Pagination pagination={data?.pagination} onPage={setPage} />
-    </div>
+    </AdminPage>
   )
 }

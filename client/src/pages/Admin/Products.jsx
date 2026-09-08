@@ -1,10 +1,32 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
+import { Plus, Search, Pencil, Check, X } from 'lucide-react'
 import { useApi } from '../../hooks/useApi.js'
 import * as api from '../../services/endpoints.js'
 import Loading from '../../components/common/Loading.jsx'
 import ErrorMessage from '../../components/common/ErrorMessage.jsx'
 import Pagination from '../../components/common/Pagination.jsx'
+import Alert from '../../components/ui/Alert.jsx'
+import Button from '../../components/ui/Button.jsx'
+import { Field, Input, Textarea, Select, Checkbox } from '../../components/ui/Field.jsx'
+import {
+  AdminPage,
+  Table,
+  Th,
+  Td,
+  EmptyRow,
+  AdminButton,
+  Pill,
+  CONTROL,
+} from '../../components/admin/AdminUI.jsx'
+
+const FLAGS = [
+  ['is_active', 'Active'],
+  ['is_featured', 'Featured'],
+  ['is_new_arrival', 'New arrival'],
+  ['is_todays_deal', "Today's deal"],
+  ['is_popular_accessory', 'Popular accessory'],
+]
 
 /**
  * Product management.
@@ -135,275 +157,290 @@ export default function Products() {
       current.includes(id) ? current.filter((v) => v !== id) : [...current, id],
     )
 
-  return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1 style={{ fontSize: 24 }}>Products</h1>
-        <button type="button" className="btn btn-primary" onClick={startCreate}>
-          Add product
-        </button>
-      </div>
+  /** One stock input per colour or size. */
+  const variantGrid = (kind, options, prefix) => (
+    <div className="mt-4 grid gap-3 sm:grid-cols-3 lg:grid-cols-4">
+      {options.map((option) => {
+        const current = variants[kind].find((v) => v.id === Number(option.id))
+        const id = `${prefix}-${option.id}`
 
+        return (
+          <div key={option.id}>
+            <label htmlFor={id} className="mb-1 block text-[13px] text-ink">
+              {option.name}
+            </label>
+            <input
+              id={id}
+              type="number"
+              min="0"
+              value={current?.quantity ?? ''}
+              onChange={(e) => setVariantQuantity(kind, Number(option.id), e.target.value)}
+              className={`${CONTROL} w-full`}
+            />
+          </div>
+        )
+      })}
+    </div>
+  )
+
+  return (
+    <AdminPage
+      title="Products"
+      actions={
+        <Button type="button" size="sm" onClick={startCreate}>
+          <Plus size={15} strokeWidth={1.5} aria-hidden="true" />
+          Add product
+        </Button>
+      }
+    >
       {notice && (
-        <div className="alert alert-info" role="status">
+        <Alert tone="info" className="mb-5">
           {notice}
-        </div>
+        </Alert>
       )}
 
-      <div style={{ display: 'flex', gap: 12, margin: '16px 0', flexWrap: 'wrap' }}>
-        <input
-          className="form-control"
-          placeholder="Search products…"
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value)
-            setPage(1)
-          }}
-          style={{ maxWidth: 300 }}
-          aria-label="Search products"
-        />
+      <div className="mb-6 flex flex-wrap items-center gap-3">
+        <div className="relative w-full max-w-xs">
+          <Search
+            size={16}
+            strokeWidth={1.5}
+            aria-hidden="true"
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-body"
+          />
+          <label htmlFor="product-search" className="sr-only">
+            Search products
+          </label>
+          <input
+            id="product-search"
+            type="search"
+            placeholder="Search products…"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value)
+              setPage(1)
+            }}
+            className={`${CONTROL} w-full pl-9`}
+          />
+        </div>
 
         {selected.length > 0 && (
-          <>
-            <span style={{ alignSelf: 'center' }}>{selected.length} selected</span>
-            <button type="button" onClick={() => bulk('enable')}>Enable</button>
-            <button type="button" onClick={() => bulk('disable')}>Disable</button>
-            <button type="button" onClick={() => bulk('set_todays_deal')}>Set deal</button>
-            <button type="button" onClick={() => bulk('delete')}>Delete</button>
-          </>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[13px] text-body">{selected.length} selected</span>
+            <AdminButton onClick={() => bulk('enable')}>Enable</AdminButton>
+            <AdminButton onClick={() => bulk('disable')}>Disable</AdminButton>
+            <AdminButton onClick={() => bulk('set_todays_deal')}>Set deal</AdminButton>
+            <AdminButton variant="danger" onClick={() => bulk('delete')}>
+              Delete
+            </AdminButton>
+          </div>
         )}
       </div>
 
       {editing && (
-        <form
-          onSubmit={handleSubmit(onSubmit)}
-          noValidate
-          style={{ border: '1px solid #eee', padding: 20, marginBottom: 24 }}
-        >
-          <h2 style={{ fontSize: 18 }}>{editing === 'new' ? 'New product' : 'Edit product'}</h2>
+        <form onSubmit={handleSubmit(onSubmit)} noValidate className="mb-8 border border-line p-5">
+          <h2 className="text-[17px] font-semibold text-ink">
+            {editing === 'new' ? 'New product' : 'Edit product'}
+          </h2>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px,1fr))', gap: 14 }}>
-            <div className="form-group">
-              <label htmlFor="p-title">Title</label>
-              <input
+          <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <Field label="Title" htmlFor="p-title" required error={errors.title?.message}>
+              {/* products.title is UNIQUE, so a duplicate is reported here. */}
+              <Input
                 id="p-title"
-                className="form-control"
+                error={errors.title}
                 {...register('title', { required: 'Please enter a product title.' })}
               />
-              {/* products.title is UNIQUE, so a duplicate is reported here. */}
-              {errors.title && <p style={{ color: '#b00', fontSize: 13 }}>{errors.title.message}</p>}
-            </div>
+            </Field>
 
-            <div className="form-group">
-              <label htmlFor="p-category">Category</label>
-              <select id="p-category" className="form-control" {...register('category_id', { required: true })}>
+            <Field label="Category" htmlFor="p-category" required>
+              <Select id="p-category" {...register('category_id', { required: true })}>
                 <option value="">— choose —</option>
                 {(formData?.categories ?? []).map((c) => (
-                  <option key={c.id} value={c.id}>{c.title}</option>
+                  <option key={c.id} value={c.id}>
+                    {c.title}
+                  </option>
                 ))}
-              </select>
-            </div>
+              </Select>
+            </Field>
 
-            <div className="form-group">
-              <label htmlFor="p-subcategory">Sub-category</label>
-              <select id="p-subcategory" className="form-control" {...register('sub_category_id')}>
+            <Field label="Sub-category" htmlFor="p-subcategory">
+              <Select id="p-subcategory" {...register('sub_category_id')}>
                 <option value="">— none —</option>
                 {(formData?.subCategories ?? []).map((c) => (
-                  <option key={c.id} value={c.id}>{c.title}</option>
+                  <option key={c.id} value={c.id}>
+                    {c.title}
+                  </option>
                 ))}
-              </select>
-            </div>
+              </Select>
+            </Field>
 
-            <div className="form-group">
-              <label htmlFor="p-brand">Brand</label>
-              <select id="p-brand" className="form-control" {...register('brand_id')}>
+            <Field label="Brand" htmlFor="p-brand">
+              <Select id="p-brand" {...register('brand_id')}>
                 <option value="">— none —</option>
                 {(formData?.brands ?? []).map((b) => (
-                  <option key={b.id} value={b.id}>{b.name}</option>
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
                 ))}
-              </select>
-            </div>
+              </Select>
+            </Field>
 
-            <div className="form-group">
-              <label htmlFor="p-offer">Offer</label>
-              <select id="p-offer" className="form-control" {...register('offer_id')}>
+            <Field label="Offer" htmlFor="p-offer">
+              <Select id="p-offer" {...register('offer_id')}>
                 <option value="">— none —</option>
                 {(formData?.offers ?? []).map((o) => (
-                  <option key={o.id} value={o.id}>{o.title}</option>
+                  <option key={o.id} value={o.id}>
+                    {o.title}
+                  </option>
                 ))}
-              </select>
-            </div>
+              </Select>
+            </Field>
 
-            <div className="form-group">
-              <label htmlFor="p-mrp">MRP</label>
-              <input id="p-mrp" type="number" step="0.01" className="form-control" {...register('mrp', { required: true })} />
-            </div>
+            <Field label="MRP" htmlFor="p-mrp" required>
+              <Input id="p-mrp" type="number" step="0.01" {...register('mrp', { required: true })} />
+            </Field>
 
-            <div className="form-group">
-              <label htmlFor="p-selling">Selling price</label>
-              <input id="p-selling" type="number" step="0.01" className="form-control" {...register('selling_price')} />
-            </div>
+            <Field label="Selling price" htmlFor="p-selling">
+              <Input id="p-selling" type="number" step="0.01" {...register('selling_price')} />
+            </Field>
 
-            <div className="form-group">
-              <label htmlFor="p-max">Max per order</label>
-              <input id="p-max" type="number" className="form-control" {...register('max_unit_buy')} />
-            </div>
+            <Field label="Max per order" htmlFor="p-max">
+              <Input id="p-max" type="number" {...register('max_unit_buy')} />
+            </Field>
 
-            <div className="form-group">
-              <label htmlFor="p-delivery">Delivery charge</label>
-              <input id="p-delivery" type="number" step="0.01" className="form-control" {...register('delivery_charge')} />
-            </div>
+            <Field label="Delivery charge" htmlFor="p-delivery">
+              <Input id="p-delivery" type="number" step="0.01" {...register('delivery_charge')} />
+            </Field>
           </div>
 
-          <div className="form-group">
-            <label htmlFor="p-desc">Short description</label>
-            <textarea id="p-desc" rows="3" className="form-control" {...register('short_description')} />
-          </div>
+          <Field label="Short description" htmlFor="p-desc" className="mt-5">
+            <Textarea id="p-desc" rows={3} {...register('short_description')} />
+          </Field>
 
-          <fieldset style={{ border: '1px solid #eee', padding: 14, marginTop: 12 }}>
-            <legend style={{ fontSize: 15 }}>Stock by colour</legend>
-            <p style={{ fontSize: 12, opacity: 0.7 }}>
+          <fieldset className="mt-6 border border-line p-4">
+            <legend className="px-2 text-[14px] font-semibold text-ink">Stock by colour</legend>
+            <p className="text-[12px] text-body">
               Leave a quantity blank to remove that colour. These figures are the live stock the
               cart enforces.
             </p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px,1fr))', gap: 10 }}>
-              {(formData?.colors ?? []).map((color) => {
-                const current = variants.colors.find((v) => v.id === Number(color.id))
-                return (
-                  <div key={color.id}>
-                    <label htmlFor={`c-${color.id}`}>{color.name}</label>
-                    <input
-                      id={`c-${color.id}`}
-                      type="number"
-                      min="0"
-                      className="form-control"
-                      value={current?.quantity ?? ''}
-                      onChange={(e) => setVariantQuantity('colors', Number(color.id), e.target.value)}
-                    />
-                  </div>
-                )
-              })}
-            </div>
+            {variantGrid('colors', formData?.colors ?? [], 'c')}
           </fieldset>
 
-          <fieldset style={{ border: '1px solid #eee', padding: 14, marginTop: 12 }}>
-            <legend style={{ fontSize: 15 }}>Stock by size</legend>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px,1fr))', gap: 10 }}>
-              {(formData?.sizes ?? []).map((size) => {
-                const current = variants.sizes.find((v) => v.id === Number(size.id))
-                return (
-                  <div key={size.id}>
-                    <label htmlFor={`s-${size.id}`}>{size.name}</label>
-                    <input
-                      id={`s-${size.id}`}
-                      type="number"
-                      min="0"
-                      className="form-control"
-                      value={current?.quantity ?? ''}
-                      onChange={(e) => setVariantQuantity('sizes', Number(size.id), e.target.value)}
-                    />
-                  </div>
-                )
-              })}
-            </div>
+          <fieldset className="mt-5 border border-line p-4">
+            <legend className="px-2 text-[14px] font-semibold text-ink">Stock by size</legend>
+            {variantGrid('sizes', formData?.sizes ?? [], 's')}
           </fieldset>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px,1fr))', gap: 12, marginTop: 14 }}>
-            <div>
-              <label htmlFor="p-featured-image">Featured image</label>
+          <div className="mt-6 grid gap-5 sm:grid-cols-2">
+            <Field label="Featured image" htmlFor="p-featured-image">
               <input
                 id="p-featured-image"
                 type="file"
                 accept="image/*"
-                className="form-control"
                 onChange={(e) => setFiles((f) => ({ ...f, featured_image: e.target.files?.[0] }))}
+                className="w-full border border-line bg-white p-2 text-[13px] text-ink file:mr-3 file:border-0 file:bg-sand file:px-3 file:py-1.5 file:text-[13px] file:text-ink"
               />
-            </div>
-            <div>
-              <label htmlFor="p-gallery">Gallery images</label>
+            </Field>
+
+            <Field label="Gallery images" htmlFor="p-gallery">
               <input
                 id="p-gallery"
                 type="file"
                 accept="image/*"
                 multiple
-                className="form-control"
                 onChange={(e) => setFiles((f) => ({ ...f, gallery: e.target.files }))}
+                className="w-full border border-line bg-white p-2 text-[13px] text-ink file:mr-3 file:border-0 file:bg-sand file:px-3 file:py-1.5 file:text-[13px] file:text-ink"
               />
-            </div>
+            </Field>
           </div>
 
-          <div style={{ display: 'flex', gap: 18, marginTop: 14, flexWrap: 'wrap' }}>
-            {[
-              ['is_active', 'Active'],
-              ['is_featured', 'Featured'],
-              ['is_new_arrival', 'New arrival'],
-              ['is_todays_deal', "Today's deal"],
-              ['is_popular_accessory', 'Popular accessory'],
-            ].map(([name, label]) => (
-              <label key={name} htmlFor={`p-${name}`}>
-                <input id={`p-${name}`} type="checkbox" {...register(name)} /> {label}
-              </label>
+          <div className="mt-6 flex flex-wrap gap-x-6 gap-y-3">
+            {FLAGS.map(([name, label]) => (
+              <Checkbox key={name} id={`p-${name}`} label={label} {...register(name)} />
             ))}
           </div>
 
-          <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-            <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            <Button type="submit" size="sm" loading={isSubmitting}>
               {isSubmitting ? 'Saving…' : 'Save product'}
-            </button>
-            <button type="button" className="btn btn-link" onClick={() => setEditing(null)}>
+            </Button>
+            <button
+              type="button"
+              onClick={() => setEditing(null)}
+              className="text-[13px] text-body underline underline-offset-2 transition-colors hover:text-brand"
+            >
               Cancel
             </button>
           </div>
         </form>
       )}
 
-      <table className="table">
-        <thead>
-          <tr>
-            <th scope="col"><span className="sr-only">Select</span></th>
-            <th scope="col">Title</th>
-            <th scope="col">Category</th>
-            <th scope="col">MRP</th>
-            <th scope="col">Price</th>
-            <th scope="col">Active</th>
-            <th scope="col"><span className="sr-only">Actions</span></th>
-          </tr>
-        </thead>
-        <tbody>
-          {(data?.items ?? []).map((item) => (
-            <tr key={item.id}>
-              <td>
-                <input
-                  type="checkbox"
-                  checked={selected.includes(item.id)}
-                  onChange={() => toggleSelected(item.id)}
-                  aria-label={`Select ${item.title}`}
-                />
-              </td>
-              <td>{item.title}</td>
-              <td>{item.category?.title ?? '—'}</td>
-              <td>{item.mrp}</td>
-              <td>{item.sellingPrice}</td>
-              <td>
-                <button type="button" onClick={async () => { await api.admin.products.toggle(item.id); refetch() }}>
+      <Table
+        caption="Products"
+        head={
+          <>
+            <Th className="w-10">
+              <span className="sr-only">Select</span>
+            </Th>
+            <Th>Title</Th>
+            <Th>Category</Th>
+            <Th className="text-right">MRP</Th>
+            <Th className="text-right">Price</Th>
+            <Th>Active</Th>
+            <Th className="text-right">
+              <span className="sr-only">Actions</span>
+            </Th>
+          </>
+        }
+      >
+        {(data?.items ?? []).map((item) => (
+          <tr key={item.id}>
+            <Td>
+              <input
+                type="checkbox"
+                className="size-4 accent-brand"
+                checked={selected.includes(item.id)}
+                onChange={() => toggleSelected(item.id)}
+                aria-label={`Select ${item.title}`}
+              />
+            </Td>
+            <Td className="font-medium">{item.title}</Td>
+            <Td>{item.category?.title ?? '—'}</Td>
+            <Td className="whitespace-nowrap text-right">{item.mrp}</Td>
+            <Td className="whitespace-nowrap text-right">{item.sellingPrice}</Td>
+            <Td>
+              <button
+                type="button"
+                onClick={async () => {
+                  await api.admin.products.toggle(item.id)
+                  refetch()
+                }}
+                aria-label={`${item.isActive ? 'Deactivate' : 'Activate'} ${item.title}`}
+              >
+                <Pill tone={item.isActive ? 'good' : 'neutral'}>
+                  {item.isActive ? (
+                    <Check size={13} strokeWidth={2} aria-hidden="true" className="mr-1" />
+                  ) : (
+                    <X size={13} strokeWidth={2} aria-hidden="true" className="mr-1" />
+                  )}
                   {item.isActive ? 'Yes' : 'No'}
-                </button>
-              </td>
-              <td>
-                <button type="button" onClick={() => startEdit(item)}>Edit</button>
-              </td>
-            </tr>
-          ))}
+                </Pill>
+              </button>
+            </Td>
+            <Td className="text-right">
+              <AdminButton onClick={() => startEdit(item)}>
+                <Pencil size={14} strokeWidth={1.5} aria-hidden="true" />
+                Edit
+                <span className="sr-only"> {item.title}</span>
+              </AdminButton>
+            </Td>
+          </tr>
+        ))}
 
-          {data?.items?.length === 0 && (
-            <tr>
-              <td colSpan="7" style={{ opacity: 0.6 }}>No products found.</td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+        {data?.items?.length === 0 && <EmptyRow colSpan={7}>No products found.</EmptyRow>}
+      </Table>
 
       <Pagination pagination={data?.pagination} onPage={setPage} />
-    </div>
+    </AdminPage>
   )
 }

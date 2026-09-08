@@ -1,9 +1,15 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { motion, AnimatePresence } from 'motion/react'
+import { X, ShoppingBag, Tag, ArrowLeft } from 'lucide-react'
 import { useCartStore } from '../../store/index.js'
-import Money from '../../components/common/Money.jsx'
 import Loading from '../../components/common/Loading.jsx'
 import Seo from '../../components/common/Seo.jsx'
+import Container from '../../components/ui/Container.jsx'
+import Button from '../../components/ui/Button.jsx'
+import Image from '../../components/ui/Image.jsx'
+import Alert from '../../components/ui/Alert.jsx'
+import ProductQuantity from '../../components/product/ProductQuantity.jsx'
 
 /**
  * Cart page.
@@ -11,6 +17,9 @@ import Seo from '../../components/common/Seo.jsx'
  * Every figure shown is the server's. Changing a quantity sends the change and replaces
  * the whole summary with the response — the page never patches a total locally, so what
  * is displayed is always what checkout will charge.
+ *
+ * The desktop table becomes a stacked list below `md`: five columns cannot be read on a
+ * phone, and both layouts render from the same loop over the same server data.
  */
 export default function Cart() {
   const { cart, loading, error, refresh, update, remove, applyCoupon, removeCoupon, clearError } =
@@ -56,182 +65,300 @@ export default function Cart() {
 
   if (cart.items.length === 0) {
     return (
-      <div className="container" style={{ padding: '80px 0', textAlign: 'center' }}>
+      <Container className="py-20 text-center md:py-28">
         <Seo title="Cart" noIndex />
-        <h1>Your cart is empty</h1>
-        <Link to="/shop" className="btn btn-primary" style={{ marginTop: 20 }}>
+        <ShoppingBag
+          size={40}
+          strokeWidth={1}
+          aria-hidden="true"
+          className="mx-auto mb-5 text-body"
+        />
+        <h1 className="pp-heading">Your cart is empty</h1>
+        <p className="mx-auto mt-3 max-w-sm text-body">
+          Nothing here yet. Browse the collection and add something you love.
+        </p>
+        <Button to="/shop" className="mt-7">
           Continue shopping
-        </Link>
-      </div>
+        </Button>
+      </Container>
     )
   }
 
+  const itemCount = cart.items.reduce((sum, item) => sum + item.quantity, 0)
+
+  const variantLine = (item) =>
+    [item.color, item.size, item.packageLabel].filter(Boolean).join(' / ')
+
+  const RemoveButton = ({ item, className = '' }) => (
+    <button
+      type="button"
+      onClick={() => remove(item.productId, lineBody(item))}
+      disabled={loading}
+      aria-label={`Remove ${item.title} from your cart`}
+      className={`grid size-8 place-items-center text-body transition-colors hover:text-brand disabled:opacity-40 ${className}`}
+    >
+      <X size={16} strokeWidth={1.5} aria-hidden="true" />
+    </button>
+  )
+
   return (
-    <div className="container pp-cart" style={{ padding: '32px 0' }}>
+    <Container className="py-10 md:py-14">
       <Seo title="Cart" noIndex />
-      <h1>Your cart</h1>
+
+      <h1 className="pp-heading">Your cart</h1>
+      <p className="mt-1 text-body">
+        {itemCount} item{itemCount === 1 ? '' : 's'}
+      </p>
 
       {error && (
-        <div className="alert alert-danger" role="alert">
+        <Alert tone="error" className="mt-5">
           {error}
-        </div>
+        </Alert>
       )}
 
-      <div className="row">
-        <div className="col-lg-8">
-          <table className="table pp-cart__table">
+      <div className="mt-8 grid gap-10 lg:grid-cols-[1fr_380px] lg:gap-14">
+        <div>
+          {/* Desktop: a real table, so column meanings are announced. */}
+          <table className="hidden w-full md:table">
             <caption className="sr-only">Items in your cart</caption>
             <thead>
-              <tr>
-                <th scope="col">Product</th>
-                <th scope="col">Price</th>
-                <th scope="col">Quantity</th>
-                <th scope="col">Total</th>
-                <th scope="col"><span className="sr-only">Remove</span></th>
+              <tr className="border-b border-line text-left">
+                <th scope="col" className="pp-eyebrow pb-3 text-ink">
+                  Product
+                </th>
+                <th scope="col" className="pp-eyebrow pb-3 text-ink">
+                  Price
+                </th>
+                <th scope="col" className="pp-eyebrow pb-3 text-ink">
+                  Quantity
+                </th>
+                <th scope="col" className="pp-eyebrow pb-3 text-right text-ink">
+                  Total
+                </th>
+                <th scope="col" className="pb-3">
+                  <span className="sr-only">Remove</span>
+                </th>
               </tr>
             </thead>
+
             <tbody>
-              {cart.items.map((item) => (
-                <tr key={item.lineKey}>
-                  <td>
-                    <div style={{ display: 'flex', gap: 12 }}>
-                      <img src={item.image} alt="" width="72" height="96" loading="lazy" />
-                      <div>
-                        <Link to={item.url}>{item.title}</Link>
-                        {(item.color || item.size || item.packageLabel) && (
-                          <p style={{ fontSize: 13, opacity: 0.7, margin: '4px 0 0' }}>
-                            {[item.color, item.size, item.packageLabel].filter(Boolean).join(' / ')}
-                          </p>
-                        )}
+              <AnimatePresence initial={false}>
+                {cart.items.map((item) => (
+                  <motion.tr
+                    key={item.lineKey}
+                    layout
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="border-b border-line align-top"
+                  >
+                    <td className="py-5 pr-4">
+                      <div className="flex gap-4">
+                        <Link to={item.url} className="w-[72px] shrink-0" tabIndex={-1}>
+                          <Image src={item.image} alt="" className="w-[72px]" />
+                        </Link>
+                        <div>
+                          <Link
+                            to={item.url}
+                            className="text-[14px] text-ink transition-colors hover:text-brand"
+                          >
+                            {item.title}
+                          </Link>
+                          {variantLine(item) && (
+                            <p className="mt-1 text-[13px] text-body">{variantLine(item)}</p>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </td>
+                    </td>
 
-                  <td>
-                    <Money formatted={item.unitPriceFormatted} />
-                    {item.discountPercent > 0 && (
-                      <del style={{ marginLeft: 6, opacity: 0.6, fontSize: 13 }}>
-                        <Money formatted={item.mrpFormatted} />
-                      </del>
-                    )}
-                  </td>
+                    <td className="py-5 pr-4 text-[14px] text-ink">
+                      {item.unitPriceFormatted}
+                      {item.discountPercent > 0 && (
+                        <del className="ml-2 text-[13px] text-body">{item.mrpFormatted}</del>
+                      )}
+                    </td>
 
-                  <td>
-                    <label htmlFor={`qty-${item.lineKey}`} className="sr-only">
-                      Quantity for {item.title}
-                    </label>
-                    <input
-                      id={`qty-${item.lineKey}`}
-                      type="number"
-                      min="0"
-                      max={item.maxQuantity}
-                      value={item.quantity}
-                      disabled={loading}
-                      onChange={(e) => changeQuantity(item, Number(e.target.value))}
-                      style={{ width: 76 }}
-                      className="form-control"
-                    />
-                    {item.maxQuantity < 10 && (
-                      <span style={{ fontSize: 12, opacity: 0.6 }}>Max {item.maxQuantity}</span>
-                    )}
-                  </td>
+                    <td className="py-5 pr-4">
+                      <ProductQuantity
+                        id={`qty-${item.lineKey}`}
+                        label={`Quantity for ${item.title}`}
+                        value={item.quantity}
+                        max={item.maxQuantity}
+                        disabled={loading}
+                        compact
+                        onChange={(quantity) => changeQuantity(item, quantity)}
+                      />
+                      {item.maxQuantity < 10 && (
+                        <p className="mt-1.5 text-[12px] text-body">Max {item.maxQuantity}</p>
+                      )}
+                    </td>
 
-                  <td>
-                    <Money formatted={item.lineTotalFormatted} />
-                  </td>
+                    <td className="py-5 text-right text-[14px] text-ink">
+                      {item.lineTotalFormatted}
+                    </td>
 
-                  <td>
-                    <button
-                      type="button"
-                      onClick={() => remove(item.productId, lineBody(item))}
-                      disabled={loading}
-                      aria-label={`Remove ${item.title}`}
-                    >
-                      ×
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                    <td className="py-5 pl-2 text-right">
+                      <RemoveButton item={item} className="ml-auto" />
+                    </td>
+                  </motion.tr>
+                ))}
+              </AnimatePresence>
             </tbody>
           </table>
 
-          <Link to="/shop">← Continue shopping</Link>
+          {/* Mobile: the same lines, stacked. */}
+          <ul className="md:hidden">
+            <AnimatePresence initial={false}>
+              {cart.items.map((item) => (
+                <motion.li
+                  key={item.lineKey}
+                  layout
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="flex gap-4 border-b border-line py-5 first:border-t"
+                >
+                  <Link to={item.url} className="w-[84px] shrink-0" tabIndex={-1}>
+                    <Image src={item.image} alt="" className="w-[84px]" />
+                  </Link>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <Link
+                        to={item.url}
+                        className="text-[14px] text-ink transition-colors hover:text-brand"
+                      >
+                        {item.title}
+                      </Link>
+                      <RemoveButton item={item} className="-mr-2 -mt-1 shrink-0" />
+                    </div>
+
+                    {variantLine(item) && (
+                      <p className="mt-1 text-[13px] text-body">{variantLine(item)}</p>
+                    )}
+
+                    <p className="mt-1 text-[13px] text-body">
+                      {item.unitPriceFormatted}
+                      {item.discountPercent > 0 && <del className="ml-2">{item.mrpFormatted}</del>}
+                    </p>
+
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                      <ProductQuantity
+                        id={`qty-m-${item.lineKey}`}
+                        label={`Quantity for ${item.title}`}
+                        value={item.quantity}
+                        max={item.maxQuantity}
+                        disabled={loading}
+                        compact
+                        onChange={(quantity) => changeQuantity(item, quantity)}
+                      />
+                      <span className="text-[14px] text-ink">{item.lineTotalFormatted}</span>
+                    </div>
+                  </div>
+                </motion.li>
+              ))}
+            </AnimatePresence>
+          </ul>
+
+          <Link
+            to="/shop"
+            className="mt-7 inline-flex items-center gap-2 text-[13px] uppercase tracking-[0.1em] text-ink transition-colors hover:text-brand"
+          >
+            <ArrowLeft size={15} strokeWidth={1.5} aria-hidden="true" />
+            Continue shopping
+          </Link>
         </div>
 
-        <div className="col-lg-4">
-          <aside className="pp-cart__summary" style={{ border: '1px solid #eee', padding: 20 }}>
-            <h2 style={{ fontSize: 18 }}>Order summary</h2>
+        {/* Below the lines on mobile; sticks alongside them on desktop. */}
+        <aside className="h-fit border border-line p-6 lg:sticky lg:top-24">
+          <h2 className="pp-eyebrow text-ink">Order summary</h2>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', margin: '8px 0' }}>
-              <span>Subtotal</span>
-              <Money formatted={cart.subtotalFormatted} />
+          <dl className="mt-5 space-y-2.5 text-[14px]">
+            <div className="flex justify-between gap-4">
+              <dt className="text-body">Subtotal</dt>
+              <dd className="text-ink">{cart.subtotalFormatted}</dd>
             </div>
 
             {cart.discount.amount > 0 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', margin: '8px 0' }}>
-                <span>
-                  Discount{cart.discount.code ? ` (${cart.discount.code})` : ''}
+              <div className="flex justify-between gap-4">
+                <dt className="flex flex-wrap items-center gap-x-2 text-body">
+                  <span>Discount{cart.discount.code ? ` (${cart.discount.code})` : ''}</span>
                   <button
                     type="button"
                     onClick={removeCoupon}
-                    style={{ marginLeft: 8, fontSize: 12 }}
-                    aria-label="Remove coupon"
+                    className="text-[12px] underline underline-offset-2 transition-colors hover:text-brand"
                   >
-                    remove
+                    Remove
+                    <span className="sr-only"> coupon</span>
                   </button>
-                </span>
-                <span>− <Money formatted={cart.discount.amountFormatted} /></span>
+                </dt>
+                <dd className="text-brand">− {cart.discount.amountFormatted}</dd>
               </div>
             )}
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', margin: '8px 0' }}>
-              <span>Delivery</span>
-              <Money formatted={cart.shipping.amountFormatted} />
+            <div className="flex justify-between gap-4">
+              <dt className="text-body">Delivery</dt>
+              <dd className="text-ink">{cart.shipping.amountFormatted}</dd>
+            </div>
+          </dl>
+
+          {!cart.shipping.isFree && cart.shipping.freeShippingThreshold > 0 && (
+            <p className="mt-3 bg-brand-tint px-3 py-2 text-[13px] text-brand">
+              Spend ₹
+              {(
+                cart.shipping.freeShippingThreshold -
+                (cart.subtotal - cart.discount.amount)
+              ).toFixed(2)}{' '}
+              more for free delivery.
+            </p>
+          )}
+
+          <div className="mt-5 flex justify-between gap-4 border-t border-line pt-5 text-[17px] font-semibold text-ink">
+            <span>Total</span>
+            <span>{cart.totalFormatted}</span>
+          </div>
+
+          <Button to="/checkout" size="sm" className="mt-6 w-full">
+            Proceed to checkout
+          </Button>
+
+          <form onSubmit={submitCoupon} className="mt-7 border-t border-line pt-6" noValidate>
+            <label
+              htmlFor="coupon-code"
+              className="mb-2 flex items-center gap-2 text-[13px] text-ink"
+            >
+              <Tag size={15} strokeWidth={1.5} aria-hidden="true" />
+              Have a coupon?
+            </label>
+
+            <div className="flex">
+              <input
+                id="coupon-code"
+                value={couponCode}
+                onChange={(e) => setCouponCode(e.target.value)}
+                placeholder="Enter code"
+                aria-describedby={couponStatus ? 'coupon-status' : undefined}
+                className="min-w-0 flex-1 border border-line bg-white px-3 py-2.5 text-[14px] uppercase text-ink placeholder:normal-case placeholder:text-body/60 focus:border-brand focus:outline-none"
+              />
+              <button
+                type="submit"
+                disabled={loading}
+                className="shrink-0 border border-ink px-5 py-2.5 text-[12px] font-semibold uppercase tracking-[0.1em] text-ink transition-colors hover:border-brand hover:bg-brand hover:text-white disabled:opacity-50"
+              >
+                Apply
+              </button>
             </div>
 
-            {!cart.shipping.isFree && cart.shipping.freeShippingThreshold > 0 && (
-              <p style={{ fontSize: 13, opacity: 0.7 }}>
-                Spend ₹ {(cart.shipping.freeShippingThreshold - (cart.subtotal - cart.discount.amount)).toFixed(2)}{' '}
-                more for free delivery.
+            {couponStatus && (
+              <p
+                id="coupon-status"
+                role="status"
+                className={`mt-2 text-[13px] ${couponStatus.ok ? 'text-brand' : 'text-red-700'}`}
+              >
+                {couponStatus.message}
               </p>
             )}
-
-            <hr />
-
-            <div
-              style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 18 }}
-            >
-              <span>Total</span>
-              <Money formatted={cart.totalFormatted} />
-            </div>
-
-            <form onSubmit={submitCoupon} style={{ marginTop: 20 }} noValidate>
-              <label htmlFor="coupon-code">Have a coupon?</label>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input
-                  id="coupon-code"
-                  className="form-control"
-                  value={couponCode}
-                  onChange={(e) => setCouponCode(e.target.value)}
-                  placeholder="Enter code"
-                />
-                <button type="submit" className="btn btn-outline-dark" disabled={loading}>
-                  Apply
-                </button>
-              </div>
-              {couponStatus && (
-                <p role="status" style={{ marginTop: 8, color: couponStatus.ok ? '#146c43' : '#b00' }}>
-                  {couponStatus.message}
-                </p>
-              )}
-            </form>
-
-            <Link to="/checkout" className="btn btn-primary" style={{ width: '100%', marginTop: 20 }}>
-              Proceed to checkout
-            </Link>
-          </aside>
-        </div>
+          </form>
+        </aside>
       </div>
-    </div>
+    </Container>
   )
 }

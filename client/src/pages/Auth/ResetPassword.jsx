@@ -3,6 +3,10 @@ import { useForm } from 'react-hook-form'
 import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom'
 import * as api from '../../services/endpoints.js'
 import Seo from '../../components/common/Seo.jsx'
+import Button from '../../components/ui/Button.jsx'
+import Alert from '../../components/ui/Alert.jsx'
+import { Field, Input } from '../../components/ui/Field.jsx'
+import AuthCard from './AuthCard.jsx'
 
 /**
  * Reset password.
@@ -40,72 +44,78 @@ export default function ResetPassword() {
   }
 
   return (
-    <div className="container" style={{ padding: '48px 0', maxWidth: 460 }}>
+    <AuthCard
+      title="Choose a new password"
+      footer={
+        <p>
+          <Link
+            to="/login"
+            className="text-ink underline underline-offset-2 transition-colors hover:text-brand"
+          >
+            Back to sign in
+          </Link>
+        </p>
+      }
+    >
       <Seo title="Choose a new password" noIndex />
-      <h1>Choose a new password</h1>
 
       {failure && (
-        <div className="alert alert-danger" role="alert">
+        <Alert tone="error" className="mb-5">
           {failure}
-        </div>
+        </Alert>
       )}
 
-      <form onSubmit={handleSubmit(onSubmit)} noValidate>
-        <div className="form-group">
-          <label htmlFor="rp-email">Email</label>
-          <input
+      <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
+        <Field label="Email" htmlFor="rp-email" required error={errors.email?.message}>
+          <Input
             id="rp-email"
             type="email"
-            className="form-control"
+            autoComplete="email"
+            error={errors.email}
             {...register('email', { required: 'Please enter your email address.' })}
           />
-          {errors.email && <p style={{ color: '#b00' }}>{errors.email.message}</p>}
-        </div>
+        </Field>
 
-        <div className="form-group">
-          <label htmlFor="rp-password">New password</label>
-          <input
+        <Field
+          label="New password"
+          htmlFor="rp-password"
+          required
+          hint="At least 6 characters."
+          error={errors.password?.message}
+        >
+          <Input
             id="rp-password"
             type="password"
             autoComplete="new-password"
-            className="form-control"
+            error={errors.password}
             {...register('password', {
               required: 'Please choose a password.',
               minLength: { value: 6, message: 'Password must be at least 6 characters.' },
             })}
           />
-          {errors.password && <p style={{ color: '#b00' }}>{errors.password.message}</p>}
-        </div>
+        </Field>
 
-        <div className="form-group">
-          <label htmlFor="rp-confirm">Confirm new password</label>
-          <input
+        <Field
+          label="Confirm new password"
+          htmlFor="rp-confirm"
+          required
+          error={errors.password_confirmation?.message}
+        >
+          <Input
             id="rp-confirm"
             type="password"
             autoComplete="new-password"
-            className="form-control"
+            error={errors.password_confirmation}
             {...register('password_confirmation', {
               validate: (value) => value === watch('password') || 'Passwords do not match.',
             })}
           />
-          {errors.password_confirmation && (
-            <p style={{ color: '#b00' }}>{errors.password_confirmation.message}</p>
-          )}
-        </div>
+        </Field>
 
-        <button
-          type="submit"
-          className="btn btn-primary"
-          disabled={isSubmitting}
-          style={{ width: '100%' }}
-        >
+        <Button type="submit" size="sm" loading={isSubmitting} className="w-full">
           {isSubmitting ? 'Saving…' : 'Save new password'}
-        </button>
+        </Button>
       </form>
-
-      <p style={{ marginTop: 16 }}>
-        <Link to="/login">Back to sign in</Link>
-      </p>
-    </div>
+    </AuthCard>
   )
 }
