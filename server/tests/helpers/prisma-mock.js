@@ -35,12 +35,26 @@ function matches(row, where = {}) {
   })
 }
 
+const TABLE_NAMES = [
+  'user',
+  'passwordResetToken',
+  'passwordResetAttempt',
+  'product',
+  'category',
+  'subCategory',
+  'brand',
+  'color',
+  'size',
+  'offer',
+  'productImage',
+  'productReview',
+  'banner',
+  'blogPost',
+  'homeSectionProduct',
+]
+
 export function createPrismaMock(seed = {}) {
-  const tables = {
-    user: [...(seed.user ?? [])],
-    passwordResetToken: [...(seed.passwordResetToken ?? [])],
-    passwordResetAttempt: [...(seed.passwordResetAttempt ?? [])],
-  }
+  const tables = Object.fromEntries(TABLE_NAMES.map((name) => [name, [...(seed[name] ?? [])]]))
 
   let nextId = Math.max(0, ...tables.user.map((u) => Number(u.id ?? 0))) + 1
 

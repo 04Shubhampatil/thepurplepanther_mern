@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import healthRoutes from './health.routes.js'
 import authRoutes from './auth.routes.js'
+import catalogRoutes from './catalog.routes.js'
 import adminRoutes from './admin/index.js'
 import { publicConfig } from '../config/env.js'
 import { ok } from '../utils/api-response.js'
@@ -23,11 +24,10 @@ router.use('/health', healthRoutes)
 router.get('/config', (req, res) => ok(res, publicConfig, 'Configuration'))
 
 router.use('/auth', authRoutes) // phase 2
+router.use('/', catalogRoutes) // phase 3 — products, taxonomy, search, home
 router.use('/admin', adminRoutes) // phase 2 (auth only); rest in phase 13
 
 // -- added in later phases -------------------------------------------------
-// router.use('/products', productRoutes)       // phase 3
-// router.use('/categories', categoryRoutes)    // phase 3
 // router.use('/blog', blogRoutes)              // phase 4
 // router.use('/pages', pageRoutes)             // phase 4
 // router.use('/cart', cartRoutes)              // phase 5

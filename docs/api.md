@@ -168,8 +168,109 @@ managed through the admin user CRUD (phase 13). Tracked in `migration-status.md`
 
 ---
 
+## Catalog
+
+All public. Prices are returned twice — a raw number for logic and a pre-formatted
+`"₹ 1,234.56"` string for display. **The formatted value is authoritative**; React must never
+re-implement currency formatting.
+
+### `GET /products`
+Powers `/shop`, `/collection` and `/{categorySlug}`.
+
+| Query | Default | Notes |
+|---|---|---|
+| `q` or `search` | — | Both accepted; Laravel read either |
+| `category` | — | Category **slug**. `404` if unknown or inactive |
+| `page` | `1` | |
+| `per_page` | `50` | Capped at 100 |
+
+Search matches, case-insensitively, across: product `title`, `slug`, `short_description`,
+`features`, plus the **category** and **sub-category** title/slug. Ordering is always
+`sort_order ASC, id DESC`.
+
+```jsonc
+{ "success": true, "message": "Products",
+  "data": { "products": [ /* cards */ ],
+            "activeCategory": { "id": 2, "title": "Kurtis", "slug": "kurtis" } | null,
+            "search": "cotton",
+            "pagination": { "page": 1, "perPage": 50, "total": 66, "lastPage": 2, "hasMore": true } } }
+```
+
+Card shape: `id, title, slug, url, image, hoverImage, price, priceFormatted, mrp,
+mrpFormatted, hasSellingPrice, discountPercent, isNewArrival, isFeatured, isTodaysDeal,
+category, colors[], sizes[]`. Colours and sizes carry `quantity` — the per-variant stock the
+cart uses.
+
+### `GET /products/:slug`
+Returns the product plus its related and recently-viewed products in one round trip.
+
+| Query | Notes |
+|---|---|
+| `ids` | Comma-separated recently-viewed product ids, max 12. The current product is excluded and the rest are returned **in the order given**. |
+
+`404` → `"Product not found."` for unknown or inactive products.
+
+Detail adds: `shortDescription, features, saving, savingFormatted, maxUnitBuy, deliveryCharge,
+gallery[], colourGalleries{}, subCategory, brand, offer, showSizeGuide, sizeGuideContent,
+sizeGuideImage, highlights{}, informationItems[], specifications[], accessoryPackages[], seo{},
+reviews{}`.
+
+**Gallery rules** (from `FrontendController::shopSingle`, all preserved):
+1. featured image, then the hover image when `featured_image_2` is set
+2. then every product image with **no** colour attached
+3. padded to at least 4 (the theme's slider breaks below 4), capped at 8
+4. **if the first colour has its own images, they replace the whole gallery**
+
+`colourGalleries` is keyed by **UPPERCASED** colour name.
+
+`reviews` contains only active reviews: `{ count, average (1dp), breakdown{5..1}, items[] }`.
+Reviewer email addresses are never returned.
+
+`discountPercent` takes an attached **offer's** percent when one exists, even if the computed
+mrp/selling-price difference is larger — matching `Product::getDiscountPercentAttribute`.
+
+### `GET /search`
+Type-ahead. Returns `{ query, products, count, seeAllUrl }`.
+Fewer than **2 characters** returns empty **without touching the database**, and
+`message: "Type at least 2 characters"`. `limit` defaults to 8, max 20.
+
+### `GET /categories` · `GET /sub-categories` · `GET /brands` · `GET /colors` · `GET /sizes`
+Active rows only, ordered `sort_order` then name/title.
+`/sub-categories` accepts `?category_id=`.
+
+### `GET /home`
+The whole homepage in one request, with Laravel's fallback chains preserved so no section
+ever renders empty:
+
+| Section | Chain |
+|---|---|
+| `shopTheLook` | curated `home_section_products` (by `position`) → `is_featured` → any (2 items) |
+| `newArrivals` | `is_new_arrival` → any (6) |
+| `popularAccessories` | `is_popular_accessory` → category slug `accessories` **or** title containing `accessor` (6) |
+| `journalPosts` | published posts (4) |
+| `banners` | active banners grouped by `section`, first of each, with active images by `sort_order` |
+
+### `POST /products/:slug/reviews`
+Public — guests may review.
+
+| Field | Rules |
+|---|---|
+| `rating` | required, integer 1–5 |
+| `comment` | required, 10–2000 chars |
+| `reviewer_name` | required, ≤255 |
+| `reviewer_email` | required, email, ≤255 |
+
+`201` → `"Thank you! Your review has been submitted."`
+
+Two preserved behaviours worth knowing: reviews are created **active** (no moderation queue —
+admins can only deactivate afterwards), and a guest review is linked to a customer account
+when the supplied email matches one. Purchase is not required. Both are flagged as deferred
+improvements in `migration-status.md`.
+
+---
+
 ## Not yet implemented
 
-Products, categories, cart, wishlist, coupons, account, checkout, orders, catalog feed and the
-admin modules land in phases 3–13. See `route-mapping.md` for the planned surface and
+Cart, wishlist, coupons, account, checkout, orders, blog/CMS, catalog feed and the admin
+modules land in phases 4–13. See `route-mapping.md` for the planned surface and
 `migration-status.md` for status.

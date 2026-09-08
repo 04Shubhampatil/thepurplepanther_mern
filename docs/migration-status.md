@@ -3,7 +3,7 @@
 Single source of truth for progress. **Nothing is marked COMPLETE until every box in the
 completion criteria is genuinely ticked** — compiling is not completing.
 
-Last updated: 2026-09-08 · Current phase: **2 → 3**
+Last updated: 2026-09-08 · Current phase: **3 → 4**
 
 `COMPLETE*` = code complete and tested, with one task blocked on an external input that is
 named in that phase's section. It is not a substitute for COMPLETE and does not unblock a
@@ -39,7 +39,7 @@ Status values: `NOT STARTED` · `IN PROGRESS` · `BLOCKED` · `COMPLETE`
 |---|---|---|---|---|---|
 | 1 | Backend foundation | COMPLETE* | n/a | PASS (22) | n/a |
 | 2 | Auth (customer + admin) | COMPLETE* | NOT STARTED | PASS (57) | PASS (rules) |
-| 3 | Catalog | NOT STARTED | NOT STARTED | NOT STARTED | NOT STARTED |
+| 3 | Catalog | COMPLETE* | NOT STARTED | PASS (71) | PASS (rules) |
 | 4 | CMS / home | NOT STARTED | NOT STARTED | NOT STARTED | NOT STARTED |
 | 5 | Cart | NOT STARTED | NOT STARTED | NOT STARTED | NOT STARTED |
 | 6 | Wishlist | NOT STARTED | NOT STARTED | NOT STARTED | NOT STARTED |
@@ -181,6 +181,64 @@ Verified rule-for-rule against `CustomerAuthController`, `Admin\AuthController` 
   a product decision. Admin passwords are managed via admin user CRUD in phase 13.
 - Tests mock Prisma, so they verify business rules rather than SQL. Query correctness is
   confirmed once the dev database is restored.
+
+## Phase 3 — Catalog (backend)
+
+**Status: backend COMPLETE and tested. React pages deferred to the frontend pass.**
+
+| Task | Status |
+|---|---|
+| `utils/product-presenter.js` — Laravel model accessors | COMPLETE |
+| `services/catalog.service.js` — listing, detail, search, home | COMPLETE |
+| `services/review.service.js` | COMPLETE |
+| Product listing with category scope, search, pagination | COMPLETE |
+| Product detail + related + recently-viewed | COMPLETE |
+| Type-ahead search | COMPLETE |
+| Taxonomy endpoints (categories, sub-categories, brands, colors, sizes) | COMPLETE |
+| `GET /home` with all fallback chains | COMPLETE |
+| Public review submission | COMPLETE |
+| `vitest.config.js` + `tests/setup.js` | COMPLETE |
+| Tests — 31 presenter + 40 catalog = **71**; suite total **150** | COMPLETE |
+| Verify queries against real data | BLOCKED (dev DB restore) |
+| React catalog pages | NOT STARTED |
+
+### Laravel comparison
+
+Verified against `FrontendController::home / collection / search / shopSingle /
+storeProductReview / applyProductSearch`:
+
+- Ordering `sort_order ASC, id DESC` on every product list; `paginate(50)`.
+- Search spans the same six fields including category and sub-category names.
+- Unknown category slug → 404 (`abort(404)`).
+- Type-ahead returns empty below 2 characters **without querying**.
+- Gallery assembly including the first-colour override and the pad-to-4 rule.
+- `discountPercent` gives an attached offer precedence over the computed difference.
+- Related products: same category, topped up to ≥4 from elsewhere.
+- Recently-viewed re-sorted into the order the ids were supplied.
+- All three homepage fallback chains, including the `slug='accessories' OR title LIKE
+  '%accessor%'` fallback.
+- Reviews created active; guest reviews linked to a customer account by email.
+
+### N+1 prevention
+
+Laravel's `with([...])` becomes an explicit Prisma `include`. Because Prisma has no lazy
+loading, a missing include fails loudly in tests rather than degrading into a per-row query
+in production. Tests assert the include sets directly. Listing runs its count and page in one
+`$transaction`; the homepage issues its independent queries concurrently.
+
+### Deliberate differences
+
+| # | Change | Why |
+|---|---|---|
+| 1 | Recently-viewed moves from the PHP session to the client | Per-device UI state with no business meaning — it never affects pricing, stock or any server decision. Passed back as `?ids=`. |
+| 2 | `per_page` capped at 100 | Laravel's `paginate(50)` was not client-controllable; exposing the parameter without a cap would let anyone request the whole table. |
+
+### Deferred improvements (recorded, not done)
+
+| # | Item |
+|---|---|
+| I6 | Reviews are published immediately with no moderation queue |
+| I7 | Reviews require no purchase, and a guest review is auto-linked to a customer account by email alone — someone can attach a review to an account they did not authenticate as |
 
 ## Open decisions
 
