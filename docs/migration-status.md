@@ -3,7 +3,7 @@
 Single source of truth for progress. **Nothing is marked COMPLETE until every box in the
 completion criteria is genuinely ticked** — compiling is not completing.
 
-Last updated: 2026-09-08 · Current phase: **12 → 13**
+Last updated: 2026-09-08 · Current phase: **13 done → React frontend**
 
 `COMPLETE*` = code complete and tested, with one task blocked on an external input that is
 named in that phase's section. It is not a substitute for COMPLETE and does not unblock a
@@ -49,7 +49,7 @@ Status values: `NOT STARTED` · `IN PROGRESS` · `BLOCKED` · `COMPLETE`
 | 10 | Razorpay | COMPLETE* | NOT STARTED | PASS (with checkout) | PASS (rules) |
 | 11 | Email | COMPLETE* | n/a | PASS | PASS (subjects) |
 | 12 | Meta CAPI + catalog | COMPLETE* | n/a | PASS (47) | PASS (9 events) |
-| 13 | Admin panel | NOT STARTED | NOT STARTED | NOT STARTED | NOT STARTED |
+| 13 | Admin panel | COMPLETE* | NOT STARTED | PASS (66) | PASS (rules) |
 | 14 | Final integration | NOT STARTED | NOT STARTED | NOT STARTED | NOT STARTED |
 
 ---
@@ -535,6 +535,65 @@ reduced price — that is how Meta renders a strikethrough; sending the sale pri
 loses the discount. Sellable quantity is the **minimum** of colour and size stock, never
 their product, because the two dimensions describe the same stock. Streaming uses a keyset
 cursor in pages of 250, so memory stays flat as the catalogue grows.
+
+## Phase 13 — Admin panel (backend)
+
+**Status: backend COMPLETE and tested.** All 20 Laravel admin controllers are covered.
+
+| Module | Status |
+|---|---|
+| Dashboard (aggregates only) | COMPLETE |
+| Profile | COMPLETE |
+| Products + variants + gallery + reviews | COMPLETE |
+| Categories, sub-categories, brands, colors, sizes, offers, news types, blog posts | COMPLETE |
+| Banners + home sections | COMPLETE |
+| Coupons | COMPLETE |
+| Orders (status machine, delivery date, status logs, bulk) | COMPLETE |
+| Users (+ bulk) | COMPLETE |
+| Contacts (subscribers + messages, incl. bulk) | COMPLETE |
+| Settings (CMS pages, shipping) | COMPLETE |
+| File uploads (local disk, same directories) | COMPLETE |
+| Tests — **66**; suite total **480** | COMPLETE |
+
+### Authorisation
+
+`requireAuth + requireAdmin` is applied **once at the router**, so a newly added endpoint
+cannot ship unprotected by omission. Only `/admin/auth` sits above the guard, because
+admins must be able to sign in. Twenty parameterised tests hit every module anonymously
+(401) and as a signed-in customer (403). The user list never selects the password column.
+
+### The dangerous operations, all test-pinned
+
+- **Pivot sync is delete-missing / upsert-present, never delete-all + recreate.**
+  `product_color.quantity` and `product_size.quantity` are the live per-variant stock the
+  cart reads; recreating them would zero inventory on every product save. Editing a
+  product without touching variants issues no pivot queries at all.
+- **Status transitions go through the state machine.** Backwards moves are refused,
+  `delivered` and `cancelled` are terminal. An endpoint accepting an arbitrary status
+  string could un-cancel an order.
+- **A paid order cannot be deleted** — that would destroy the financial record and orphan
+  the Razorpay payment. Bulk delete skips paid orders and reports which. *(Laravel allowed
+  this; deliberate change.)*
+- **An admin cannot delete or deactivate their own account**, and bulk user actions exclude
+  self — otherwise the panel can be left with no administrator. *(New guard.)*
+- **`coupons.used_count` is not writable from the form** — it is derived from redemptions,
+  and editing it would break `usage_limit`.
+- Uploads are written only after validation, deleted only after a transaction commits, and
+  the delete path has a traversal guard.
+
+### Consolidation
+
+Seven near-identical Laravel controllers (brands, colors, sizes, sub-categories, news
+types, categories, offers) share one CRUD factory plus one controller factory. Each keeps
+its own Zod schema, so validation rules and messages remain per-resource — the behaviour is
+unchanged, the duplication is not.
+
+### Route-order hazards preserved
+
+`products/check-title`, `products/form-data`, `products/sub-categories`, `products/bulk`,
+`orders/statuses` and `orders/bulk` are all declared **before** their resource's `/:id`.
+Banner update accepts **POST as well as PATCH**, because Laravel used POST to work around
+Hostinger's ModSecurity blocking PUT.
 
 ## Open decisions
 
