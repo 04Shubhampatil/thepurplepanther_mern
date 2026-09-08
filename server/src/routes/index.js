@@ -1,5 +1,7 @@
 import { Router } from 'express'
 import healthRoutes from './health.routes.js'
+import authRoutes from './auth.routes.js'
+import adminRoutes from './admin/index.js'
 import { publicConfig } from '../config/env.js'
 import { ok } from '../utils/api-response.js'
 
@@ -20,8 +22,10 @@ router.use('/health', healthRoutes)
 // Values React is allowed to read. See docs/env-mapping.md §10.
 router.get('/config', (req, res) => ok(res, publicConfig, 'Configuration'))
 
+router.use('/auth', authRoutes) // phase 2
+router.use('/admin', adminRoutes) // phase 2 (auth only); rest in phase 13
+
 // -- added in later phases -------------------------------------------------
-// router.use('/auth', authRoutes)              // phase 2
 // router.use('/products', productRoutes)       // phase 3
 // router.use('/categories', categoryRoutes)    // phase 3
 // router.use('/blog', blogRoutes)              // phase 4
@@ -33,6 +37,5 @@ router.get('/config', (req, res) => ok(res, publicConfig, 'Configuration'))
 // router.use('/checkout', checkoutRoutes)      // phase 9-10
 // router.use('/orders', orderRoutes)           // phase 9
 // router.use('/catalog', catalogFeedRoutes)    // phase 12
-// router.use('/admin', adminRoutes)            // phase 13
 
 export default router

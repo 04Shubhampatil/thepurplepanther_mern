@@ -3,7 +3,7 @@
 Single source of truth for progress. **Nothing is marked COMPLETE until every box in the
 completion criteria is genuinely ticked** — compiling is not completing.
 
-Last updated: 2026-09-08 · Current phase: **1 → 2**
+Last updated: 2026-09-08 · Current phase: **2 → 3**
 
 `COMPLETE*` = code complete and tested, with one task blocked on an external input that is
 named in that phase's section. It is not a substitute for COMPLETE and does not unblock a
@@ -38,7 +38,7 @@ Status values: `NOT STARTED` · `IN PROGRESS` · `BLOCKED` · `COMPLETE`
 | # | Feature | Backend | Frontend | Tests | Laravel comparison |
 |---|---|---|---|---|---|
 | 1 | Backend foundation | COMPLETE* | n/a | PASS (22) | n/a |
-| 2 | Auth (customer + admin) | NOT STARTED | NOT STARTED | NOT STARTED | NOT STARTED |
+| 2 | Auth (customer + admin) | COMPLETE* | NOT STARTED | PASS (57) | PASS (rules) |
 | 3 | Catalog | NOT STARTED | NOT STARTED | NOT STARTED | NOT STARTED |
 | 4 | CMS / home | NOT STARTED | NOT STARTED | NOT STARTED | NOT STARTED |
 | 5 | Cart | NOT STARTED | NOT STARTED | NOT STARTED | NOT STARTED |
@@ -126,6 +126,61 @@ The script refuses to run unless the host is local, the database name is not the
 name, and the name ends in `_dev` / `_test` / `_local`.
 
 ---
+
+## Phase 2 — Auth (backend)
+
+**Status: backend COMPLETE and tested. React pages deferred to the frontend pass.**
+
+| Task | Status |
+|---|---|
+| D5 spike — Laravel `$2y$` hash compatibility | COMPLETE (defect found + fixed) |
+| `utils/auth-token.js` — JWT, cookies, Laravel-compatible reset tokens | COMPLETE |
+| `services/auth.service.js` — all rules from the 3 Laravel controllers | COMPLETE |
+| `middleware/auth.middleware.js` — `auth` / `customer` / `admin` / `guest` | COMPLETE |
+| `middleware/validate.middleware.js` — Zod, authoritative server-side | COMPLETE |
+| `validators/auth.validator.js` — rules + verbatim messages | COMPLETE |
+| Customer login / register / logout / me / check-email | COMPLETE |
+| Forgot password + reset (2/day cap, 60-min expiry, hashed tokens) | COMPLETE |
+| Admin login / logout / me (username **or** email) | COMPLETE |
+| Auth rate limiting (Laravel had none on login) | COMPLETE |
+| `integrations/email/` — mailer + reset template | COMPLETE |
+| `docs/api.md` | COMPLETE |
+| Tests — 57 auth + 22 foundation = **79 passing** | COMPLETE |
+| Verify queries against real data | BLOCKED (dev DB restore) |
+| React `Login` / `Signup` / `ForgotPassword` / `ResetPassword` pages | NOT STARTED |
+
+### Laravel comparison
+
+Verified rule-for-rule against `CustomerAuthController`, `Admin\AuthController` and
+`CustomerPasswordController`:
+
+- Customer login scoped to `role='customer'`; admin login to `role='admin'`; both require
+  `is_active`. An admin cannot sign in through the storefront endpoint, and vice versa.
+- Admin's single `username` field accepts a username **or** an email, resolved the same way.
+- Every user-visible message reproduced verbatim.
+- Reset: 2 emails per address per 24 h → 429; 60-minute expiry; bcrypt-hashed token stored
+  under an email primary key; single use; `remember_token` rotated; user **not** signed in
+  afterwards.
+- Reset token format matches Laravel's exactly, so links issued by either app work in both —
+  required for the parallel run and rollback.
+
+### Deliberate differences
+
+| # | Change | Why |
+|---|---|---|
+| 1 | Sessions → JWT in an HTTP-only cookie | Brief §14. Not readable by JS; works cross-origin. |
+| 2 | Failed admin check returns 403 instead of logging the user out | Laravel's `AdminMiddleware` called `auth()->logout()`, silently ending a *customer's* storefront session and dropping their cart if they touched an admin URL. |
+| 3 | Rate limiting on login/register | Laravel throttled password resets only; login had no brute-force protection at all. |
+| 4 | Reset email is not awaited on the checkout path | Groundwork for audit R8. The forgot-password response still awaits, so the customer is told the truth. |
+
+### Known gaps
+
+- **Admin password reset is not implemented.** Laravel routed `/admin/forgot-password` through
+  the generic broker, but the customer flow scopes `password_reset_tokens` to
+  `role='customer'` and there is no admin-specific mailable in the source. Scoping this needs
+  a product decision. Admin passwords are managed via admin user CRUD in phase 13.
+- Tests mock Prisma, so they verify business rules rather than SQL. Query correctness is
+  confirmed once the dev database is restored.
 
 ## Open decisions
 
