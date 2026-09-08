@@ -10,10 +10,9 @@ import { useConfigStore, useCartStore, useAuthStore, useOffersStore } from '../s
 /**
  * Storefront shell — the Blade layout every frontend page shared.
  *
- * The DOM here reproduces what Blade emitted around `@yield`: `.wrapper.ovh` holding the
- * preloader, the header, the sign-in side panel, then `.body_content_wrapper` with the
- * page, the footer and the scroll-to-top link. The theme's CSS and script.js both select
- * on that structure, so it is layout, not decoration.
+ * The DOM here reproduces what Blade emitted around each page: `.wrapper.ovh` holding the
+ * preloader, the header, the page, the footer and the scroll-to-top link. The theme's CSS
+ * and script.js both select on that structure, so it is layout, not decoration.
  *
  * BOOT ORDER IS LOAD-BEARING. script.js runs once, and when it runs it takes over `#menu`
  * and reads window.PP_SITE for the logo and account link it builds into the mmenu navbar.
@@ -66,12 +65,17 @@ export default function StoreLayout() {
 
       <SiteHeader />
 
-      <div className="body_content_wrapper position-relative">
-        <Outlet />
+      {/*
+        Each page supplies its own `.body_content_wrapper`, because Blade did not agree on
+        one: home.blade.php wraps it in a <div> with the footer inside, collection and the
+        rest use a <main class="body_content_wrapper ... collection-page"> with a
+        page-specific modifier class that style.css keys off. Hoisting it here would either
+        drop those modifiers or nest two wrappers.
+      */}
+      <Outlet />
 
-        <SiteFooter />
-        <a className="scrollToHome" href="#"><i className="fas fa-angle-up"></i></a>
-      </div>
+      <SiteFooter />
+      <a className="scrollToHome" href="#"><i className="fas fa-angle-up"></i></a>
 
       <MinicartDrawer />
     </div>

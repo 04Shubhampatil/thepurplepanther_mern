@@ -1,346 +1,484 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { AnimatePresence, motion } from 'motion/react'
-import { Check, AlertCircle, Truck, RotateCcw, ChevronDown } from 'lucide-react'
-import { useApi } from '../../hooks/useApi.js'
-import * as api from '../../services/endpoints.js'
-import { useCartStore, useRecentStore } from '../../store/index.js'
-import ProductGallery from '../../components/product/ProductGallery.jsx'
-import ProductVariants from '../../components/product/ProductVariants.jsx'
-import ProductQuantity from '../../components/product/ProductQuantity.jsx'
+import { useNavigate, useParams } from 'react-router-dom'
+import PpPrice from '../../components/product/PpPrice.jsx'
 import WishlistButton from '../../components/product/WishlistButton.jsx'
-import ProductCarousel from '../../components/home/ProductCarousel.jsx'
-import Button from '../../components/ui/Button.jsx'
-import Container from '../../components/ui/Container.jsx'
-import Badge from '../../components/ui/Badge.jsx'
-import Seo from '../../components/common/Seo.jsx'
-import ErrorMessage from '../../components/common/ErrorMessage.jsx'
-import { Skeleton } from '../../components/ui/Skeleton.jsx'
-import NotFound from '../NotFound.jsx'
+import ProductRecommendations from '../../components/product/ProductRecommendations.jsx'
+import SizeGuideDrawer from '../../components/product/SizeGuideDrawer.jsx'
 import ReviewSection from './ReviewSection.jsx'
-
-/** Collapsible detail panel — replaces the theme's accordion. */
-function Accordion({ title, children, defaultOpen = false }) {
-  const [open, setOpen] = useState(defaultOpen)
-
-  return (
-    <div className="border-b border-line">
-      <h3>
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          aria-expanded={open}
-          className="flex w-full items-center justify-between py-4 text-left text-[13px] font-semibold uppercase tracking-[0.1em] text-ink transition-colors hover:text-brand"
-        >
-          {title}
-          <ChevronDown
-            size={16}
-            strokeWidth={1.5}
-            aria-hidden="true"
-            className={`transition-transform duration-300 ${open ? 'rotate-180' : ''}`}
-          />
-        </button>
-      </h3>
-
-      <AnimatePresence initial={false}>
-        {open && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-            className="overflow-hidden"
-          >
-            <div className="pb-5 text-body">{children}</div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  )
-}
+import Loading from '../../components/common/Loading.jsx'
+import NotFound from '../NotFound.jsx'
+import { useApi } from '../../hooks/useApi.js'
+import { useCartStore, useRecentStore } from '../../store/index.js'
+import { useBodyClass, usePageTitle } from '../../theme/page.js'
+import { slugify } from '../../utils/slug.js'
+import * as api from '../../services/endpoints.js'
 
 /**
- * Product detail.
+ * frontend/pages/shop-single.blade.php, plus the `productDesignInteractions()` block from
+ * script.js (line 3313) which is what made the page work.
  *
- * The variant rules mirror the server's cart service, because a mismatch surfaces as
- * add-to-cart failing with a 422 the customer cannot act on:
- *   · the first colour (upper-cased) and size are pre-selected
- *   · max quantity is min(max_unit_buy, colour stock, size stock)
- *   · packs are chosen by key only — the price is always the server's
+ * The interactions ported here, and why each one matters:
+ *
+ *   - Choosing a colour swaps the whole gallery when that colour has its own images, then
+ *     pads the set back up to four. The theme's grid expects four tiles; three leaves a
+ *     hole and five reflows the row.
+ *   - The quantity ceiling is `min(max_unit_buy, selected colour stock, selected size
+ *     stock)`, recomputed on every change, and it disables ADD TO CART at zero. This is
+ *     the only thing stopping someone adding more than exists.
+ *   - Choosing an accessory pack rewrites the displayed price from that pack's own
+ *     mrp/price, and the pack key travels with the add-to-cart call.
+ *
+ * TWO SECTIONS OF THE BLADE FILE ARE DELIBERATELY NOT PORTED: `.legacy-product-section`
+ * and `.legacy-related-section`, roughly 400 lines between them. Both carry
+ * `display: none !important` in style.css (lines 42941 and 43676) — they are the previous
+ * design left in the file, and they render nothing on the live site.
  */
+const GALLERY_MIN = 4
+const GALLERY_MAX = 8
+
 export default function ProductDetail() {
   const { slug } = useParams()
   const navigate = useNavigate()
-  const { add, openDrawer, loading: cartLoading } = useCartStore()
-  const { ids: recentIds, push: pushRecent, exclude } = useRecentStore()
+  // Selecting the raw array matters: a selector that CALLS exclude() builds a new array on
+  // every render, zustand sees a changed snapshot each time, and the component re-renders
+  // itself to death ("Maximum update depth exceeded").
+  const recentIds = useRecentStore((s) => s.ids)
+  const pushRecent = useRecentStore((s) => s.push)
+  const add = useCartStore((s) => s.add)
+  const openDrawer = useCartStore((s) => s.openDrawer)
 
-  const [color, setColor] = useState(null)
-  const [size, setSize] = useState(null)
-  const [packageKey, setPackageKey] = useState(null)
-  const [quantity, setQuantity] = useState(1)
-  const [feedback, setFeedback] = useState(null)
-
-  const recentQuery = useMemo(() => exclude(slug).join(','), [recentIds, slug])
+  // Frozen per slug on purpose: `recentIds` gains this product the moment the page loads,
+  // and re-reading it in the fetcher would make the page request itself back as its own
+  // "recently viewed" on the next render.
+  const recentParam = useMemo(() => recentIds.join(','), [slug]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const { data, error, loading, refetch } = useApi(
-    () => api.catalog.product(slug, { ids: recentQuery }),
+    () => api.catalog.product(slug, { ids: recentParam }),
     [slug],
   )
 
-  const product = data?.product
+  // The endpoint returns the product alongside its related and recently-viewed lists, so
+  // the page still renders in one round trip the way the Blade view did.
+  const product = data?.product ?? null
+  const related = data?.related ?? []
+  const recentlyViewed = data?.recentlyViewed ?? []
 
+  const [colour, setColour] = useState(null)
+  const [size, setSize] = useState(null)
+  const [packageKey, setPackageKey] = useState(null)
+  const [quantity, setQuantity] = useState(1)
+  const [activeImage, setActiveImage] = useState(0)
+  const [sizeGuideOpen, setSizeGuideOpen] = useState(false)
+
+  // Blade printed the first colour, size and pack as pre-selected, so the page always has
+  // a complete selection and ADD TO CART never needs the customer to choose anything.
   useEffect(() => {
     if (!product) return
-    setColor(product.colors?.[0]?.name ? String(product.colors[0].name).toUpperCase() : null)
+    setColour(product.colors?.[0]?.name ? product.colors[0].name.toUpperCase() : null)
     setSize(product.sizes?.[0]?.name ?? null)
     setPackageKey(product.accessoryPackages?.[0]?.key ?? null)
     setQuantity(1)
-    setFeedback(null)
+    setActiveImage(0)
     pushRecent(product.id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [product?.id])
+  }, [product, pushRecent])
 
-  const maxQuantity = useMemo(() => {
-    if (!product) return 1
-    const limits = [Math.max(1, product.maxUnitBuy || 99)]
+  useBodyClass(
+    'product-detail-page',
+    'product-size-closed',
+    product?.category ? `category-${slugify(product.category.title)}` : '',
+  )
+  usePageTitle(
+    product ? `${product.title} - The Purple Panther` : 'Product - The Purple Panther',
+    product?.seo?.description,
+  )
 
-    if (color && product.colors?.length) {
-      const match = product.colors.find(
-        (c) => String(c.name).toLowerCase() === String(color).toLowerCase(),
-      )
-      if (match) limits.push(Number(match.quantity))
-    }
-    if (size && product.sizes?.length) {
-      const match = product.sizes.find(
-        (s) => String(s.name).toLowerCase() === String(size).toLowerCase(),
-      )
-      if (match) limits.push(Number(match.quantity))
-    }
+  // showColourGallery(): a colour with its own images replaces the gallery, padded to four
+  // and capped at eight — script.js:3381.
+  const gallery = useMemo(() => {
+    if (!product) return []
+
+    const forColour = colour ? product.colourGalleries?.[colour.toUpperCase()] : null
+    if (!Array.isArray(forColour) || forColour.length === 0) return product.gallery ?? []
+
+    const images = [...forColour]
+    while (images.length < GALLERY_MIN) images.push(images[0])
+    return images.slice(0, GALLERY_MAX)
+  }, [product, colour])
+
+  const packages = product?.accessoryPackages ?? []
+  const selectedPackage = packages.find((p) => p.key === packageKey) ?? packages[0] ?? null
+
+  // selectedStockLimit() — script.js:3324.
+  const stockLimit = useMemo(() => {
+    if (!product) return 0
+
+    const limits = [Number(product.maxUnitBuy) || 99]
+    const selectedColour = product.colors?.find((c) => c.name?.toUpperCase() === colour)
+    const selectedSize = product.sizes?.find((s) => s.name === size)
+    if (selectedColour) limits.push(Number(selectedColour.quantity) || 0)
+    if (selectedSize) limits.push(Number(selectedSize.quantity) || 0)
 
     return Math.min(...limits)
-  }, [product, color, size])
+  }, [product, colour, size])
+
+  // applyStockLimit() clamped the visible quantity whenever the selection changed.
+  useEffect(() => {
+    setQuantity((current) => (stockLimit > 0 ? Math.min(current, stockLimit) : 0))
+  }, [stockLimit])
 
   if (error?.status === 404) return <NotFound />
+  if (loading || !product) return <Loading full />
 
-  if (error) {
-    return (
-      <Container className="py-24">
-        <ErrorMessage error={error} onRetry={refetch} />
-      </Container>
-    )
-  }
+  const soldOut = stockLimit < 1
+  const packageDiscount =
+    selectedPackage && selectedPackage.mrp > selectedPackage.price && selectedPackage.mrp > 0
+      ? Math.round(((selectedPackage.mrp - selectedPackage.price) / selectedPackage.mrp) * 100)
+      : 0
 
-  if (loading || !product) {
-    return (
-      <Container className="py-10">
-        <div className="grid gap-10 md:grid-cols-2">
-          <Skeleton className="aspect-[3/4] w-full" />
-          <div className="space-y-4 py-4">
-            <Skeleton className="h-8 w-3/4" />
-            <Skeleton className="h-6 w-1/3" />
-            <Skeleton className="h-24 w-full" />
-            <Skeleton className="h-12 w-full" />
-          </div>
-        </div>
-      </Container>
-    )
-  }
+  const highlightItems = (product.highlights?.items ?? []).filter(
+    (item) => item?.title || item?.subtitle || item?.description,
+  )
+  const highlightIntro = product.highlights?.shortDescription || product.shortDescription
+  const showHighlights = Boolean(highlightIntro || highlightItems.length > 0 || product.highlights?.image)
 
-  const outOfStock = maxQuantity < 1
-  const payload = () => ({
+  // Blade split `features` on newlines into the highlights list.
+  const featureLines = String(product.features ?? '')
+    .split(/\r\n|\r|\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+
+  const informationItems = (product.informationItems ?? []).filter((item) => item?.title || item?.text)
+  const specificationItems = (product.specifications ?? []).filter((item) => item?.key || item?.value)
+
+  const cartPayload = () => ({
     product_id: product.id,
-    quantity,
-    color,
-    size,
-    package_key: packageKey,
+    quantity: Math.max(1, quantity),
+    ...(colour ? { color: colour } : {}),
+    ...(size ? { size } : {}),
+    ...(packageKey ? { package_key: packageKey } : {}),
   })
 
-  const handleAdd = async () => {
-    setFeedback(null)
+  async function onAddToCart() {
+    if (soldOut) return
     try {
-      await add(payload())
+      await add(cartPayload())
       openDrawer()
-    } catch (err) {
-      // The server's message names the actual limit, e.g. "Only 2 item(s) are available".
-      setFeedback({ ok: false, message: err.message })
+    } catch {
+      // The store holds the error; the bag stays shut.
     }
   }
 
-  const handleBuyNow = async () => {
-    setFeedback(null)
+  async function onBuyNow(event) {
+    event.preventDefault()
+    if (soldOut) return
     try {
-      await api.cart.buyNow(payload())
+      await api.cart.buyNow(cartPayload())
       navigate('/checkout')
-    } catch (err) {
-      setFeedback({ ok: false, message: err.message })
+    } catch {
+      // Same as above — checkout is not entered on a failed line.
     }
+  }
+
+  function step(delta) {
+    setQuantity((current) => {
+      const next = current + delta
+      return Math.max(stockLimit > 0 ? 1 : 0, Math.min(stockLimit, next))
+    })
   }
 
   return (
-    <>
-      <Seo
-        title={product.seo?.title ?? product.title}
-        description={product.seo?.description ?? product.shortDescription}
-        keywords={product.seo?.keywords}
-      />
+    <main className="body_content_wrapper position-relative product-detail-main">
+      <section
+        className="product-design"
+        aria-labelledby="product-design-title"
+        data-product-id={product.id}
+        data-max-unit-buy={product.maxUnitBuy || 99}
+      >
+        <div className="product-design__top">
+          <div className="product-design__gallery" aria-label="Product image gallery">
+            {gallery.map((imageUrl, index) => (
+              <button
+                className={`product-design__image${index < 2 ? ' product-design__image--half' : ''}${index === activeImage ? ' is-active' : ''}`}
+                type="button"
+                data-product-image={imageUrl}
+                onClick={() => setActiveImage(index)}
+                key={`${imageUrl}-${index}`}
+              >
+                <img src={imageUrl} alt={product.title} />
+              </button>
+            ))}
+          </div>
 
-      <Container className="pt-8 md:pt-12">
-        <div className="grid gap-8 md:grid-cols-2 md:gap-12 lg:gap-16">
-          <ProductGallery images={product.gallery} title={product.title} />
-
-          <div className="md:py-4">
-            {product.category && (
-              <p className="pp-eyebrow mb-3 text-body">{product.category.title}</p>
-            )}
-
-            <h1 className="pp-heading">{product.title}</h1>
-
-            <div className="mt-4 flex flex-wrap items-baseline gap-3">
-              <span className="text-[22px] font-medium text-ink">{product.priceFormatted}</span>
-              {product.discountPercent > 0 && (
-                <>
-                  <del className="text-[15px] text-body/70">{product.mrpFormatted}</del>
-                  <Badge>{product.discountPercent}% off</Badge>
-                </>
-              )}
-            </div>
-
-            {product.shortDescription && (
-              <p className="mt-5 max-w-lg text-body">{product.shortDescription}</p>
-            )}
-
-            <ProductVariants
-              product={product}
-              color={color}
-              size={size}
-              packageKey={packageKey}
-              onColor={setColor}
-              onSize={setSize}
-              onPackage={setPackageKey}
-            />
-
-            <div className="mt-7 flex flex-wrap items-center gap-4">
-              <ProductQuantity
-                value={quantity}
-                onChange={setQuantity}
-                max={Math.max(1, maxQuantity)}
-                disabled={outOfStock}
-              />
-
-              {maxQuantity > 0 && maxQuantity <= 5 && (
-                <p className="text-[13px] text-brand">Only {maxQuantity} left</p>
-              )}
-            </div>
-
-            <AnimatePresence>
-              {feedback && (
-                <motion.p
-                  initial={{ opacity: 0, y: -6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  role="alert"
-                  className={`mt-4 flex items-center gap-2 text-[13px] ${
-                    feedback.ok ? 'text-brand' : 'text-red-700'
-                  }`}
-                >
-                  {feedback.ok ? (
-                    <Check size={15} strokeWidth={2} aria-hidden="true" />
+          <div className="product-design__details" data-product-id={product.id}>
+            <div className="product-design__details-inner">
+              <div className="product-design__head">
+                <p className="product-design__eyebrow">
+                  {product.isNewArrival ? 'NEW ARRIVAL' : (product.category?.title ?? 'SHOP').toUpperCase()}
+                </p>
+                <h1 id="product-design-title">{product.title}</h1>
+                <p className="product-design__price" data-product-price>
+                  {selectedPackage ? (
+                    <span className="pp-price pp-price--has-selling-price">
+                      <span className="pp-price__mrp">
+                        {packageDiscount ? (
+                          <s>₹ {selectedPackage.mrp.toFixed(2)}</s>
+                        ) : (
+                          <>₹ {selectedPackage.mrp.toFixed(2)}</>
+                        )}
+                      </span>
+                      {packageDiscount > 0 && <span className="pp-price__discount">-{packageDiscount}%</span>}
+                      <span className="pp-price__selling">₹ {selectedPackage.price.toFixed(2)}</span>
+                    </span>
                   ) : (
-                    <AlertCircle size={15} strokeWidth={2} aria-hidden="true" />
+                    <PpPrice product={product} />
                   )}
-                  {feedback.message}
-                </motion.p>
-              )}
-            </AnimatePresence>
+                </p>
+                <WishlistButton product={product} className="product-design__wish">
+                  <i className="far fa-heart" aria-hidden="true"></i>
+                </WishlistButton>
+              </div>
 
-            <div className="mt-6 flex flex-wrap items-center gap-3">
-              <Button
-                onClick={handleAdd}
-                disabled={outOfStock || cartLoading}
-                loading={cartLoading}
-                className="flex-1 sm:flex-none"
-              >
-                {outOfStock ? 'Out of stock' : 'Add to cart'}
-              </Button>
+              <p className="product-design__intro">
+                {product.shortDescription || product.features || 'Premium Purple Panther piece.'}
+              </p>
 
-              <Button
-                variant="outline"
-                onClick={handleBuyNow}
-                disabled={outOfStock || cartLoading}
-                className="flex-1 sm:flex-none"
-              >
-                Buy now
-              </Button>
+              <fieldset className="product-design__choice product-design__colours">
+                {product.colors?.length > 0 && (
+                  <>
+                    <legend>COLORS: <span data-selected-colour>{colour}</span></legend>
+                    <div className="product-design__colour-list">
+                      {product.colors.map((color) => {
+                        const name = String(color.name ?? '').toUpperCase()
+                        return (
+                          <button
+                            className={name === colour ? 'is-active' : ''}
+                            type="button"
+                            data-colour={name}
+                            data-stock={color.quantity}
+                            aria-label={`${color.name} (${color.quantity} available)`}
+                            aria-pressed={name === colour ? 'true' : 'false'}
+                            style={{ background: color.code }}
+                            onClick={() => {
+                              setColour(name)
+                              setActiveImage(0)
+                            }}
+                            key={color.id}
+                          ></button>
+                        )
+                      })}
+                    </div>
+                  </>
+                )}
+              </fieldset>
 
-              <WishlistButton
-                productId={product.id}
-                productTitle={product.title}
-                className="!size-[52px] border border-line !bg-white"
-              />
-            </div>
-
-            <ul className="mt-8 space-y-2.5 text-[13px] text-body">
-              <li className="flex items-center gap-2.5">
-                <Truck size={16} strokeWidth={1.5} aria-hidden="true" className="text-brand" />
-                Free delivery on qualifying orders
-              </li>
-              <li className="flex items-center gap-2.5">
-                <RotateCcw size={16} strokeWidth={1.5} aria-hidden="true" className="text-brand" />
-                7-day returns on unused items
-              </li>
-            </ul>
-
-            <div className="mt-8">
-              {product.features && (
-                <Accordion title="Description" defaultOpen>
-                  <div dangerouslySetInnerHTML={{ __html: product.features }} />
-                </Accordion>
-              )}
-
-              {product.informationItems?.length > 0 && (
-                <Accordion title="Information">
-                  <dl className="space-y-3">
-                    {product.informationItems.map((item, i) => (
-                      <div key={i}>
-                        {item.title && <dt className="text-ink">{item.title}</dt>}
-                        {item.content && <dd className="mt-0.5">{item.content}</dd>}
-                      </div>
+              {packages.length > 0 && (
+                <fieldset className="product-design__choice product-design__packages">
+                  <legend>CHOOSE PACK: <span data-selected-package>{selectedPackage?.label}</span></legend>
+                  <div className="product-design__package-list" role="group" aria-label="Choose accessory package">
+                    {packages.map((pack) => (
+                      <button
+                        type="button"
+                        className={pack.key === packageKey ? 'is-active' : ''}
+                        data-accessory-package={pack.key}
+                        data-package-label={pack.label}
+                        data-package-mrp={pack.mrp}
+                        data-package-price={pack.price}
+                        aria-pressed={pack.key === packageKey ? 'true' : 'false'}
+                        onClick={() => setPackageKey(pack.key)}
+                        key={pack.key}
+                      >
+                        <span>{pack.label}</span>
+                        <strong>
+                          {pack.mrp > pack.price && <s>₹ {Math.round(pack.mrp)}</s>}
+                          {' '}₹ {Math.round(pack.price)}
+                        </strong>
+                      </button>
                     ))}
-                  </dl>
-                </Accordion>
+                  </div>
+                </fieldset>
               )}
 
-              {product.specifications?.length > 0 && (
-                <Accordion title="Specifications">
-                  <dl className="divide-y divide-line">
-                    {product.specifications.map((row, i) => (
-                      <div key={i} className="flex justify-between gap-6 py-2.5">
-                        <dt className="text-ink">{row.label ?? row.title}</dt>
-                        <dd className="text-right">{row.value ?? row.content}</dd>
-                      </div>
+              {product.sizes?.length > 0 && (
+                <fieldset className="product-design__choice product-design__sizes">
+                  <div className="product-design__size-head">
+                    <legend>SELECT SIZE: <span data-selected-size>{size}</span></legend>
+                    {product.showSizeGuide && (
+                      <button
+                        type="button"
+                        className="color-title guide-btn cloth-size-btn border-0 bg-transparent"
+                        onClick={() => setSizeGuideOpen(true)}
+                      >
+                        View the Size Guide
+                      </button>
+                    )}
+                  </div>
+                  <div className="product-design__size-list" role="group" aria-label="Choose size">
+                    {product.sizes.map((entry) => (
+                      <button
+                        type="button"
+                        className={entry.name === size ? 'is-active' : ''}
+                        data-size={entry.name}
+                        data-stock={entry.quantity}
+                        aria-label={`${entry.name} (${entry.quantity} available)`}
+                        aria-pressed={entry.name === size ? 'true' : 'false'}
+                        onClick={() => setSize(entry.name)}
+                        key={entry.id}
+                      >
+                        {entry.name}
+                      </button>
                     ))}
-                  </dl>
-                </Accordion>
+                  </div>
+                </fieldset>
               )}
 
-              {product.showSizeGuide && product.sizeGuideContent && (
-                <Accordion title="Size guide">
-                  <div dangerouslySetInnerHTML={{ __html: product.sizeGuideContent }} />
-                </Accordion>
-              )}
+              <div className="product-design__quantity" aria-label="Quantity selector">
+                <button type="button" data-product-qty="minus" aria-label="Decrease quantity" onClick={() => step(-1)}>-</button>
+                <span data-product-qty-value>{quantity}</span>
+                <button
+                  type="button"
+                  data-product-qty="plus"
+                  aria-label="Increase quantity"
+                  disabled={stockLimit < 1 || quantity >= stockLimit}
+                  onClick={() => step(1)}
+                >
+                  +
+                </button>
+              </div>
+
+              <div className="product-design__actions">
+                <button
+                  className={`product-design__cart${soldOut ? ' is-disabled' : ''}`}
+                  type="button"
+                  data-add-to-cart
+                  data-product-id={product.id}
+                  data-default-color={colour ?? ''}
+                  data-default-size={size ?? ''}
+                  data-default-package={packageKey ?? ''}
+                  aria-disabled={soldOut ? 'true' : 'false'}
+                  onClick={onAddToCart}
+                >
+                  ADD TO CART
+                </button>
+                <a
+                  className={`product-design__buy${soldOut ? ' is-disabled' : ''}`}
+                  href="/checkout"
+                  data-buy-now
+                  data-product-id={product.id}
+                  data-default-color={colour ?? ''}
+                  data-default-size={size ?? ''}
+                  data-default-package={packageKey ?? ''}
+                  aria-disabled={soldOut ? 'true' : 'false'}
+                  onClick={onBuyNow}
+                >
+                  BUY NOW
+                </a>
+              </div>
             </div>
           </div>
         </div>
-      </Container>
 
-      <Container>
-        <ReviewSection product={product} slug={slug} onSubmitted={refetch} />
-      </Container>
+        {showHighlights && (
+          <section className="product-care" aria-labelledby="product-care-title">
+            <div className="product-care__media">
+              <img src={product.highlights.image} alt={`${product.title} highlights`} />
+            </div>
+            <div className="product-care__content">
+              <div className="product-care__intro">
+                <h2 id="product-care-title">Product Highlights</h2>
+              </div>
+              {highlightItems.length > 0 && (
+                <div className="product-care__grid">
+                  {highlightItems.map((item, index) => (
+                    <article className="product-care__item" key={index}>
+                      <span className="product-care__icon">
+                        <img src={item.icon} alt="" />
+                      </span>
+                      {item.title && <h3>{item.title}</h3>}
+                      {item.subtitle && <strong>{item.subtitle}</strong>}
+                      {item.description && <p>{item.description}</p>}
+                    </article>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+        )}
 
-      <ProductCarousel title="You may also like" products={data.related ?? []} />
-      <ProductCarousel title="Recently viewed" products={data.recentlyViewed ?? []} />
+        <section className="product-design__information" aria-label="Product information">
+          <article>
+            <h2>DESCRIPTION</h2>
+            {product.shortDescription && (
+              <p style={{ whiteSpace: 'pre-line' }}>{product.shortDescription}</p>
+            )}
+            {featureLines.length > 0 ? (
+              <>
+                <h3>Product Highlights</h3>
+                <ul className="product-design__highlights">
+                  {featureLines.map((line, index) => (
+                    <li key={index}>{line}</li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+              !product.shortDescription && <p>Details coming soon.</p>
+            )}
+          </article>
 
-      <div className="pb-16" />
-    </>
+          {/*
+            The INFORMATION column is the theme's fixed copy, not the product's
+            `information_items` — Blade commented the dynamic version out and shipped this.
+            The stored items still gate whether the column appears at all, which is why the
+            condition reads the data it does not print.
+          */}
+          {informationItems.length > 0 && (
+            <article>
+              <h2>INFORMATION</h2>
+              <h3>Shipping</h3>
+              <p>We offer free shipping across India on orders above ₹799.</p>
+              <h3>Sizing</h3>
+              <p>Fits true to size. Do you need size advice?</p>
+              <h3>Return &amp; exchange</h3>
+              <p>If you are not satisfied with your purchase you can return it to us within 7 days for an exchange</p>
+              <h3>Assistance</h3>
+              <p>Contact us on +91 87886 05592, or email us info@thepurplepanther.in</p>
+            </article>
+          )}
+
+          {specificationItems.length > 0 && (
+            <article>
+              <h2>SPECIFICATIONS</h2>
+              <dl>
+                {specificationItems.map((spec, index) => (
+                  <div key={index}>
+                    <dt>{spec.key ?? ''}</dt>
+                    <dd>{spec.value ?? ''}</dd>
+                  </div>
+                ))}
+              </dl>
+            </article>
+          )}
+        </section>
+
+        {product.showSizeGuide && (
+          <SizeGuideDrawer product={product} open={sizeGuideOpen} onClose={() => setSizeGuideOpen(false)} />
+        )}
+      </section>
+
+      <ReviewSection product={product} slug={slug} onSubmitted={refetch} />
+
+      <ProductRecommendations
+        items={related}
+        heading="YOU MAY ALSO LIKE"
+        titleId="related-products-title"
+        variant="related"
+      />
+
+      <ProductRecommendations
+        items={recentlyViewed}
+        heading="RECENTLY VIEWED"
+        titleId="recent-products-title"
+        variant="recent"
+      />
+    </main>
   )
 }

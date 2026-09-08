@@ -55,7 +55,7 @@ export default function Home() {
   if (loading) return <Loading full />
 
   return (
-    <>
+    <div className="body_content_wrapper position-relative">
 
       {/* banner-area-start */}
       <section className="home21-banner">
@@ -364,6 +364,6 @@ export default function Home() {
       </div>
     </section> */}
       {/* blog-area-end */}
-    </>
+    </div>
   )
 }

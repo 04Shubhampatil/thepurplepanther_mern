@@ -1,184 +1,264 @@
 import { useState } from 'react'
-import { useForm } from 'react-hook-form'
-import * as api from '../../services/endpoints.js'
 import { useAuthStore } from '../../store/index.js'
-import Rating from '../../components/product/Rating.jsx'
-import Button from '../../components/ui/Button.jsx'
-import Alert from '../../components/ui/Alert.jsx'
-import { Field, Input, Textarea, Select } from '../../components/ui/Field.jsx'
+import * as api from '../../services/endpoints.js'
 
 /**
- * Reviews and the submission form.
+ * frontend/partials/product-reviews.blade.php, with product-review.js's client validation.
  *
- * Guests may review, matching Laravel — a purchase is not required. The server links a
- * guest review to a matching customer account by email, so a signed-in customer's details
- * are pre-filled but never trusted from the client.
+ * Reviews are open to guests — name and email, no account — which is the original's rule
+ * and the reason the form carries its own name/email fields rather than reading the
+ * session. A signed-in customer gets them pre-filled, as Blade did with `old(...)`.
+ *
+ * The star row is five buttons over a hidden input, not a radio group: the theme styles
+ * `.review-star-btn`, and the opacity split is how "3 of 5" reads.
  */
+const STARS = [1, 2, 3, 4, 5]
+
 export default function ReviewSection({ product, slug, onSubmitted }) {
   const user = useAuthStore((s) => s.user)
-  const [status, setStatus] = useState(null)
-  const reviews = product.reviews ?? { count: 0, average: 0, breakdown: {}, items: [] }
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    setError,
-    formState: { errors, isSubmitting },
-  } = useForm({
-    defaultValues: {
-      rating: 5,
-      comment: '',
-      reviewer_name: user ? `${user.firstName} ${user.lastName}`.trim() : '',
-      reviewer_email: user?.email ?? '',
-    },
-  })
+  const [rating, setRating] = useState(5)
+  const [comment, setComment] = useState('')
+  const [name, setName] = useState(user?.name ?? '')
+  const [email, setEmail] = useState(user?.email ?? '')
+  const [alert, setAlert] = useState('')
+  const [success, setSuccess] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
-  const onSubmit = async (values) => {
-    setStatus(null)
+  const reviews = product.reviews?.items ?? []
+  const reviewCount = product.reviews?.count ?? 0
+  const average = product.reviews?.average ?? 0
+  const breakdown = product.reviews?.breakdown ?? {}
+
+  async function onSubmit(event) {
+    event.preventDefault()
+    setAlert('')
+    setSuccess('')
+
+    if (comment.trim().length < 10) {
+      setAlert('Please write at least 10 characters.')
+      return
+    }
+    if (!name.trim() || !email.trim()) {
+      setAlert('Name and email are required.')
+      return
+    }
+
+    setSubmitting(true)
     try {
-      await api.catalog.submitReview(slug, values)
-      setStatus({ ok: true, message: 'Thank you! Your review has been submitted.' })
-      reset({
-        rating: 5,
-        comment: '',
-        reviewer_name: values.reviewer_name,
-        reviewer_email: values.reviewer_email,
+      const response = await api.catalog.submitReview(slug, {
+        rating,
+        comment: comment.trim(),
+        reviewer_name: name.trim(),
+        reviewer_email: email.trim(),
       })
+      setSuccess(response?.message ?? 'Thank you for your review.')
+      setComment('')
       onSubmitted?.()
     } catch (error) {
-      // Surface per-field messages from the server rather than a single banner.
-      if (error.errors) {
-        Object.entries(error.errors).forEach(([field, messages]) => {
-          setError(field, { type: 'server', message: messages[0] })
-        })
-      }
-      setStatus({ ok: false, message: error.message })
+      setAlert(error.message || 'Could not submit your review.')
+    } finally {
+      setSubmitting(false)
     }
   }
 
   return (
-    <section id="write-review" className="border-t border-line pt-12 md:pt-16">
-      <h2 className="pp-heading">Reviews</h2>
-
-      <div className="mt-8 grid gap-10 md:grid-cols-[280px_1fr] md:gap-14">
-        <div className="h-fit border border-line p-6">
-          <p className="text-[40px] font-semibold leading-none text-ink">{reviews.average || 0}</p>
-          <Rating value={reviews.average || 0} size={17} className="mt-2" />
-          <p className="mt-1 text-[13px] text-body">
-            {reviews.count} review{reviews.count === 1 ? '' : 's'}
-          </p>
-
-          <ul className="mt-5 space-y-2">
-            {[5, 4, 3, 2, 1].map((star) => {
-              const percent = reviews.breakdown?.[star]?.percent ?? 0
-              const count = reviews.breakdown?.[star]?.count ?? 0
-
-              return (
-                <li key={star} className="flex items-center gap-3 text-[13px] text-body">
-                  <span className="w-12 shrink-0">{star} star</span>
-                  <span className="h-1.5 flex-1 bg-line">
-                    <span
-                      className="block h-full bg-brand"
-                      style={{ width: `${percent}%` }}
-                      aria-hidden="true"
-                    />
-                  </span>
-                  <span className="w-6 shrink-0 text-right">{count}</span>
-                </li>
-              )
-            })}
-          </ul>
+    <section className="shop-review-area pt90 pb-0 gap-60" id="reviews">
+      <div className="container">
+        <div className="shop-title mb50 style13 text-center">
+          <h2 className="title">REVIEWS</h2>
         </div>
 
-        <div className="min-w-0">
-          {reviews.items?.length > 0 ? (
-            <ul>
-              {reviews.items.map((review) => (
-                <li key={review.id} className="border-b border-line py-5 first:pt-0">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <Rating value={review.rating} />
-                    <span className="text-[14px] font-semibold text-ink">
-                      {review.reviewerName}
-                    </span>
-                  </div>
-                  {review.comment && <p className="mt-2 text-body">{review.comment}</p>}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-body">No reviews yet. Be the first to write one.</p>
-          )}
+        {success && <div className="alert alert-success text-center mb30">{success}</div>}
 
-          <form onSubmit={handleSubmit(onSubmit)} noValidate className="mt-10 max-w-xl">
-            <h3 className="pp-eyebrow text-ink">Write a review</h3>
-
-            <div className="mt-5 space-y-5">
-              <Field label="Rating" htmlFor="review-rating">
-                <Select id="review-rating" {...register('rating', { valueAsNumber: true })}>
-                  {[5, 4, 3, 2, 1].map((n) => (
-                    <option key={n} value={n}>
-                      {n} star{n === 1 ? '' : 's'}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-
-              <div className="grid gap-5 sm:grid-cols-2">
-                <Field
-                  label="Your name"
-                  htmlFor="review-name"
-                  required
-                  error={errors.reviewer_name?.message}
-                >
-                  <Input
-                    id="review-name"
-                    autoComplete="name"
-                    error={errors.reviewer_name}
-                    {...register('reviewer_name', { required: 'Please enter your name.' })}
-                  />
-                </Field>
-
-                <Field
-                  label="Your email"
-                  htmlFor="review-email"
-                  required
-                  error={errors.reviewer_email?.message}
-                >
-                  <Input
-                    id="review-email"
-                    type="email"
-                    autoComplete="email"
-                    error={errors.reviewer_email}
-                    {...register('reviewer_email', {
-                      required: 'Please enter a valid email address.',
-                    })}
-                  />
-                </Field>
-              </div>
-
-              <Field
-                label="Your review"
-                htmlFor="review-comment"
-                required
-                error={errors.comment?.message}
-              >
-                <Textarea
-                  id="review-comment"
-                  rows={4}
-                  error={errors.comment}
-                  {...register('comment', {
-                    required: 'Please write a review.',
-                    minLength: { value: 10, message: 'Please write at least 10 characters.' },
+        <div className="review-info">
+          <div className="row g-4 bb1 pb40">
+            <div className="col-xl-4 col-lg-6">
+              <div className="review-info-box">
+                <div className="rating-progress">
+                  {[5, 4, 3, 2, 1].map((star) => {
+                    const data = breakdown[star] ?? { percent: 0, count: 0 }
+                    return (
+                      <div className="progress-item d-flex align-items-center" key={star}>
+                        <h4 className="star flex-shrink-0">{star} Star</h4>
+                        <div
+                          className="progress flex-grow-1"
+                          role="progressbar"
+                          aria-valuenow={data.percent}
+                          aria-valuemin="0"
+                          aria-valuemax="100"
+                        >
+                          <div className="progress-bar" style={{ width: `${data.percent}%` }}></div>
+                        </div>
+                        <span className="num flex-shrink-0">{data.count}</span>
+                      </div>
+                    )
                   })}
-                />
-              </Field>
+                </div>
+              </div>
+            </div>
+            <div className="col-xl-4 col-lg-6"></div>
+            <div className="col-xl-4 col-lg-6">
+              <div className="review-info-box">
+                <h4 className="review-number mb10 d-flex align-items-center">
+                  <strong>{reviewCount ? average.toFixed(1) : '0.0'}</strong>
+                  out of 5 stars
+                  <span className="ms-2 text-muted fz14">({reviewCount})</span>
+                </h4>
+                <a className="su-btn-4 btn-black-border w-100 text-center su-left-right" href="#write-review">
+                  <span className="mr10 su-text d-inline-block">WRITE A REVIEW</span>
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
 
-              {status && <Alert tone={status.ok ? 'success' : 'error'}>{status.message}</Alert>}
+        <div className="review-list-wrapper pt50">
+          <div className="review-list-main">
+            {reviews.length === 0 ? (
+              <div className="text-center py-4">
+                <p className="mb-0">No reviews yet. Be the first to review this product.</p>
+              </div>
+            ) : (
+              reviews.map((review) => (
+                <div className="review-list-item d-xl-flex align-items-start mb40" key={review.id}>
+                  <div className="left-content flex-shrink-0 me-xl-4 mb20 mb-xl-0">
+                    <div className="rating mb10">
+                      <ul className="list-unstyled d-flex align-items-center gap-2 mb-0">
+                        {STARS.map((star) => (
+                          <li style={{ opacity: star <= review.rating ? 1 : 0.25 }} key={star}>★</li>
+                        ))}
+                      </ul>
+                    </div>
+                    <h5 className="mb5">{review.reviewerName}</h5>
+                    <p className="mb-0 text-muted">
+                      {review.createdAt
+                        ? new Date(review.createdAt).toLocaleDateString('en-US', {
+                            month: 'long',
+                            day: '2-digit',
+                            year: 'numeric',
+                          })
+                        : ''}
+                    </p>
+                  </div>
+                  <div className="right-content flex-grow-1">
+                    <p className="mb-0">{review.comment}</p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
 
-              <Button type="submit" size="sm" loading={isSubmitting}>
-                {isSubmitting ? 'Submitting…' : 'Submit review'}
-              </Button>
+        <div className="submit-review-box shop-s9 mt60" id="write-review">
+          <div className="text-center">
+            <h3 className="title mb20">
+              {reviewCount
+                ? 'WRITE A REVIEW'
+                : `BE THE FIRST TO REVIEW “${product.title.toUpperCase()}”`}
+            </h3>
+            <p className="text mb15">
+              Login is optional. Guests can review with name and email. Required fields are marked *
+            </p>
+          </div>
+
+          <form id="product-review-form" noValidate onSubmit={onSubmit}>
+            <div
+              id="review-form-alert"
+              className={`alert alert-danger text-center mb20${alert ? '' : ' d-none'}`}
+              role="alert"
+              hidden={!alert}
+              aria-live="assertive"
+            >
+              {alert}
+            </div>
+
+            <p className="rate-text mb-2">Overall rating*</p>
+            <div className="rating mb20" id="review-star-picker">
+              <input type="hidden" name="rating" id="review-rating" value={rating} readOnly />
+              <ul className="list-unstyled d-flex align-items-center gap-3 mb-0" role="listbox" aria-label="Rating">
+                {STARS.map((star) => (
+                  <li key={star}>
+                    <button
+                      type="button"
+                      className="review-star-btn border-0 bg-transparent p-0"
+                      data-rating={star}
+                      aria-label={`${star} stars`}
+                      style={{
+                        fontSize: '22px',
+                        lineHeight: 1,
+                        color: '#1d1d1d',
+                        cursor: 'pointer',
+                        opacity: star <= rating ? 1 : 0.25,
+                      }}
+                      onClick={() => setRating(star)}
+                    >
+                      ★
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <div className="field-error text-danger mt1" id="rating-error" aria-live="polite"></div>
+            </div>
+
+            <div className="review-box mt30">
+              <div className="row g-4">
+                <div className="col-lg-12">
+                  <div className="form-floating form-group">
+                    <textarea
+                      name="comment"
+                      className="form-control textarea shadow-none"
+                      placeholder="Your Review*"
+                      id="review-comment"
+                      required
+                      minLength="10"
+                      value={comment}
+                      onChange={(event) => setComment(event.target.value)}
+                    />
+                    <label htmlFor="review-comment">Review *</label>
+                    <div className="field-error text-danger" aria-live="polite"></div>
+                  </div>
+                </div>
+                <div className="col-lg-6">
+                  <div className="form-floating form-group">
+                    <input
+                      type="text"
+                      name="reviewer_name"
+                      id="reviewer-name"
+                      className="form-control shadow-none"
+                      placeholder="Name*"
+                      required
+                      maxLength="255"
+                      value={name}
+                      onChange={(event) => setName(event.target.value)}
+                    />
+                    <label htmlFor="reviewer-name">Name *</label>
+                    <div className="field-error text-danger" aria-live="polite"></div>
+                  </div>
+                </div>
+                <div className="col-lg-6">
+                  <div className="form-floating form-group">
+                    <input
+                      type="email"
+                      name="reviewer_email"
+                      id="reviewer-email"
+                      className="form-control shadow-none"
+                      placeholder="Email*"
+                      required
+                      maxLength="255"
+                      value={email}
+                      onChange={(event) => setEmail(event.target.value)}
+                    />
+                    <label htmlFor="reviewer-email">Email *</label>
+                    <div className="field-error text-danger" aria-live="polite"></div>
+                  </div>
+                </div>
+                <div className="col-lg-12">
+                  <button type="submit" className="su-btn-4 su-btn-16-black w-100 su-left-right" disabled={submitting}>
+                    <span className="mr10 su-text d-inline-block">WRITE A REVIEW</span>
+                  </button>
+                </div>
+              </div>
             </div>
           </form>
         </div>

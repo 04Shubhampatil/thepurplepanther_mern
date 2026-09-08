@@ -1,118 +1,106 @@
-import { useSearchParams, NavLink } from 'react-router-dom'
+import { useSearchParams, Link } from 'react-router-dom'
 import { useApi } from '../../hooks/useApi.js'
 import * as api from '../../services/endpoints.js'
 import { useConfigStore } from '../../store/index.js'
-import ProductGrid from '../../components/product/ProductGrid.jsx'
-import Pagination from '../../components/common/Pagination.jsx'
-import ErrorMessage from '../../components/common/ErrorMessage.jsx'
-import Seo from '../../components/common/Seo.jsx'
-import Container from '../../components/ui/Container.jsx'
+import CollectionGrid from '../../components/product/CollectionGrid.jsx'
+import CollectionPagination from '../../components/common/CollectionPagination.jsx'
+import Loading from '../../components/common/Loading.jsx'
 import NotFound from '../NotFound.jsx'
+import { useBodyClass, usePageTitle } from '../../theme/page.js'
 
 /**
- * Product listing — serves /shop, /collection and every clean category URL.
+ * frontend/pages/collection.blade.php — serves /shop, /collection and every clean
+ * category URL, as FrontendController::collection was one method for all three.
  *
- * One component for all three, as `FrontendController::collection` was one method.
- * Filters and pagination live in the query string, so a filtered view is linkable and
- * survives a refresh.
+ * Filters and the page number live in the query string, so a filtered view is linkable
+ * and survives a refresh — which is also what the Blade page did, since its filter links
+ * were plain hrefs.
  */
 export default function Collection({ categorySlug = null }) {
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [searchParams] = useSearchParams()
   const categories = useConfigStore((s) => s.categories)
 
   const search = searchParams.get('q') ?? searchParams.get('search') ?? ''
   const page = Number.parseInt(searchParams.get('page') ?? '1', 10) || 1
 
-  const { data, error, loading, refetch } = useApi(
+  const { data, error, loading } = useApi(
     () => api.catalog.products({ category: categorySlug, q: search, page }),
     [categorySlug, search, page],
   )
 
+  const activeCategory = data?.activeCategory ?? null
+  const products = data?.products ?? []
+  const newArrivals = data?.newArrivals ?? []
+  const pagination = data?.pagination ?? { page: 1, lastPage: 1, total: 0, perPage: 50 }
+
+  useBodyClass('collection-template')
+  usePageTitle(
+    activeCategory ? `${activeCategory.title} - The Purple Panther` : 'Collection - The Purple Panther',
+  )
+
   // The server 404s an unknown or inactive category slug, matching Laravel's abort(404).
   if (error?.status === 404) return <NotFound />
+  if (loading) return <Loading full />
 
-  if (error) {
-    return (
-      <Container className="py-24">
-        <ErrorMessage error={error} onRetry={refetch} />
-      </Container>
-    )
-  }
+  // Blade's `$products->firstItem()`/`lastItem()` — 1-based and clamped to the total.
+  const firstItem = pagination.total === 0 ? 0 : (pagination.page - 1) * pagination.perPage + 1
+  const lastItem = Math.min(pagination.page * pagination.perPage, pagination.total)
 
-  const { products = [], activeCategory, pagination } = data ?? {}
-  const title = activeCategory?.title ?? (search ? `Search results` : 'Shop')
-
-  const goToPage = (next) => {
-    const params = new URLSearchParams(searchParams)
-    params.set('page', String(next))
-    setSearchParams(params)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
-
-  const filterLink = ({ isActive }) =>
-    `whitespace-nowrap border-b-2 pb-1 text-[13px] uppercase tracking-[0.1em] transition-colors ${
-      isActive ? 'border-brand text-brand' : 'border-transparent text-body hover:text-ink'
-    }`
+  // The "All" link keeps an active search, exactly as `route('shop', request()->only('q'))`.
+  const withSearch = (base) => (search ? `${base}?q=${encodeURIComponent(search)}` : base)
 
   return (
-    <Container className="pb-16 pt-10 md:pt-14">
-      <Seo
-        title={title}
-        description={
-          activeCategory?.shortDescription ?? `Shop ${title} at The Purple Panther.`
-        }
-      />
+    <main className="body_content_wrapper position-relative collection-page" id="main-content">
+      <section className="collection-page__section" aria-labelledby="collection-title">
+        <div className="container collection-page__inner">
+          <header className="collection-page__heading">
+            <h1 id="collection-title">{activeCategory?.title ?? 'Collection'}</h1>
 
-      <header className="mb-8 md:mb-10">
-        <h1 className="pp-heading">
-          {title}
-          {search && <span className="text-body"> — “{search}”</span>}
-        </h1>
+            <nav className="collection-page__filters" aria-label="Shop by category">
+              <Link to={withSearch('/shop')} className={!activeCategory ? 'is-active' : ''}>All</Link>
+              {categories.map((category) => (
+                <Link
+                  to={withSearch(category.url)}
+                  className={activeCategory?.id === category.id ? 'is-active' : ''}
+                  key={category.id}
+                >
+                  {category.title}
+                </Link>
+              ))}
+            </nav>
 
-        {activeCategory?.shortDescription && (
-          <p className="mt-2 max-w-xl text-body">{activeCategory.shortDescription}</p>
-        )}
+            {search && (
+              <p className="collection-page__search-note mt-2 mb-0">Results for “{search}”</p>
+            )}
+          </header>
 
-        {pagination && !loading && (
-          <p className="mt-2 text-[13px] text-body">
-            {pagination.total} product{pagination.total === 1 ? '' : 's'}
-          </p>
-        )}
-      </header>
+          <div className="collection-page__grid">
+            <CollectionGrid products={products} />
+          </div>
 
-      <nav aria-label="Categories" className="mb-10 border-b border-line">
-        <ul className="-mb-px flex gap-6 overflow-x-auto pb-px">
-          <li>
-            <NavLink to="/shop" end className={filterLink}>
-              All
-            </NavLink>
-          </li>
-          {categories.map((category) => (
-            <li key={category.id}>
-              <NavLink to={`/${category.slug}`} className={filterLink}>
-                {category.title}
-              </NavLink>
-            </li>
-          ))}
-        </ul>
-      </nav>
-
-      <ProductGrid
-        products={products}
-        loading={loading}
-        skeletonCount={12}
-        empty={
-          search
-            ? `No products match “${search}”.`
-            : 'No products in this collection yet.'
-        }
-      />
-
-      {pagination && pagination.lastPage > 1 && (
-        <div className="mt-14">
-          <Pagination pagination={pagination} onPage={goToPage} />
+          {pagination.total > 0 && (
+            <div className="collection-page__pagination pt60 pb30">
+              <p className="collection-page__count mb-3">
+                Showing {firstItem}–{lastItem} of {pagination.total} products
+              </p>
+              <CollectionPagination page={pagination.page} lastPage={pagination.lastPage} />
+            </div>
+          )}
         </div>
+      </section>
+
+      {newArrivals.length > 0 && (
+        <section className="collection-page__section collection-page__section--new" aria-labelledby="new-products-title">
+          <div className="container collection-page__inner">
+            <header className="collection-page__heading">
+              <h2 id="new-products-title">New Arrivals</h2>
+            </header>
+            <div className="collection-page__grid">
+              <CollectionGrid products={newArrivals} />
+            </div>
+          </div>
+        </section>
       )}
-    </Container>
+    </main>
   )
 }

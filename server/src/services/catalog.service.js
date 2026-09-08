@@ -88,8 +88,20 @@ export async function listProducts({ categorySlug = null, search = '', page = 1,
     }),
   ])
 
+  // The collection page renders a "New Arrivals" strip under the grid, and Laravel loaded
+  // it in the same controller action (FrontendController::collection). Keeping it here
+  // means the page is still one round trip; asking for it separately would show the grid
+  // and then push it down a moment later.
+  const newArrivals = await prisma.product.findMany({
+    where: { ...ACTIVE, isNewArrival: true },
+    include: CARD_INCLUDE,
+    orderBy: PRODUCT_ORDER,
+    take: 12,
+  })
+
   return {
     products: rows.map(presentProductCard),
+    newArrivals: newArrivals.map(presentProductCard),
     activeCategory,
     search: term,
     pagination: {

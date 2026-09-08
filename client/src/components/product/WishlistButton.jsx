@@ -1,63 +1,64 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion } from 'motion/react'
-import { Heart } from 'lucide-react'
 import { useAuthStore } from '../../store/index.js'
+import { toast } from '../../utils/toast.js'
 import * as api from '../../services/endpoints.js'
 
 /**
- * Wishlist toggle.
+ * The heart on a product card — wishlist-toggle.js.
  *
- * The wishlist requires an account, so a signed-out visitor is sent to sign in with a
- * return path rather than being shown a control that silently fails.
+ * Two behaviours from the original are worth keeping deliberately:
  *
- * The add is idempotent server-side (unique on user + product), so a double click cannot
- * create a duplicate.
+ *   - a signed-out visitor is sent to /login with `?account=required`, and the wishlist
+ *     they were reaching for is stashed so they land there after signing in. Silently
+ *     doing nothing, or adding to a local list the server never sees, both lose the click.
+ *   - the button only ever ADDS. It is not a toggle, despite looking like one; a second
+ *     click re-adds and the server treats it as idempotent.
+ *
+ * `is-wishlisted` is the class the theme styles as the filled state.
  */
-export default function WishlistButton({ productId, productTitle = 'this product', className = '' }) {
+export default function WishlistButton({ product, className, children, label }) {
   const user = useAuthStore((s) => s.user)
   const navigate = useNavigate()
-  const [added, setAdded] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [wishlisted, setWishlisted] = useState(false)
 
-  const toggle = async () => {
+  async function onClick(event) {
+    event.preventDefault()
+    event.stopPropagation()
+
     if (!user) {
-      navigate('/login', { state: { from: window.location.pathname } })
+      try {
+        sessionStorage.setItem('pp_account_return', '/account/wishlist')
+      } catch {
+        // Blocked storage only costs the redirect back, not the sign-in.
+      }
+      navigate('/login?account=required')
       return
     }
 
     setBusy(true)
     try {
-      if (added) {
-        await api.account.removeWishlistProduct(productId)
-        setAdded(false)
-      } else {
-        await api.account.addToWishlist(productId)
-        setAdded(true)
-      }
-    } catch {
-      // A wishlist failure must never interrupt browsing; the state simply does not flip.
+      const response = await api.account.addToWishlist(product.id)
+      toast(response?.message ?? 'Added to wishlist.')
+      setWishlisted(true)
+    } catch (error) {
+      toast(error.message || 'Could not add to wishlist.')
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <motion.button
+    <button
       type="button"
-      onClick={toggle}
+      className={`${className}${wishlisted ? ' is-wishlisted' : ''}`}
+      data-wishlist-product={product.id}
+      aria-label={label ?? `Add ${product.title} to wishlist`}
       disabled={busy}
-      whileTap={{ scale: 0.88 }}
-      aria-pressed={added}
-      aria-label={added ? `Remove ${productTitle} from wishlist` : `Add ${productTitle} to wishlist`}
-      className={`pointer-events-auto grid size-9 place-items-center bg-white/95 text-ink shadow-sm transition-colors hover:text-brand disabled:opacity-50 ${className}`}
+      onClick={onClick}
     >
-      <Heart
-        size={17}
-        strokeWidth={1.5}
-        aria-hidden="true"
-        className={added ? 'fill-brand text-brand' : ''}
-      />
-    </motion.button>
+      {children}
+    </button>
   )
 }
