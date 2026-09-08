@@ -1,0 +1,53 @@
+# ---------------------------------------------------------------- secrets
+# The audited Laravel archive shipped a populated .env with live production
+# credentials. Nothing of that kind may ever enter this repository.
+.env
+.env.*
+!.env.example
+
+# Database dumps contain customer PII and order history.
+*.sql
+*.sql.gz
+*.dump
+
+# ---------------------------------------------------------------- dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# ---------------------------------------------------------------- build output
+dist/
+build/
+client/dist/
+*.tsbuildinfo
+
+# ---------------------------------------------------------------- prisma
+# Generated client — reproduced by `prisma generate`.
+server/node_modules/.prisma/
+server/src/generated/
+
+# ---------------------------------------------------------------- runtime
+logs/
+*.log
+npm-debug.log*
+yarn-error.log*
+pids/
+*.pid
+
+# Uploaded media lives on disk (or a CDN), never in git.
+server/storage/
+public/storage/
+
+# ---------------------------------------------------------------- tooling
+coverage/
+.nyc_output/
+.vitest/
+.eslintcache
+
+# ---------------------------------------------------------------- editors / os
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
