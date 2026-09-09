@@ -71,7 +71,7 @@ export default function Contacts() {
           aria-hidden="true"
           className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-body"
         />
-        <label htmlFor="contact-search" className="sr-only">
+        <label htmlFor="contact-search" className="sr-only ">
           Search contacts
         </label>
         <input
