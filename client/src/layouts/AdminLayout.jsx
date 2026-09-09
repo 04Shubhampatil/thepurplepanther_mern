@@ -15,9 +15,8 @@ import '../admin.css'
  * RESPONSIVE BEHAVIOUR IS COPIED, NOT INVENTED. The Blade layout ran a small script that
  * treated `max-width: 991px` as mobile: below it the sidebar is a drawer over an overlay
  * and starts closed; above it the drawer classes are stripped and the sidebar is simply
- * part of the layout. Tailwind's `lg:` is 1024px rather than 992px — close enough that the
- * behaviour matches at every real breakpoint, and the alternative is a custom screen for a
- * 32px difference.
+ * part of the layout. The breakpoint is written as `min-[992px]:` rather than Tailwind's
+ * `lg:` (1024px) so the drawer appears and disappears at exactly the width it always did.
  *
  * The storefront's stylesheets are detached while this is mounted (theme/adminChrome.js);
  * the Laravel admin loaded only admin.css and inheriting Bootstrap here would undo the
@@ -47,7 +46,7 @@ export default function AdminLayout() {
     <div className="admin-root flex min-h-screen">
       {sidebarOpen ? (
         <div
-          className="fixed inset-0 z-30 bg-black/40 lg:hidden"
+          className="fixed inset-0 z-30 bg-black/40 max-[991px]:block min-[992px]:hidden"
           onClick={() => setSidebarOpen(false)}
           aria-hidden="true"
         />

@@ -103,7 +103,10 @@ export default function Categories() {
           No categories found. <Link to="/admin/categories/create" className="text-admin-primary">Add New</Link>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(220px,1fr))] lg:gap-4">
+        /* .category-grid — auto-fill minmax(220px,1fr) at 16px from 992px; 2 columns at 10px
+           from 576px; one column below that. Written as arbitrary breakpoints because the
+           original's media queries are 991px/575px, not Tailwind's 1024/640. */
+        <div className="grid grid-cols-1 gap-2.5 min-[576px]:grid-cols-2 min-[992px]:grid-cols-[repeat(auto-fill,minmax(220px,1fr))] min-[992px]:gap-4">
           {items.map((category) => (
             <article
               key={category.id}

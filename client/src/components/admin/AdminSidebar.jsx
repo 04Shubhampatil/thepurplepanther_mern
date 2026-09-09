@@ -130,7 +130,7 @@ function NavGroup({ item, onNavigate }) {
 export default function AdminSidebar({ open, onClose, onLogout }) {
   return (
     <aside
-      className={`fixed inset-y-0 left-0 z-40 w-[250px] shrink-0 bg-admin-sidebar text-white transition-transform duration-[250ms] lg:static lg:translate-x-0 ${
+      className={`fixed inset-y-0 left-0 z-40 w-[250px] shrink-0 bg-admin-sidebar text-white transition-transform duration-[250ms] min-[992px]:static min-[992px]:translate-x-0 ${
         open ? 'translate-x-0' : '-translate-x-full'
       }`}
     >
@@ -143,7 +143,7 @@ export default function AdminSidebar({ open, onClose, onLogout }) {
         />
         <button
           type="button"
-          className="absolute right-3 text-white/70 hover:text-white lg:hidden"
+          className="absolute right-3 text-white/70 hover:text-white min-[992px]:hidden"
           aria-label="Close menu"
           onClick={onClose}
         >

@@ -31,7 +31,7 @@ export default function AdminHeader({ user, onToggleSidebar, onLogout }) {
   return (
     <header className="sticky top-0 z-[15] flex min-h-[58px] items-center justify-between gap-2.5 bg-admin-topbar px-5 pl-[18px] text-white">
       <div className="flex items-center gap-3">
-        <button type="button" aria-label="Toggle menu" onClick={onToggleSidebar} className="lg:hidden">
+        <button type="button" aria-label="Toggle menu" onClick={onToggleSidebar} className="min-[992px]:hidden">
           <Menu size={20} />
         </button>
         <h1 className="text-[17px] font-semibold">Purple Panther</h1>
