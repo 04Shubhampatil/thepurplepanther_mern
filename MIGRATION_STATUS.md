@@ -82,6 +82,8 @@ packed `#e3f2fd/#1565c0`, shipped `#fff3e0/#ef6c00`, delivered `#e8f5e9/#2e7d32`
 | `AdminLayout` / `AdminSidebar` / `AdminHeader` | n/a | ✅ | pending |
 | Component library (`components/admin/AdminUI.jsx`) | n/a | ✅ | pending |
 | Dashboard | ✅ `stats` added to `dashboardStats()` | ✅ | pending |
+| Categories | unchanged (existing `/admin/categories`) | ✅ image cards | pending |
+| Sub-Categories | unchanged (existing `/admin/sub-categories`) | ✅ inline form + table | pending |
 
 ### Stylesheet isolation
 
@@ -98,7 +100,7 @@ unstyled content on the storefront (which loading them on demand would cause).
 Backend endpoints already exist for all of these (see §5); the work is the React UI plus
 per-module visual QA against the Blade view.
 
-Categories · Sub-Categories · Brands (hidden) · Colors · Sizes · Offers · Products (incl.
+Brands (hidden) · Colors · Sizes · Offers · Products (incl.
 the 620-line form, reviews, bulk actions) · Banners · Home Sections · News Types · Blog
 Posts · Coupons · Orders (incl. status log, print) · Users · Contacts/Subscribers/Messages ·
 Web Settings (CMS pages) · Shipping Settings · Profile · Change password · Admin auth
@@ -121,8 +123,11 @@ once under a red build. **It must be deleted with the last un-rebuilt page** (`R
   below `/admin` is behind `RequireAdmin`, so no admin screen has been seen rendered yet —
   only proven to build. A password, or permission to add a separate dev-only admin, unblocks
   it.
-- Pages not yet rebuilt (Products, Orders, Contacts, Settings, Resource) still carry the
-  earlier generic-Tailwind styling and do **not** match the Blade design.
+- Pages not yet rebuilt (Products, Orders, Contacts, Settings, and everything still served
+  by `Resource.jsx`) carry the earlier generic-Tailwind styling and do **not** match the
+  Blade design.
+- Categories has no create/edit screen yet — the cards link to `/admin/categories/create`
+  and `/:id/edit`, which currently fall through to the generic resource route.
 
 ---
 

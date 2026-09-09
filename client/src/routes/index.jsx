@@ -39,6 +39,8 @@ const AdminProducts = lazy(() => import('../pages/Admin/Products.jsx'))
 const AdminOrders = lazy(() => import('../pages/Admin/Orders.jsx'))
 const AdminResource = lazy(() => import('../pages/Admin/Resource.jsx'))
 const AdminSettings = lazy(() => import('../pages/Admin/Settings.jsx'))
+const AdminCategories = lazy(() => import('../pages/Admin/Categories.jsx'))
+const AdminSubCategories = lazy(() => import('../pages/Admin/SubCategories.jsx'))
 
 /**
  * Reserved first-path segments — the negative lookahead from Laravel's clean-category
@@ -185,6 +187,11 @@ export default function AppRoutes() {
           <Route element={<AdminLayout />}>
             <Route index element={<Navigate to="/admin/dashboard" replace />} />
             <Route path="dashboard" element={<Dashboard />} />
+            {/* Rebuilt against the Blade views; declared before the generic :resource
+                route so they win over it. */}
+            <Route path="categories" element={<AdminCategories />} />
+            <Route path="sub-categories" element={<AdminSubCategories />} />
+
             <Route path="products" element={<AdminProducts />} />
             <Route path="orders" element={<AdminOrders />} />
             <Route path="settings" element={<AdminSettings />} />
