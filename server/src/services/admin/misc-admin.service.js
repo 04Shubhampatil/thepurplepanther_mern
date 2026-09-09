@@ -395,9 +395,25 @@ export async function updateHomeSection(section, productIds = []) {
 
 // ══════════════════════════════════════════════ coupons
 
-export async function listCoupons({ search = '', page = 1, perPage = 20 } = {}) {
+/*
+ * `paginate(9)`, so the grid fills three rows of three at the widest breakpoint. The search
+ * spans five columns in CouponController — code, description, offer type and both discount
+ * figures — not just the code, which is what lets "10" find FLAT10 and the 10% coupons alike.
+ */
+export async function listCoupons({ search = '', page = 1, perPage = 9 } = {}) {
   const term = String(search ?? '').trim()
-  const where = term ? { code: { contains: term } } : {}
+  const where = term
+    ? {
+        OR: [
+          { code: { contains: term } },
+          { description: { contains: term } },
+          { offerType: { contains: term } },
+          ...(Number.isNaN(Number(term))
+            ? []
+            : [{ discountPercent: Number(term) }, { discountAmount: Number(term) }]),
+        ],
+      }
+    : {}
 
   const take = Math.min(Math.max(1, perPage), 100)
   const currentPage = Math.max(1, page)
@@ -406,7 +422,9 @@ export async function listCoupons({ search = '', page = 1, perPage = 20 } = {}) 
     prisma.coupon.count({ where }),
     prisma.coupon.findMany({
       where,
-      orderBy: { id: 'desc' },
+      // CouponController::index is a bare `latest()` — created_at descending. Ordering
+      // by id instead reversed the coupons that share a timestamp.
+      orderBy: { createdAt: 'desc' },
       skip: (currentPage - 1) * take,
       take,
     }),

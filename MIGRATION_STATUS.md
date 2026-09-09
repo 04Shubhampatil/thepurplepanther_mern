@@ -93,6 +93,8 @@ packed `#e3f2fd/#1565c0`, shipped `#fff3e0/#ef6c00`, delivered `#e8f5e9/#2e7d32`
 | News Types | snake_case keys now reach Prisma | ✅ inline form + table, inline edit | ✅ |
 | Journal Posts (index) | news-type filter added | ✅ filter card + thumbnail table | ✅ |
 | Journal Posts (create / edit) | second image column, comments_count, naive dates | ✅ 640px form grid + editor | ✅ |
+| Coupons (index) | `latest()` ordering + 5-column search + `paginate(9)` | ✅ dark card grid | ✅ |
+| Coupons (detail) | unchanged | ✅ hero + definition grid | ✅ |
 | Home Sections | unchanged | ✅ two-product picker | pending |
 
 ### Stylesheet isolation
@@ -238,6 +240,25 @@ Geometry is admin.css's: fixed 18px from the top and right at z-index 2000, card
 `requestAnimationFrame` was for and why the component tracks a mount flag rather than
 rendering the final state immediately. Auto-dismiss is 4s, with the 250ms removal timer
 outlasting the 200ms fade so the card is gone before it leaves the DOM.
+
+### Coupons
+
+`.coupon-card` is NOT the `.category-card` the other grids share, and the differences are
+deliberate: 280px minimum instead of 220, an 18px gutter instead of 16, a 150px floor, and a
+gradient running LEFT to RIGHT (`90deg, rgba(0,0,0,.55), rgba(0,0,0,.2)`) rather than top to
+bottom — so the text stays legible against the left edge while the art shows on the right.
+Four controls per card too: this is the only grid with a View.
+
+Three accessors move to utils/coupon.js, since the admin API returns raw rows.
+`discountLabel` is the card's entire headline and its branch order IS the behaviour — BOGO
+wins outright, free shipping only counts when there is no discount figure to show, and the
+amount/percent split is on `discount_type` rather than on whichever column is filled. Amounts
+print through Laravel's `rtrim(rtrim(number_format(...), '0'), '.')`, so 10.00 reads "10".
+
+Three server fixes: the list ordered by `id` where CouponController wrote a bare `latest()`,
+which reversed the coupons sharing a timestamp; it searched only `code` where the controller
+searches five columns, so "10" could not find FLAT10; and it paginated 20 where the
+controller paginates 9, the number that fills three rows of three.
 
 ## 4. Known issues / blockers
 

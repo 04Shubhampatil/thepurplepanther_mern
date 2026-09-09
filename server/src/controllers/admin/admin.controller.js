@@ -324,16 +324,16 @@ export const couponShow = asyncHandler(async (req, res) =>
 )
 
 export const couponStore = asyncHandler(async (req, res) =>
-  created(res, { item: await miscAdmin.createCoupon(req.body, req.file) }, 'Coupon created.'),
+  created(res, { item: await miscAdmin.createCoupon(req.body, req.file) }, 'Coupon created successfully.'),
 )
 
 export const couponUpdate = asyncHandler(async (req, res) =>
-  ok(res, { item: await miscAdmin.updateCoupon(req.params.id, req.body, req.file) }, 'Coupon updated.'),
+  ok(res, { item: await miscAdmin.updateCoupon(req.params.id, req.body, req.file) }, 'Coupon updated successfully.'),
 )
 
 export const couponDestroy = asyncHandler(async (req, res) => {
   await miscAdmin.deleteCoupon(req.params.id)
-  return ok(res, {}, 'Coupon deleted.')
+  return ok(res, {}, 'Coupon deleted successfully.')
 })
 
 export const couponToggle = asyncHandler(async (req, res) =>

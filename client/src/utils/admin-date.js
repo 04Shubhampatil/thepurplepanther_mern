@@ -50,6 +50,22 @@ export function toDateTimeLocal(value) {
 }
 
 /**
+ * `format('d-m-Y h:i A')` — "09-08-2026 08:27 PM", the coupon detail's date format.
+ *
+ * Same naive reading as formatDate: the stored wall clock, not a converted one.
+ */
+export function formatDateTime(value) {
+  const parts = wallClockParts(value)
+  if (!parts) return ''
+
+  const hour24 = Number(parts.hour)
+  const meridiem = hour24 >= 12 ? 'PM' : 'AM'
+  const hour12 = String(hour24 % 12 || 12).padStart(2, '0')
+
+  return `${parts.day}-${parts.month}-${parts.year} ${hour12}:${parts.minute} ${meridiem}`
+}
+
+/**
  * `now()` in the same shape, for a new post's default.
  *
  * This one IS local: it is the admin's own clock, not a value read back from a column.

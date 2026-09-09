@@ -49,6 +49,8 @@ const AdminBannerForm = lazy(() => import('../pages/Admin/BannerForm.jsx'))
 const AdminNewsTypes = lazy(() => import('../pages/Admin/NewsTypes.jsx'))
 const AdminJournalPosts = lazy(() => import('../pages/Admin/JournalPosts.jsx'))
 const AdminJournalPostForm = lazy(() => import('../pages/Admin/JournalPostForm.jsx'))
+const AdminCoupons = lazy(() => import('../pages/Admin/Coupons.jsx'))
+const AdminCouponDetail = lazy(() => import('../pages/Admin/CouponDetail.jsx'))
 const AdminHomeSections = lazy(() => import('../pages/Admin/HomeSections.jsx'))
 
 /**
@@ -212,6 +214,9 @@ export default function AppRoutes() {
             <Route path="blog-posts" element={<AdminJournalPosts />} />
             <Route path="blog-posts/create" element={<AdminJournalPostForm />} />
             <Route path="blog-posts/:id/edit" element={<AdminJournalPostForm />} />
+
+            <Route path="coupons" element={<AdminCoupons />} />
+            <Route path="coupons/:id" element={<AdminCouponDetail />} />
 
             <Route path="products" element={<AdminProducts />} />
             <Route path="orders" element={<AdminOrders />} />
