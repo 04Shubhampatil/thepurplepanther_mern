@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { Plus, Search, Pencil, Check, X } from 'lucide-react'
+import { Search, Pencil, Trash2, Eye, Star } from 'lucide-react'
 import { useApi } from '../../hooks/useApi.js'
 import * as api from '../../services/endpoints.js'
 import Loading from '../../components/common/Loading.jsx'
@@ -9,16 +9,11 @@ import Pagination from '../../components/common/Pagination.jsx'
 import Alert from '../../components/ui/Alert.jsx'
 import Button from '../../components/ui/Button.jsx'
 import { Field, Input, Textarea, Select, Checkbox } from '../../components/ui/Field.jsx'
-import {
-  AdminPage,
-  Table,
-  Th,
-  Td,
-  EmptyRow,
-  AdminButton,
-  Pill,
-  CONTROL,
-} from '../../components/admin/AdminUI.jsx'
+import { Alert as AdminAlert, ConfirmDialog, CONTROL } from '../../components/admin/AdminUI.jsx'
+import { Toggle } from '../../components/admin/AdminControls.jsx'
+
+/** Blade's placeholder when a product has no featured image. */
+const PRODUCT_FALLBACK = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&q=80'
 
 const FLAGS = [
   ['is_active', 'Active'],
@@ -43,10 +38,22 @@ export default function Products() {
   const [variants, setVariants] = useState({ colors: [], sizes: [] })
   const [selected, setSelected] = useState([])
   const [notice, setNotice] = useState(null)
+  const [categoryId, setCategoryId] = useState('')
+  const [offerId, setOfferId] = useState('')
+  const [bulkOpen, setBulkOpen] = useState(false)
+  const [confirmId, setConfirmId] = useState(null)
 
+  // The category and offer filters are query parameters, as they are in Laravel — the
+  // controller reads `category_id` and `offer_id` off the request.
   const { data, error, loading, refetch } = useApi(
-    () => api.admin.products.list({ page, search: search || undefined }),
-    [page, search],
+    () =>
+      api.admin.products.list({
+        page,
+        search: search || undefined,
+        category_id: categoryId || undefined,
+        offer_id: offerId || undefined,
+      }),
+    [page, search, categoryId, offerId],
   )
 
   const { data: formData } = useApi(() => api.admin.products.formData(), [])
@@ -183,57 +190,140 @@ export default function Products() {
     </div>
   )
 
-  return (
-    <AdminPage
-      title="Products"
-      actions={
-        <Button type="button" size="sm" onClick={startCreate}>
-          <Plus size={15} strokeWidth={1.5} aria-hidden="true" />
-          Add product
-        </Button>
-      }
-    >
-      {notice && (
-        <Alert tone="info" className="mb-5">
-          {notice}
-        </Alert>
-      )}
+  const categoryOptions = formData?.categories ?? []
+  const offerOptions = formData?.offers ?? []
+  const items = data?.items ?? []
+  const allSelected = items.length > 0 && items.every((item) => selected.includes(item.id))
 
-      <div className="mb-6 flex flex-wrap items-center gap-3">
-        <div className="relative w-full max-w-xs">
-          <Search
-            size={16}
-            strokeWidth={1.5}
-            aria-hidden="true"
-            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-body"
-          />
-          <label htmlFor="product-search" className="sr-only">
-            Search products
-          </label>
-          <input
-            id="product-search"
-            type="search"
-            placeholder="Search products…"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value)
-              setPage(1)
-            }}
-            className={`${CONTROL} w-full pl-9`}
-          />
+  /* .product-add-btn / .product-action-btn — 40px tall, 0 18px, 6px radius */
+  const panelButton =
+    'inline-flex h-10 items-center justify-center whitespace-nowrap rounded-md bg-admin-primary px-[18px] text-[13px] font-semibold text-white transition-colors hover:bg-admin-primary-dark'
+
+  /*
+   * `.product-card-actions .icon-btn` — 34px, 1px #eee, white; `.active` turns the border
+   * #ffe082 and the glyph #f9a825.
+   *
+   * Written as one branch rather than a base plus an override: `border-[#ffe082]` and
+   * `border-admin-line` carry identical specificity, so stacking them leaves the winner to
+   * whichever Tailwind happens to emit last — which is how the amber border silently went
+   * missing while the amber glyph applied.
+   */
+  const cardIcon = (featured) =>
+    `inline-flex size-[34px] items-center justify-center rounded-full border bg-white transition-colors ${
+      featured ? 'border-[#ffe082] text-[#f9a825]' : 'border-admin-line text-[#555] hover:bg-[#fafafa]'
+    }`
+
+  return (
+    <>
+      {notice && <AdminAlert tone="info" onDismiss={() => setNotice(null)}>{notice}</AdminAlert>}
+
+      {/* .product-panel — white, 10px radius, 18px 20px, 0 1px 4px rgba(0,0,0,.04) */}
+      <div className="mb-[18px] rounded-[10px] bg-white px-5 py-[18px] shadow-[0_1px_4px_rgba(0,0,0,0.04)] max-sm:p-3.5">
+        <div className="flex flex-wrap items-center justify-between gap-4 pb-4 max-sm:flex-col max-sm:items-stretch">
+          <h2 className="text-[22px] font-semibold text-[#444]">Products</h2>
+
+          <div className="flex flex-wrap items-center gap-3 max-sm:w-full">
+            {/* .product-search is a 40px PILL with the icon on the RIGHT — not the square
+                .search-box the other modules use. */}
+            <div className="flex h-10 min-w-[220px] items-center rounded-full border border-[#e0e0e0] bg-white pl-4 pr-1 max-sm:w-full">
+              <input
+                type="text"
+                placeholder="Search here..."
+                autoComplete="off"
+                value={search}
+                onChange={(event) => {
+                  setSearch(event.target.value)
+                  setPage(1)
+                }}
+                className="min-w-0 flex-1 border-none bg-transparent text-[14px] text-[#555] outline-none placeholder:text-[#bdbdbd]"
+              />
+              <button type="button" aria-label="Search" className="inline-flex size-9 items-center justify-center rounded-full text-[#bdbdbd]">
+                <Search size={16} />
+              </button>
+            </div>
+
+            <button type="button" className={panelButton} onClick={startCreate}>Add New</button>
+          </div>
         </div>
 
-        {selected.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[13px] text-body">{selected.length} selected</span>
-            <AdminButton onClick={() => bulk('enable')}>Enable</AdminButton>
-            <AdminButton onClick={() => bulk('disable')}>Disable</AdminButton>
-            <AdminButton onClick={() => bulk('set_todays_deal')}>Set deal</AdminButton>
-            <AdminButton variant="danger" onClick={() => bulk('delete')}>
-              Delete
-            </AdminButton>
+        <div className="flex flex-wrap items-center justify-between gap-4 pt-1 max-sm:flex-col max-sm:items-stretch">
+          {/* .product-filters — 14px gap. Brands is withheld here for the same reason it is
+              withheld from the sidebar: the Blade gates it behind $showBrands = false. */}
+          <div className="flex flex-wrap gap-3.5 max-sm:w-full">
+            <select
+              value={categoryId}
+              onChange={(event) => {
+                setCategoryId(event.target.value)
+                setPage(1)
+              }}
+              className="h-10 rounded-md border border-[#e0e0e0] bg-white px-3 text-[14px] text-[#555] outline-none max-sm:w-full"
+            >
+              <option value="">---All Category---</option>
+              {categoryOptions.map((category) => (
+                <option key={category.id} value={category.id}>{category.title}</option>
+              ))}
+            </select>
+
+            <select
+              value={offerId}
+              onChange={(event) => {
+                setOfferId(event.target.value)
+                setPage(1)
+              }}
+              className="h-10 rounded-md border border-[#e0e0e0] bg-white px-3 text-[14px] text-[#555] outline-none max-sm:w-full"
+            >
+              <option value="">---All Offers---</option>
+              {offerOptions.map((offer) => (
+                <option key={offer.id} value={offer.id}>{offer.title}</option>
+              ))}
+            </select>
           </div>
-        )}
+
+          {/* .product-bulk — Select All beside the Action dropdown */}
+          <div className="flex items-center gap-3.5 max-sm:w-full max-sm:justify-end">
+            <label className="inline-flex cursor-pointer select-none items-center gap-2 text-[13px] font-medium text-[#555]">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                onChange={() => setSelected(allSelected ? [] : items.map((item) => item.id))}
+                className="size-[15px] accent-admin-primary"
+              />
+              Select All
+            </label>
+
+            <div className="relative">
+              <button type="button" className={panelButton} onClick={() => setBulkOpen((v) => !v)}>
+                Action <span className="ml-1 text-[10px]">&#9662;</span>
+              </button>
+
+              {bulkOpen ? (
+                /* .bulk-action-menu — the five actions, in the original's order and wording,
+                   including "Set to todays Deal" as written. */
+                <div className="absolute right-0 top-[calc(100%+4px)] z-20 min-w-[190px] overflow-hidden rounded-lg border border-admin-line bg-white shadow-[0_8px_24px_rgba(0,0,0,0.12)]">
+                  {[
+                    ['enable', 'Enable'],
+                    ['disable', 'Disable'],
+                    ['delete', 'Delete'],
+                    ['set_todays_deal', 'Set to todays Deal'],
+                    ['remove_todays_deal', 'Remove to todays Deal'],
+                  ].map(([action, label]) => (
+                    <button
+                      key={action}
+                      type="button"
+                      onClick={() => {
+                        setBulkOpen(false)
+                        bulk(action)
+                      }}
+                      className="block w-full bg-white px-3.5 py-2.5 text-left text-[13px] text-[#333] hover:bg-[#f7f7f7]"
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
       </div>
 
       {editing && (
@@ -375,72 +465,97 @@ export default function Products() {
         </form>
       )}
 
-      <Table
-        caption="Products"
-        head={
-          <>
-            <Th className="w-10">
-              <span className="sr-only">Select</span>
-            </Th>
-            <Th>Title</Th>
-            <Th>Category</Th>
-            <Th className="text-right">MRP</Th>
-            <Th className="text-right">Price</Th>
-            <Th>Active</Th>
-            <Th className="text-right">
-              <span className="sr-only">Actions</span>
-            </Th>
-          </>
-        }
-      >
-        {(data?.items ?? []).map((item) => (
-          <tr key={item.id}>
-            <Td>
+      {/* .product-grid — auto-fill minmax(260px, 1fr), 16px gap */}
+      <div className="grid grid-cols-1 gap-4 min-[576px]:grid-cols-[repeat(auto-fill,minmax(260px,1fr))]">
+        {items.map((item) => (
+          <div key={item.id} className="flex flex-col overflow-hidden rounded-[10px] bg-white shadow-[0_2px_10px_rgba(0,0,0,0.06)]">
+            <div className="flex items-center justify-between gap-2 px-3 py-2.5">
+              <span className="text-[12px] font-bold text-[#666]">{item.category?.title ?? '\u2014'}</span>
               <input
                 type="checkbox"
-                className="size-4 accent-brand"
                 checked={selected.includes(item.id)}
                 onChange={() => toggleSelected(item.id)}
                 aria-label={`Select ${item.title}`}
+                className="size-[15px] accent-admin-primary"
               />
-            </Td>
-            <Td className="font-medium">{item.title}</Td>
-            <Td>{item.category?.title ?? '—'}</Td>
-            <Td className="whitespace-nowrap text-right">{item.mrp}</Td>
-            <Td className="whitespace-nowrap text-right">{item.sellingPrice}</Td>
-            <Td>
+            </div>
+
+            {/* .product-card-media — a fixed 200px band, cover, #f0f0f0 behind it */}
+            <div
+              className="relative h-[200px] bg-[#f0f0f0] bg-cover bg-center"
+              style={{ backgroundImage: `url('${item.image || PRODUCT_FALLBACK}')` }}
+            >
+              {item.discountPercent > 0 ? (
+                <span className="absolute left-0 top-2.5 rounded-r bg-admin-primary px-2.5 py-1 text-[11px] font-bold text-white">
+                  {item.discountPercent}% OFF
+                </span>
+              ) : null}
+
+              {/* .product-card-info — gradient plate over the foot of the image. The title is
+                  cut at 36 characters, which is Str::limit's length in the Blade. */}
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent px-3 pb-3 pt-7 text-white">
+                <h3 title={item.title} className="text-[14px] font-bold leading-[1.3]">
+                  {item.title && item.title.length > 36 ? `${item.title.slice(0, 36)}...` : item.title}
+                </h3>
+                <p className="mt-0.5 text-[12px] opacity-90">
+                  {item.subCategory?.title ?? item.category?.title ?? ''}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-1.5 border-t border-[#f0f0f0] px-3 py-2.5">
+              <button type="button" title="View" className={cardIcon(false)} onClick={() => startEdit(item)}>
+                <Eye size={15} />
+              </button>
+
               <button
                 type="button"
+                title="Featured"
+                className={cardIcon(item.isFeatured)}
                 onClick={async () => {
+                  await api.admin.products.toggleFeatured(item.id)
+                  refetch()
+                }}
+              >
+                <Star size={15} fill={item.isFeatured ? 'currentColor' : 'none'} />
+              </button>
+
+              <button type="button" title="Edit" className={cardIcon(false)} onClick={() => startEdit(item)}>
+                <Pencil size={15} />
+              </button>
+
+              <button type="button" title="Delete" className={cardIcon(false)} onClick={() => setConfirmId(item.id)}>
+                <Trash2 size={15} />
+              </button>
+
+              <Toggle
+                checked={Boolean(item.isActive)}
+                title="Enable / Disable"
+                onChange={async () => {
                   await api.admin.products.toggle(item.id)
                   refetch()
                 }}
-                aria-label={`${item.isActive ? 'Deactivate' : 'Activate'} ${item.title}`}
-              >
-                <Pill tone={item.isActive ? 'good' : 'neutral'}>
-                  {item.isActive ? (
-                    <Check size={13} strokeWidth={2} aria-hidden="true" className="mr-1" />
-                  ) : (
-                    <X size={13} strokeWidth={2} aria-hidden="true" className="mr-1" />
-                  )}
-                  {item.isActive ? 'Yes' : 'No'}
-                </Pill>
-              </button>
-            </Td>
-            <Td className="text-right">
-              <AdminButton onClick={() => startEdit(item)}>
-                <Pencil size={14} strokeWidth={1.5} aria-hidden="true" />
-                Edit
-                <span className="sr-only"> {item.title}</span>
-              </AdminButton>
-            </Td>
-          </tr>
+              />
+            </div>
+          </div>
         ))}
+      </div>
 
-        {data?.items?.length === 0 && <EmptyRow colSpan={7}>No products found.</EmptyRow>}
-      </Table>
+      {!loading && items.length === 0 ? (
+        <div className="rounded-[10px] bg-white p-6 text-center text-[#888]">No products found.</div>
+      ) : null}
 
       <Pagination pagination={data?.pagination} onPage={setPage} />
-    </AdminPage>
+
+      <ConfirmDialog
+        open={confirmId !== null}
+        onCancel={() => setConfirmId(null)}
+        onProceed={async () => {
+          await api.admin.products.remove(confirmId)
+          setConfirmId(null)
+          refetch()
+        }}
+      />
+    </>
   )
 }

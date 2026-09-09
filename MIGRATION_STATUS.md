@@ -84,6 +84,10 @@ packed `#e3f2fd/#1565c0`, shipped `#fff3e0/#ef6c00`, delivered `#e8f5e9/#2e7d32`
 | Dashboard | ✅ `stats` added to `dashboardStats()` | ✅ | pending |
 | Categories | unchanged (existing `/admin/categories`) | ✅ image cards | pending |
 | Sub-Categories | unchanged (existing `/admin/sub-categories`) | ✅ inline form + table | pending |
+| Colors | unchanged | ✅ inline form + table, picker autofill | pending |
+| Sizes | unchanged | ✅ inline form + table | pending |
+| Offers | unchanged | ✅ card grid (shares Categories') | pending |
+| Products (index) | unchanged | ✅ panel + filters + bulk + card grid | pending |
 
 ### Stylesheet isolation
 
@@ -100,8 +104,8 @@ unstyled content on the storefront (which loading them on demand would cause).
 Backend endpoints already exist for all of these (see §5); the work is the React UI plus
 per-module visual QA against the Blade view.
 
-Brands (hidden) · Colors · Sizes · Offers · Products (incl.
-the 620-line form, reviews, bulk actions) · Banners · Home Sections · News Types · Blog
+Brands (hidden) · Products create/edit form (the 620-line `_form.blade.php`) · Product
+reviews · Banners · Home Sections · News Types · Blog
 Posts · Coupons · Orders (incl. status log, print) · Users · Contacts/Subscribers/Messages ·
 Web Settings (CMS pages) · Shipping Settings · Profile · Change password · Admin auth
 (login, forgot, reset).
