@@ -3,6 +3,7 @@ import { Outlet, useLocation } from 'react-router-dom'
 import SiteHeader from '../components/layout/SiteHeader.jsx'
 import SiteFooter from '../components/layout/SiteFooter.jsx'
 import MinicartDrawer from '../components/cart/MinicartDrawer.jsx'
+import AccountDrawer from '../components/layout/AccountDrawer.jsx'
 import { useScrollToTop } from '../theme/chrome.js'
 import { useReveal } from '../theme/reveal.js'
 import { useConfigStore, useCartStore, useOffersStore } from '../store/index.js'
@@ -79,6 +80,7 @@ export default function StoreLayout() {
       </a>
 
       <MinicartDrawer />
+      <AccountDrawer />
     </div>
   )
 }

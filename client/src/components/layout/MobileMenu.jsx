@@ -42,7 +42,7 @@ const MENU_LINKS = (accessoriesUrl) => [
 export default function MobileMenu() {
   const categories = useConfigStore((s) => s.categories)
   const user = useAuthStore((s) => s.user)
-  const { menuOpen, closeMenu, openSearch } = useUiStore()
+  const { menuOpen, closeMenu, openSearch, openAccount } = useUiStore()
 
   const accessories = categories.find((c) => c.slug === 'accessories')
   const loggedIn = Boolean(user) && user.role !== 'admin'
@@ -114,7 +114,14 @@ export default function MobileMenu() {
                   className={`signin-cart-btn${loggedIn ? ' is-logged-in' : ''}`}
                   to={loggedIn ? '/account/overview' : '/login'}
                   aria-label={loggedIn ? 'My account' : 'Account'}
-                  onClick={closeMenu}
+                  onClick={
+                    loggedIn
+                      ? closeMenu
+                      : (event) => {
+                          event.preventDefault()
+                          openAccount()
+                        }
+                  }
                 >
                   {loggedIn ? (
                     <span className="site-account-avatar" aria-hidden="true">{initials}</span>

@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/index.js'
+import { useUiStore } from '../../store/ui.js'
 import { toast } from '../../utils/toast.js'
 import * as api from '../../services/endpoints.js'
 
@@ -9,9 +9,9 @@ import * as api from '../../services/endpoints.js'
  *
  * Two behaviours from the original are worth keeping deliberately:
  *
- *   - a signed-out visitor is sent to /login with `?account=required`, and the wishlist
- *     they were reaching for is stashed so they land there after signing in. Silently
- *     doing nothing, or adding to a local list the server never sees, both lose the click.
+ *   - a signed-out visitor gets the account drawer, with the wishlist stashed as where to
+ *     land afterwards — site-drawers.js's behaviour. Saving something should not cost you
+ *     the product you were looking at, which navigating away to /login does.
  *   - the button only ever ADDS. It is not a toggle, despite looking like one; a second
  *     click re-adds and the server treats it as idempotent.
  *
@@ -19,7 +19,7 @@ import * as api from '../../services/endpoints.js'
  */
 export default function WishlistButton({ product, className, children, label }) {
   const user = useAuthStore((s) => s.user)
-  const navigate = useNavigate()
+  const openAccount = useUiStore((s) => s.openAccount)
   const [busy, setBusy] = useState(false)
   const [wishlisted, setWishlisted] = useState(false)
 
@@ -28,12 +28,7 @@ export default function WishlistButton({ product, className, children, label }) 
     event.stopPropagation()
 
     if (!user) {
-      try {
-        sessionStorage.setItem('pp_account_return', '/account/wishlist')
-      } catch {
-        // Blocked storage only costs the redirect back, not the sign-in.
-      }
-      navigate('/login?account=required')
+      openAccount('/account/wishlist')
       return
     }
 

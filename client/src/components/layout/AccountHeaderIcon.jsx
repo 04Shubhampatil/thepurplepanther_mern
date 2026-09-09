@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useAuthStore } from '../../store/index.js'
+import { useUiStore } from '../../store/ui.js'
 
 /**
  * frontend/partials/account-header-icon.blade.php.
@@ -7,9 +8,15 @@ import { useAuthStore } from '../../store/index.js'
  * Guest sees the outline person; a signed-in customer sees their initials. The Blade
  * version computed the initials with preg_split + mb_substr on the first two name parts —
  * the same rule is kept here so a two-word name still reads "AB" and a one-word name "A".
+ *
+ * A GUEST DOES NOT GO TO /login. site-drawers.js intercepted this button and slid the
+ * "My account" panel over the page instead, so signing in never costs you the page you were
+ * on. The href stays /login so the control still means something without JavaScript and to
+ * middle-click into a full page.
  */
 export default function AccountHeaderIcon() {
   const user = useAuthStore((s) => s.user)
+  const openAccount = useUiStore((s) => s.openAccount)
   const loggedIn = Boolean(user) && user.role !== 'admin'
 
   const parts = String(user?.name ?? '').trim().split(/\s+/).filter(Boolean)
@@ -23,6 +30,14 @@ export default function AccountHeaderIcon() {
       className={`signin-cart-btn${loggedIn ? ' is-logged-in' : ''}`}
       aria-label={loggedIn ? 'My account' : 'Account'}
       {...(loggedIn ? { 'data-account-logged-in': '1' } : {})}
+      onClick={
+        loggedIn
+          ? undefined
+          : (event) => {
+              event.preventDefault()
+              openAccount()
+            }
+      }
     >
       {loggedIn ? (
           <span className="site-account-avatar" aria-hidden="true">{initials}</span>
