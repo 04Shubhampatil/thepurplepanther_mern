@@ -88,7 +88,8 @@ packed `#e3f2fd/#1565c0`, shipped `#fff3e0/#ef6c00`, delivered `#e8f5e9/#2e7d32`
 | Colors | unchanged | ✅ inline form + table, picker autofill | pending |
 | Sizes | unchanged | ✅ inline form + table | pending |
 | Offers | unchanged | ✅ card grid (shares Categories') | pending |
-| Products (index) | unchanged | ✅ panel + filters + bulk + card grid | pending |
+| Products (index) | unchanged | ✅ panel + filters + bulk + card grid | ✅ |
+| Products (create / edit) | colour galleries, highlight icons, upload.any() | ✅ 10 panels + 4 repeaters | ✅ |
 | Banners (index) | `BANNER_SECTIONS` labels corrected | ✅ panel + section chips + card grid | ✅ |
 | Banners (create / edit) | per-slide metadata + video uploads restored | ✅ two form cards + media repeater | ✅ |
 | News Types | snake_case keys now reach Prisma | ✅ inline form + table, inline edit | ✅ |
@@ -389,6 +390,42 @@ response carries, the factory now takes per-field messages and categories suppli
 This form is also the first to exercise the `camelizeKeys` fix end to end — `sort_order`,
 `has_color`, `has_size`, `show_on_home` and `short_description` are all snake_case, and before
 that fix none of them reached Prisma at all.
+
+### The product form — the largest one, and two uploads that were being dropped
+
+Ten `.product-form-card` panels and four repeaters. Five behaviours are load-bearing rather
+than cosmetic, and each is verified:
+
+  - **Sub-Category follows Category**, and a sub-category belonging to a different one is
+    CLEARED. Leaving it would show a value the option list no longer offers and save the
+    stale id.
+  - **The Accessory Package card is gated on the category's SLUG**, not its name, and its
+    fields on a second switch inside it. Both gates matter — the packages replace the normal
+    Selling Price on the storefront.
+  - **A colour's gallery slot appears only once that colour is ticked.** Images filed under a
+    colour swap in when the customer picks it; images with a NULL `color_id` are the shared
+    gallery, and that null is the entire distinction.
+  - **`products.title` is UNIQUE**, so it is probed against the server on a debounce and again
+    before submitting, with `ignore_id` so a product keeps its own title.
+  - **Colour and size quantities are per-variant STOCK.** They are sent for every ticked
+    variant because `syncPivot` reads them, and that function's own comment explains why:
+    a delete-all-and-recreate pass would zero live inventory on every save.
+
+**Two uploads were silently dropped.** `color_gallery[<colorId>][]` and
+`highlights[<i>][icon]` have names that only exist at runtime, and multer's `fields()` rejects
+any name it was not told about. The product routes now use `any()` and the controller groups
+`req.files` back into the map the services expect. A highlight row that gets no new file keeps
+its `existing_icon`, which the client sends back inside the JSON row — without it, editing any
+other field would strip every icon.
+
+`icon` is stored as `null` rather than `''` for a row that has never had one: `||` not `??`,
+because the client sends an empty string and storing that is drift for no reason.
+
+Verified with a save round-trip on a real product: all five size quantities survived at 2, the
+six gallery images, featured image, prices and all four display flags unchanged, and the four
+highlight rows kept their titles and subtitles. The JSON columns come back as STRINGS from the
+admin API, so the form parses both shapes — a product's highlights would otherwise reset to one
+empty row the first time it was edited.
 
 ## 4. Known issues / blockers
 

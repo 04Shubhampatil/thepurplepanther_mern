@@ -72,15 +72,30 @@ export const productShow = asyncHandler(async (req, res) =>
   ok(res, { item: await catalogAdmin.findProduct(req.params.id) }, 'Product'),
 )
 
+/**
+ * multer's `any()` hands back an ARRAY of files; the services expect the map `fields()`
+ * produced. The product routes use `any()` because two of the form's inputs have names that
+ * only exist at runtime — `color_gallery_<colorId>` and `highlight_icon_<index>`.
+ */
+const groupFiles = (req) => {
+  const out = {}
+  for (const file of req.files ?? []) (out[file.fieldname] ??= []).push(file)
+  return out
+}
+
 export const productStore = asyncHandler(async (req, res) =>
-  created(res, { item: await catalogAdmin.createProduct(req.body, req.files ?? {}) }, 'Product created.'),
+  created(
+    res,
+    { item: await catalogAdmin.createProduct(req.body, groupFiles(req)) },
+    'Product created successfully.',
+  ),
 )
 
 export const productUpdate = asyncHandler(async (req, res) =>
   ok(
     res,
-    { item: await catalogAdmin.updateProduct(req.params.id, req.body, req.files ?? {}) },
-    'Product updated.',
+    { item: await catalogAdmin.updateProduct(req.params.id, req.body, groupFiles(req)) },
+    'Product updated successfully.',
   ),
 )
 

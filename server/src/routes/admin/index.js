@@ -39,29 +39,27 @@ router.get('/products/form-data', admin.productFormData)
 router.get('/products/sub-categories', admin.subCategoriesFor)
 router.post('/products/bulk', validate(v.bulkProductSchema), admin.productBulk)
 
+/*
+ * `any()`, not `fields()`.
+ *
+ * Two of the product form's file inputs have names that cannot be declared up front:
+ * `color_gallery_<colorId>` carries the colour it belongs to, and `highlight_icon_<index>`
+ * the repeater row. `fields()` rejects any name it was not told about, so those uploads
+ * were silently dropped; the service groups them by field name instead.
+ */
+const productUpload = upload.any()
+
 router.get('/products', admin.productIndex)
 router.post(
   '/products',
-  upload.fields([
-    { name: 'featured_image', maxCount: 1 },
-    { name: 'featured_image_2', maxCount: 1 },
-    { name: 'size_guide_image', maxCount: 1 },
-    { name: 'highlights_image', maxCount: 1 },
-    { name: 'gallery', maxCount: 20 },
-  ]),
+  productUpload,
   validate(v.productSchema),
   admin.productStore,
 )
 router.get('/products/:id', admin.productShow)
 router.patch(
   '/products/:id',
-  upload.fields([
-    { name: 'featured_image', maxCount: 1 },
-    { name: 'featured_image_2', maxCount: 1 },
-    { name: 'size_guide_image', maxCount: 1 },
-    { name: 'highlights_image', maxCount: 1 },
-    { name: 'gallery', maxCount: 20 },
-  ]),
+  productUpload,
   validate(v.productSchema),
   admin.productUpdate,
 )

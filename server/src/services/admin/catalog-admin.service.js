@@ -274,8 +274,56 @@ async function syncPivot(tx, { table, productId, foreignKey, entries }) {
   }
 }
 
+/**
+ * Colour-specific gallery uploads.
+ *
+ * The Blade posts `color_gallery[<colorId>][]`, so the field name carries the colour and
+ * multer's `fields()` cannot declare it up front — the routes use `any()` and the client
+ * flattens the name to `color_gallery_<colorId>`. Images filed under a colour swap in when
+ * the customer picks that colour; images with a NULL colour_id are the shared gallery, and
+ * that null is the whole distinction, so it has to survive the round trip.
+ */
+function colourGalleryFiles(files) {
+  const out = []
+
+  for (const [field, list] of Object.entries(files)) {
+    const match = /^color_gallery_(\d+)$/.exec(field)
+    if (!match) continue
+
+    for (const file of list) out.push({ colorId: BigInt(match[1]), file })
+  }
+
+  return out
+}
+
+/**
+ * Per-highlight icon uploads, posted as `highlight_icon_<row index>`.
+ *
+ * A row that gets no new file keeps `existing_icon`, which is why the client sends that
+ * back inside the JSON row rather than the server inferring it — a highlight whose icon is
+ * left alone must not lose it.
+ */
+function applyHighlightIcons(data, files) {
+  const rows = data.highlights_items
+  if (!Array.isArray(rows)) return
+
+  data.highlights_items = rows.map((row, index) => {
+    const uploaded = files[`highlight_icon_${index}`]?.[0]
+    // `|| null`, not `??` — the client sends '' for a row that has never had an icon, and
+    // storing that instead of null is drift for no reason: both are falsy to every reader.
+    const icon = uploaded
+      ? persist(uploaded, UPLOAD_DIRS.products)
+      : (row.existing_icon || row.icon || null)
+
+    const { existing_icon: _drop, ...rest } = row
+    return { ...rest, icon }
+  })
+}
+
 export async function createProduct(data, files = {}) {
   await assertTitleAvailable(data.title)
+
+  applyHighlightIcons(data, files)
 
   const scalars = productScalars(data)
   scalars.slug = data.slug ? slugify(data.slug) : slugify(data.title)
@@ -294,6 +342,10 @@ export async function createProduct(data, files = {}) {
   }
 
   const galleryPaths = persistMany(files.gallery ?? [], UPLOAD_DIRS.products)
+  const colourGallery = colourGalleryFiles(files).map(({ colorId, file }) => ({
+    colorId,
+    image: persist(file, UPLOAD_DIRS.products),
+  }))
 
   return prisma.$transaction(async (tx) => {
     const product = await tx.product.create({ data: scalars })
@@ -311,13 +363,18 @@ export async function createProduct(data, files = {}) {
       entries: data.sizes,
     })
 
-    if (galleryPaths.length) {
+    if (galleryPaths.length || colourGallery.length) {
       await tx.productImage.createMany({
-        data: galleryPaths.map((image, index) => ({
-          productId: product.id,
-          image,
-          sortOrder: index,
-        })),
+        data: [
+          // colorId stays NULL for these — that is what makes them the shared gallery.
+          ...galleryPaths.map((image, index) => ({ productId: product.id, image, sortOrder: index })),
+          ...colourGallery.map(({ colorId, image }, index) => ({
+            productId: product.id,
+            colorId,
+            image,
+            sortOrder: galleryPaths.length + index,
+          })),
+        ],
       })
     }
 
@@ -328,6 +385,8 @@ export async function createProduct(data, files = {}) {
 export async function updateProduct(id, data, files = {}) {
   const existing = await findProduct(id)
   await assertTitleAvailable(data.title, id)
+
+  applyHighlightIcons(data, files)
 
   const scalars = productScalars(data)
   if (data.slug) scalars.slug = slugify(data.slug)
@@ -346,6 +405,10 @@ export async function updateProduct(id, data, files = {}) {
   }
 
   const galleryPaths = persistMany(files.gallery ?? [], UPLOAD_DIRS.products)
+  const colourGallery = colourGalleryFiles(files).map(({ colorId, file }) => ({
+    colorId,
+    image: persist(file, UPLOAD_DIRS.products),
+  }))
   const removeIds = (data.remove_gallery ?? []).map((v) => BigInt(v))
 
   const product = await prisma.$transaction(async (tx) => {
@@ -372,7 +435,7 @@ export async function updateProduct(id, data, files = {}) {
       replaced.push(...doomed.map((d) => d.image))
     }
 
-    if (galleryPaths.length) {
+    if (galleryPaths.length || colourGallery.length) {
       const last = await tx.productImage.findFirst({
         where: { productId: BigInt(id) },
         orderBy: { sortOrder: 'desc' },
@@ -381,11 +444,19 @@ export async function updateProduct(id, data, files = {}) {
       const start = (last?.sortOrder ?? -1) + 1
 
       await tx.productImage.createMany({
-        data: galleryPaths.map((image, index) => ({
-          productId: BigInt(id),
-          image,
-          sortOrder: start + index,
-        })),
+        data: [
+          ...galleryPaths.map((image, index) => ({
+            productId: BigInt(id),
+            image,
+            sortOrder: start + index,
+          })),
+          ...colourGallery.map(({ colorId, image }, index) => ({
+            productId: BigInt(id),
+            colorId,
+            image,
+            sortOrder: start + galleryPaths.length + index,
+          })),
+        ],
       })
     }
 

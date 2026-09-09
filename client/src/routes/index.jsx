@@ -36,6 +36,7 @@ const Account = lazy(() => import('../pages/Account/Account.jsx'))
 const AdminLogin = lazy(() => import('../pages/Admin/AdminLogin.jsx'))
 const Dashboard = lazy(() => import('../pages/Admin/Dashboard.jsx'))
 const AdminProducts = lazy(() => import('../pages/Admin/Products.jsx'))
+const AdminProductForm = lazy(() => import('../pages/Admin/ProductForm.jsx'))
 const AdminOrders = lazy(() => import('../pages/Admin/Orders.jsx'))
 const AdminResource = lazy(() => import('../pages/Admin/Resource.jsx'))
 const AdminSettings = lazy(() => import('../pages/Admin/Settings.jsx'))
@@ -233,6 +234,8 @@ export default function AppRoutes() {
             <Route path="coupons/:id" element={<AdminCouponDetail />} />
 
             <Route path="products" element={<AdminProducts />} />
+            <Route path="products/create" element={<AdminProductForm />} />
+            <Route path="products/:id/edit" element={<AdminProductForm />} />
             <Route path="orders" element={<AdminOrders />} />
             <Route path="settings" element={<AdminSettings />} />
             <Route path=":resource" element={<AdminResource />} />
