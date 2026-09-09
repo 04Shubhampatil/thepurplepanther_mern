@@ -62,31 +62,38 @@
   -webkit-font-smoothing: antialiased;
 }
 
-.admin-root *,
-.admin-root *::before,
-.admin-root *::after {
+/*
+ * EVERY SELECTOR BELOW IS WRAPPED IN `:where()`, AND THAT IS THE WHOLE POINT.
+ *
+ * `.admin-root button` is a class plus an element — specificity (0,1,1) — while every
+ * Tailwind utility is a single class, (0,1,0). So a plain reset here silently outranks the
+ * utilities it is meant to sit underneath: `color: inherit` on button beat
+ * `text-admin-primary`, which is why the category cards' pencil and bin came out white
+ * instead of pink, and `margin: 0` on headings beat `mb-1`.
+ *
+ * `:where()` must wrap `.admin-root` TOO, not just the element. Tailwind's utilities are
+ * emitted unlayered here (this file imports `tailwindcss/utilities.css` rather than the full
+ * `tailwindcss`), and this reset is ~10KB further down the same stylesheet — so at equal
+ * specificity source order alone would still hand the reset the win. Wrapping both halves
+ * makes every selector below (0,0,0), which no utility can lose to.
+ */
+:where(.admin-root) *,
+:where(.admin-root) *::before,
+:where(.admin-root) *::after {
   box-sizing: border-box;
 }
 
-.admin-root h1,
-.admin-root h2,
-.admin-root h3,
-.admin-root h4,
-.admin-root h5,
-.admin-root h6,
-.admin-root p,
-.admin-root figure {
+:where(.admin-root) :where(h1, h2, h3, h4, h5, h6, p, figure) {
   margin: 0;
 }
 
-.admin-root ul,
-.admin-root ol {
+:where(.admin-root) :where(ul, ol) {
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.admin-root button {
+:where(.admin-root) :where(button) {
   font: inherit;
   color: inherit;
   background: none;
@@ -94,35 +101,26 @@
   cursor: pointer;
 }
 
-.admin-root input,
-.admin-root select,
-.admin-root textarea {
+:where(.admin-root) :where(input, select, textarea) {
   font: inherit;
   color: inherit;
 }
 
-.admin-root table {
+:where(.admin-root) :where(table) {
   border-collapse: collapse;
   width: 100%;
 }
 
-.admin-root img,
-.admin-root svg {
+:where(.admin-root) :where(img, svg) {
   display: block;
   max-width: 100%;
 }
 
-/*
- * `:where()` on purpose. Written as `.admin-root a` this rule is a class plus an element,
- * which outranks Tailwind's single-class `.text-white` — and React Router renders <Link> as
- * an <a>, so every coloured link in the panel silently came out in the body colour.
- * `:where()` contributes no specificity, so the default still applies and any `text-*`
- * utility on the link wins without needing `!important`.
- */
-.admin-root :where(a) {
+:where(.admin-root) :where(a) {
   color: inherit;
   text-decoration: none;
 }
+
 
 /*
  * The dashboard's stat cards are gradients in the original (admin.css `.stat-orange` and
