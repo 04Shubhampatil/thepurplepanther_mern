@@ -40,6 +40,7 @@ const AdminOrders = lazy(() => import('../pages/Admin/Orders.jsx'))
 const AdminResource = lazy(() => import('../pages/Admin/Resource.jsx'))
 const AdminSettings = lazy(() => import('../pages/Admin/Settings.jsx'))
 const AdminCategories = lazy(() => import('../pages/Admin/Categories.jsx'))
+const AdminCategoryForm = lazy(() => import('../pages/Admin/CategoryForm.jsx'))
 const AdminSubCategories = lazy(() => import('../pages/Admin/SubCategories.jsx'))
 const AdminColors = lazy(() => import('../pages/Admin/Colors.jsx'))
 const AdminSizes = lazy(() => import('../pages/Admin/Sizes.jsx'))
@@ -205,6 +206,8 @@ export default function AppRoutes() {
             {/* Rebuilt against the Blade views; declared before the generic :resource
                 route so they win over it. */}
             <Route path="categories" element={<AdminCategories />} />
+            <Route path="categories/create" element={<AdminCategoryForm />} />
+            <Route path="categories/:id/edit" element={<AdminCategoryForm />} />
             <Route path="sub-categories" element={<AdminSubCategories />} />
             <Route path="colors" element={<AdminColors />} />
             <Route path="sizes" element={<AdminSizes />} />

@@ -83,6 +83,13 @@ export function createCrudService(config) {
     extraImageDirs = {},
     searchFields = [nameField],
     uniqueFields = [],
+    /*
+     * Per-field clash messages, because the source's are not uniform: CategoryController
+     * flashes "This category name already exists. Duplicate name not allowed." while the
+     * generated fallback below would say "…category title is already in use." The admin's
+     * toast shows whichever the response carries, so the wording is worth carrying over.
+     */
+    uniqueMessages = {},
     include = undefined,
     orderBy = [{ sortOrder: 'asc' }, { [nameField]: 'asc' }],
   } = config
@@ -103,10 +110,9 @@ export function createCrudService(config) {
       })
 
       if (clash) {
-        throw new ValidationError(
-          { [field]: [`This ${label.toLowerCase()} ${field} is already in use.`] },
-          `This ${label.toLowerCase()} ${field} is already in use.`,
-        )
+        const message =
+          uniqueMessages[field] ?? `This ${label.toLowerCase()} ${field} is already in use.`
+        throw new ValidationError({ [field]: [message] }, message)
       }
     }
   }

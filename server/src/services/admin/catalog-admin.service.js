@@ -21,6 +21,7 @@ export const categories = createCrudService({
   imageDir: UPLOAD_DIRS.categories,
   searchFields: ['title', 'slug'],
   uniqueFields: ['title'],
+  uniqueMessages: { title: 'This category name already exists. Duplicate name not allowed.' },
 })
 
 export const subCategories = createCrudService({

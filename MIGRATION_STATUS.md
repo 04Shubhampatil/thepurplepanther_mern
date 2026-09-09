@@ -82,7 +82,8 @@ packed `#e3f2fd/#1565c0`, shipped `#fff3e0/#ef6c00`, delivered `#e8f5e9/#2e7d32`
 | `AdminLayout` / `AdminSidebar` / `AdminHeader` | n/a | ✅ | pending |
 | Component library (`components/admin/AdminUI.jsx`) | n/a | ✅ | pending |
 | Dashboard | ✅ `stats` added to `dashboardStats()` | ✅ | pending |
-| Categories | unchanged (existing `/admin/categories`) | ✅ image cards | pending |
+| Categories (index) | unchanged (existing `/admin/categories`) | ✅ image cards | pending |
+| Categories (create / edit) | per-field clash message | ✅ 640px form grid + 3 switches | ✅ |
 | Sub-Categories | unchanged (existing `/admin/sub-categories`) | ✅ inline form + table | pending |
 | Colors | unchanged | ✅ inline form + table, picker autofill | pending |
 | Sizes | unchanged | ✅ inline form + table | pending |
@@ -364,6 +365,30 @@ and on edit omitted from the payload entirely when left blank. It is never PREFI
 returns no hash, and a placeholder would be saved back as a literal password the moment the
 admin submitted without touching it. Verified against the database: the stored bcrypt hash is
 byte-identical after a save with the field left blank.
+
+### The category form
+
+No `_form` partial here — create.blade.php and edit.blade.php are written out separately and
+differ in four small ways that would be easy to lose in a merge: the Title placeholder and the
+second image note appear only on CREATE, the current image only on EDIT, and the submit reads
+Save then Update. All four are reproduced rather than harmonised.
+
+It uses `.form-grid` (14px gap, 640px cap), the journal post form's shape — NOT the 220px
+label column the offer, coupon and user forms use. Four of the admin's forms use one and three
+use the other; there is no house style to converge on.
+
+The three switches are a group under their own heading because they decide what the PRODUCT
+form offers for that category: turning Colour off hides the colour variants there, not just on
+the storefront.
+
+One server fix: the CRUD factory generated its own uniqueness message
+("This category title is already in use.") where CategoryController flashes "This category name
+already exists. Duplicate name not allowed." Since the admin's toast shows whatever the
+response carries, the factory now takes per-field messages and categories supplies that one.
+
+This form is also the first to exercise the `camelizeKeys` fix end to end — `sort_order`,
+`has_color`, `has_size`, `show_on_home` and `short_description` are all snake_case, and before
+that fix none of them reached Prisma at all.
 
 ## 4. Known issues / blockers
 
