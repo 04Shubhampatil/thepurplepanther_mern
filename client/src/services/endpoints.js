@@ -155,7 +155,14 @@ export const admin = {
         ? patch(`/admin/coupons/${id}`, toFormData(body, files))
         : post('/admin/coupons', toFormData(body, files)),
   },
-  users: resource('users'),
+  /* The user form carries an avatar, so both writes go out as multipart. */
+  users: {
+    ...resource('users'),
+    save: (id, body, files) =>
+      id
+        ? patch(`/admin/users/${id}`, toFormData(body, files))
+        : post('/admin/users', toFormData(body, files)),
+  },
   /*
    * Banners are multipart in both directions and update over POST.
    *

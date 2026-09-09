@@ -430,11 +430,36 @@ describe('an admin cannot lock themselves out', () => {
   })
 
   it('does not require the current password when an admin resets someone else\'s', async () => {
-    prismaMock.user.findUnique.mockResolvedValue({ id: 2n, email: 'a@b.com' })
+    prismaMock.user.findUnique.mockResolvedValue({ id: 2n, email: 'a@b.com', role: 'customer' })
     prismaMock.user.findFirst.mockResolvedValue(null)
 
     await miscAdmin.updateUser(2n, { name: 'Asha', password: 'newpassword' })
     expect(prismaMock.user.update.mock.calls[0][0].data.password).toMatch(/^\$2b\$10\$/)
+  })
+
+  it('refuses to edit a non-customer through the customer screens', async () => {
+    // `ensureCustomer` — UserController 404s anything that is not a customer, so the
+    // customer form cannot be pointed at an administrator's row.
+    prismaMock.user.findUnique.mockResolvedValue({ id: 1n, email: 'a@b.com', role: 'admin' })
+
+    await expect(miscAdmin.updateUser(1n, { name: 'Nope' })).rejects.toThrow('User not found.')
+  })
+
+  it('always creates a CUSTOMER, whatever role the request asks for', async () => {
+    prismaMock.user.findFirst.mockResolvedValue(null)
+    prismaMock.user.create.mockResolvedValue({ id: 5n })
+
+    await miscAdmin.createUser({
+      name: 'Asha',
+      email: 'Asha@Example.com',
+      password: 'secret123',
+      role: 'admin',
+    })
+
+    const data = prismaMock.user.create.mock.calls.at(-1)[0].data
+    expect(data.role).toBe('customer')
+    expect(data.platform).toBe('Web')
+    expect(data.email).toBe('asha@example.com')
   })
 })
 

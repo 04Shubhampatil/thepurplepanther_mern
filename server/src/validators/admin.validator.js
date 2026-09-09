@@ -271,6 +271,12 @@ export const adminUserCreateSchema = z.object({
     .min(6, 'Password must be at least 6 characters.'),
   role: z.enum([ROLES.ADMIN, ROLES.CUSTOMER]).optional(),
   is_active: bool,
+  /*
+   * The three the form offers. `UserController::store` defaults a blank one to 'Web', which
+   * is also what the list column falls back to — a null platform and "Web" mean the same
+   * thing there, so the default is applied on write rather than only on display.
+   */
+  platform: z.enum(['Web', 'Android', 'iOS']).nullish().transform((v) => v || 'Web'),
 })
 
 export const adminUserUpdateSchema = adminUserCreateSchema.partial({ password: true }).extend({

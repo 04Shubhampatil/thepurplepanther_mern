@@ -98,6 +98,7 @@ packed `#e3f2fd/#1565c0`, shipped `#fff3e0/#ef6c00`, delivered `#e8f5e9/#2e7d32`
 | Coupons (create / edit) | offer-type enum, derived discount_type, conditional nulling, form-data | ✅ 20 rows + 5 conditionals | ✅ |
 | Users (index) | customer-only filter, sorting, platform + avatar | ✅ panel + bulk + sortable table | ✅ |
 | Users (detail) | new `/users/:id/detail`, one tab per request | ✅ banner + 5 tabs | ✅ |
+| Users (create / edit) | avatar upload, platform, role pinned to customer | ✅ 6 rows + preview | ✅ |
 | Orders (index) | sorting, date filter, statusBadgeClass, pending label | ✅ filters + bulk + sortable table | ✅ |
 | Orders (status modal) | unchanged | ✅ delivery date + timeline + form | ✅ |
 | Contacts | per-tab search / sort / per-page | ✅ two tabs, two tables | ✅ |
@@ -341,6 +342,28 @@ shows none of them.
 The status modal's hint is three fixed strings from order-admin.js, not a list built from the
 options — a packed or shipped order shows no hint at all — and Save is disabled outright once
 an order reaches a terminal status.
+
+### The user form — a role hole and two dropped fields
+
+**The create endpoint took `role` from the request.** `UserController::store` hard-codes
+`role = customer`, `login_provider = email` and `is_active = true`; the port passed
+`data.role ?? CUSTOMER` through, so a POST to `/admin/users` carrying `role: "admin"` would
+have minted an administrator from the customer form. Now pinned, with a test.
+
+**`platform` and `avatar` never reached the database.** Neither was in the schema and the
+routes had no upload middleware, so the Platform select and the image picker were decoration.
+`platform` defaults to 'Web' on write, as the controller defaulted it — the list column
+already fell back to "Web" for a null, so the two now agree instead of only looking like they
+do. The avatar is written before the old file is removed, never the other way round.
+
+**`ensureCustomer` now guards update as well**, so the customer form cannot be pointed at an
+administrator's row.
+
+The password field is the only thing that differs between the two modes: required on create,
+and on edit omitted from the payload entirely when left blank. It is never PREFILLED — the API
+returns no hash, and a placeholder would be saved back as a literal password the moment the
+admin submitted without touching it. Verified against the database: the stored bcrypt hash is
+byte-identical after a save with the field left blank.
 
 ## 4. Known issues / blockers
 

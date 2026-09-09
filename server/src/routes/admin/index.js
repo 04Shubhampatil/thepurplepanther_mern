@@ -231,10 +231,11 @@ router.delete('/orders/:id', admin.orderDestroy)
 // ── users ──────────────────────────────────────────────────────────────────
 router.post('/users/bulk', validate(v.bulkUserSchema), admin.userBulk)
 router.get('/users', admin.userIndex)
-router.post('/users', validate(v.adminUserCreateSchema), admin.userStore)
+// Multipart: the form carries an avatar, so the body arrives as form data either way.
+router.post('/users', upload.single('avatar'), validate(v.adminUserCreateSchema), admin.userStore)
 router.get('/users/:id', admin.userShow)
 router.get('/users/:id/detail', admin.userDetail)
-router.patch('/users/:id', validate(v.adminUserUpdateSchema), admin.userUpdate)
+router.patch('/users/:id', upload.single('avatar'), validate(v.adminUserUpdateSchema), admin.userUpdate)
 router.delete('/users/:id', admin.userDestroy)
 router.patch('/users/:id/toggle', admin.userToggle)
 

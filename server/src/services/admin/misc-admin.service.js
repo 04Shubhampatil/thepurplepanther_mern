@@ -277,7 +277,7 @@ async function assertEmailFree(email, ignoreId = null) {
   }
 }
 
-export async function createUser(data) {
+export async function createUser(data, file = null) {
   const email = String(data.email).trim().toLowerCase()
   await assertEmailFree(email)
 
@@ -288,21 +288,39 @@ export async function createUser(data) {
       email,
       phone: data.phone || null,
       password: await hashPassword(data.password),
-      role: data.role ?? ROLES.CUSTOMER,
-      isActive: data.is_active === undefined ? true : Boolean(data.is_active),
+      /*
+       * `UserController::store` hard-codes these three — it is the CUSTOMER screen, and the
+       * form has no role field. Taking the role from the request would let a POST to this
+       * endpoint mint an administrator.
+       */
+      role: ROLES.CUSTOMER,
+      isActive: true,
       loginProvider: 'email',
+      platform: data.platform || 'Web',
+      ...(file ? { avatar: persist(file, UPLOAD_DIRS.users) } : {}),
     },
     select: USER_SELECT,
   })
 }
 
-export async function updateUser(id, data) {
-  await findUser(id)
+export async function updateUser(id, data, file = null) {
+  const existing = await findUser(id)
+
+  // `ensureCustomer` — the customer screens refuse any other role outright.
+  if (existing.role !== ROLES.CUSTOMER) throw new NotFoundError('User not found.')
 
   const update = {
     name: data.name,
     username: data.username || null,
     phone: data.phone || null,
+    ...(data.platform ? { platform: data.platform } : {}),
+  }
+
+  if (file) {
+    update.avatar = persist(file, UPLOAD_DIRS.users)
+    // Write the new file first, then drop the old one — the other order leaves the row
+    // pointing at nothing if the write fails.
+    if (existing.avatar) remove(existing.avatar)
   }
 
   if (data.email) {
@@ -310,7 +328,6 @@ export async function updateUser(id, data) {
     await assertEmailFree(email, id)
     update.email = email
   }
-  if (data.role) update.role = data.role
   if (data.is_active !== undefined) update.isActive = Boolean(data.is_active)
 
   // An admin resetting a password does NOT need the current one — they are acting on

@@ -247,16 +247,16 @@ export const userDetail = asyncHandler(async (req, res) =>
 )
 
 export const userStore = asyncHandler(async (req, res) =>
-  created(res, { item: await miscAdmin.createUser(req.body) }, 'User created.'),
+  created(res, { item: await miscAdmin.createUser(req.body, req.file) }, 'User created successfully.'),
 )
 
 export const userUpdate = asyncHandler(async (req, res) =>
-  ok(res, { item: await miscAdmin.updateUser(req.params.id, req.body) }, 'User updated.'),
+  ok(res, { item: await miscAdmin.updateUser(req.params.id, req.body, req.file) }, 'User updated successfully.'),
 )
 
 export const userDestroy = asyncHandler(async (req, res) => {
   await miscAdmin.deleteUser(req.params.id, req.user.id)
-  return ok(res, {}, 'User deleted.')
+  return ok(res, {}, 'User deleted successfully.')
 })
 
 export const userToggle = asyncHandler(async (req, res) =>

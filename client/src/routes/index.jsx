@@ -54,6 +54,7 @@ const AdminCouponDetail = lazy(() => import('../pages/Admin/CouponDetail.jsx'))
 const AdminCouponForm = lazy(() => import('../pages/Admin/CouponForm.jsx'))
 const AdminUsers = lazy(() => import('../pages/Admin/Users.jsx'))
 const AdminUserDetail = lazy(() => import('../pages/Admin/UserDetail.jsx'))
+const AdminUserForm = lazy(() => import('../pages/Admin/UserForm.jsx'))
 const AdminHomeSections = lazy(() => import('../pages/Admin/HomeSections.jsx'))
 
 /**
@@ -223,6 +224,8 @@ export default function AppRoutes() {
             <Route path="coupons/:id/edit" element={<AdminCouponForm />} />
 
             <Route path="users" element={<AdminUsers />} />
+            <Route path="users/create" element={<AdminUserForm />} />
+            <Route path="users/:id/edit" element={<AdminUserForm />} />
             <Route path="users/:id" element={<AdminUserDetail />} />
             <Route path="coupons/:id" element={<AdminCouponDetail />} />
 
