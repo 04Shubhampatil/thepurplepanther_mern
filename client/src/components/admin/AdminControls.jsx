@@ -74,3 +74,76 @@ export function Toggle({ checked, onChange, title, disabled }) {
     </label>
   )
 }
+
+/*
+ * `.inline-form` and friends — the add/edit form that sits above the table on the
+ * master-data screens (Colors, Sizes, Sub-Categories).
+ *
+ * It is a GRID, not a flex row: `repeat(auto-fit, minmax(160px, 1fr))` at a 12px gap, which
+ * is why the fields share the width evenly and wrap together rather than each shrinking to
+ * its content. `.form-actions` carries `padding-top: 22px` to clear the label height so Save
+ * lands on the inputs' baseline instead of above them.
+ *
+ * Controls are 42px tall with 11px/12px padding; labels are 13px/600 in #666 with a 6px
+ * gap and a 16px minimum height, so a field with no label still lines up with one that has.
+ */
+
+export function FormGrid({ children, className = '', ...props }) {
+  return (
+    <form
+      className={`grid grid-cols-1 items-start gap-3 min-[576px]:grid-cols-[repeat(auto-fit,minmax(160px,1fr))] ${className}`}
+      {...props}
+    >
+      {children}
+    </form>
+  )
+}
+
+export function FormGroup({ label, children, error }) {
+  return (
+    <div className="flex min-w-0 flex-col">
+      {label ? (
+        <label className="mb-1.5 block min-h-4 text-[13px] font-semibold leading-[1.2] text-[#666]">{label}</label>
+      ) : null}
+      {children}
+      {error ? <span className="mt-1 text-[12px] text-[#e53935]">{error}</span> : null}
+    </div>
+  )
+}
+
+/** `.form-group input` — 42px, 11px/12px, 1px #ddd at 6px radius. */
+export const FORM_CONTROL =
+  'h-[42px] w-full rounded-md border border-[#ddd] bg-white px-3 py-[11px] text-[14px] outline-none transition-colors focus:border-admin-primary'
+
+export function FormActions({ children }) {
+  return (
+    <div className="flex min-h-[42px] flex-wrap items-center gap-2 pt-[22px]">{children}</div>
+  )
+}
+
+/**
+ * `.btn-edit` — white ground, #1e88e5 text, 1px #90caf9. The only blue control in the panel,
+ * and deliberately not the pink primary: on these rows Edit and Delete sit side by side and
+ * the colours are what separate a safe action from a destructive one.
+ */
+export function EditButton({ onClick, children = 'Edit' }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex items-center justify-center rounded-md border border-[#90caf9] bg-white px-[10px] py-1.5 text-[12px] font-semibold text-[#1e88e5] transition-colors hover:bg-[#e3f2fd]"
+    >
+      {children}
+    </button>
+  )
+}
+
+/** `.color-dot` — 22px circle, 1px #ddd, 8px to the right of it. */
+export function ColorDot({ code }) {
+  return (
+    <span
+      className="mr-2 inline-block size-[22px] shrink-0 rounded-full border border-[#ddd] align-middle"
+      style={{ background: code || '#ccc' }}
+    />
+  )
+}
