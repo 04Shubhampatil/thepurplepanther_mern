@@ -36,3 +36,16 @@ export function discountPercent(product) {
 
   return 0
 }
+
+/**
+ * BannerImage::getIsVideoAttribute — decided by file extension, not by a column.
+ *
+ * Another accessor the admin's raw rows do not carry. Without it the Banners grid treats a
+ * video placement as an image and paints its poster-less first frame as a background, which
+ * renders as a black card.
+ */
+const VIDEO_EXTENSIONS = new Set(['mp4', 'webm', 'ogg', 'ogv', 'mov'])
+
+export function isVideoPath(path) {
+  return VIDEO_EXTENSIONS.has(String(path ?? '').split('.').pop().toLowerCase())
+}

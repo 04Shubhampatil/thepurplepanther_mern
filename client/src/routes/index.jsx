@@ -44,6 +44,8 @@ const AdminSubCategories = lazy(() => import('../pages/Admin/SubCategories.jsx')
 const AdminColors = lazy(() => import('../pages/Admin/Colors.jsx'))
 const AdminSizes = lazy(() => import('../pages/Admin/Sizes.jsx'))
 const AdminOffers = lazy(() => import('../pages/Admin/Offers.jsx'))
+const AdminBanners = lazy(() => import('../pages/Admin/Banners.jsx'))
+const AdminHomeSections = lazy(() => import('../pages/Admin/HomeSections.jsx'))
 
 /**
  * Reserved first-path segments — the negative lookahead from Laravel's clean-category
@@ -197,6 +199,8 @@ export default function AppRoutes() {
             <Route path="colors" element={<AdminColors />} />
             <Route path="sizes" element={<AdminSizes />} />
             <Route path="offers" element={<AdminOffers />} />
+            <Route path="banners" element={<AdminBanners />} />
+            <Route path="home-sections" element={<AdminHomeSections />} />
 
             <Route path="products" element={<AdminProducts />} />
             <Route path="orders" element={<AdminOrders />} />

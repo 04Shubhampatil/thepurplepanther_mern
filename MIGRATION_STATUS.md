@@ -88,6 +88,8 @@ packed `#e3f2fd/#1565c0`, shipped `#fff3e0/#ef6c00`, delivered `#e8f5e9/#2e7d32`
 | Sizes | unchanged | ✅ inline form + table | pending |
 | Offers | unchanged | ✅ card grid (shares Categories') | pending |
 | Products (index) | unchanged | ✅ panel + filters + bulk + card grid | pending |
+| Banners | `BANNER_SECTIONS` labels corrected | ✅ panel + section chips + card grid | pending |
+| Home Sections | unchanged | ✅ two-product picker | pending |
 
 ### Stylesheet isolation
 
@@ -105,7 +107,7 @@ Backend endpoints already exist for all of these (see §5); the work is the Reac
 per-module visual QA against the Blade view.
 
 Brands (hidden) · Products create/edit form (the 620-line `_form.blade.php`) · Product
-reviews · Banners · Home Sections · News Types · Blog
+reviews · Banner create/edit · Home Sections · News Types · Blog
 Posts · Coupons · Orders (incl. status log, print) · Users · Contacts/Subscribers/Messages ·
 Web Settings (CMS pages) · Shipping Settings · Profile · Change password · Admin auth
 (login, forgot, reset).
@@ -118,6 +120,24 @@ It exists so the build stays green while pages are rebuilt one at a time rather 
 once under a red build. **It must be deleted with the last un-rebuilt page** (`Resource.jsx`).
 
 ---
+
+### The admin API returns RAW rows
+
+Worth stating once because it has now caused three separate bugs. The storefront's endpoints
+run through presenters that resolve media URLs and compute derived values; the admin CRUD
+factory returns Prisma rows untouched. So an admin screen sees Laravel's column names and
+**none of its accessors**:
+
+| Looks available | Actually | Handled by |
+|---|---|---|
+| `product.image` | column is `featuredImage` | `storageUrl` |
+| `product.discountPercent` | accessor — prefers the OFFER's percent | `discountPercent()` |
+| `banner.coverImage` | accessor — first image's path | read `images[0].image` |
+| `bannerImage.isVideo` | accessor — file extension | `isVideoPath()` |
+| `banner.sectionLabel` / `sectionPage` | accessors over `BannerSections` | the `sections` payload |
+
+All of these fail SILENTLY — a placeholder image, a missing badge — so check the Prisma model
+before wiring a new admin screen rather than assuming the storefront's presented shape.
 
 ## 4. Known issues / blockers
 
