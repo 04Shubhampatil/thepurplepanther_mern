@@ -7,6 +7,7 @@ import { persist, remove, UPLOAD_DIRS, BANNER_VIDEO_MIME } from '../upload.servi
 import { isValidSitePage, SITE_PAGES } from '../../constants/cms.js'
 import { COUPON_OFFER_TYPE_LABELS } from '../../constants/coupons.js'
 import { ROLES } from '../../constants/roles.js'
+import { statusLabel, statusBadgeClass } from '../../constants/order-statuses.js'
 
 /**
  * The remaining admin modules: users, banners, home sections, coupons, contacts and
@@ -25,9 +26,29 @@ const USER_SELECT = {
   isActive: true,
   loginProvider: true,
   createdAt: true,
+  // The list shows both: `platform` is its own column, and `avatar` feeds the row's
+  // circle — `avatar_url` is an accessor, so the fallback is resolved on the client.
+  platform: true,
+  avatar: true,
 }
 
-export async function listUsers({ search = '', role = null, page = 1, perPage = 20 } = {}) {
+/** `UserController::sortParams` — an unknown column falls back rather than erroring. */
+const USER_SORTS = {
+  platform: 'platform',
+  name: 'name',
+  email: 'email',
+  created_at: 'createdAt',
+  is_active: 'isActive',
+}
+
+export async function listUsers({
+  search = '',
+  role = null,
+  page = 1,
+  perPage = 10,
+  sort = 'created_at',
+  dir = 'desc',
+} = {}) {
   const term = String(search ?? '').trim()
 
   const where = {
@@ -38,7 +59,9 @@ export async function listUsers({ search = '', role = null, page = 1, perPage = 
             { name: { contains: term } },
             { email: { contains: term } },
             { phone: { contains: term } },
-            { username: { contains: term } },
+            // The controller searches `platform`, not `username` — the list has a Platform
+            // column and no username one.
+            { platform: { contains: term } },
           ],
         }
       : {}),
@@ -46,13 +69,17 @@ export async function listUsers({ search = '', role = null, page = 1, perPage = 
 
   const take = Math.min(Math.max(1, perPage), 100)
   const currentPage = Math.max(1, page)
+  const column = USER_SORTS[sort] ?? 'createdAt'
+  const direction = String(dir).toLowerCase() === 'asc' ? 'asc' : 'desc'
 
   const [total, items] = await prisma.$transaction([
     prisma.user.count({ where }),
     prisma.user.findMany({
       where,
       select: USER_SELECT, // never selects the password hash
-      orderBy: { id: 'desc' },
+      // `->orderBy($sort, $dir)->orderBy('id', 'desc')` — the id keeps the order stable
+      // when the sorted column ties, which it does on every same-day registration.
+      orderBy: [{ [column]: direction }, { id: 'desc' }],
       skip: (currentPage - 1) * take,
       take,
     }),
@@ -68,6 +95,173 @@ export async function findUser(id) {
   const user = await prisma.user.findUnique({ where: { id: BigInt(id) }, select: USER_SELECT })
   if (!user) throw new NotFoundError('User not found.')
   return user
+}
+
+/**
+ * `UserController::show` — the user plus ONE tab's worth of data.
+ *
+ * Only the active tab is queried, as Laravel queried it: a customer with hundreds of orders
+ * should not pay for their wishlist, cart and reviews to render a page that shows none of
+ * them. The tab is therefore part of the request, not a client-side filter over one big
+ * payload.
+ *
+ * Sorting on a related column (product title, price) orders by the RELATION in Prisma —
+ * Laravel reached the same columns through a leftJoin. Both order by the product's row, not
+ * by the pivot's.
+ */
+export async function findUserDetail(id, { tab = 'wishlist', q = '', page = 1, perPage = 10, sort = 'created_at', dir = 'desc' } = {}) {
+  const user = await findUser(id)
+
+  /*
+   * `ensureCustomer` — UserController aborts with a 404 on any non-customer, and every
+   * method of that controller calls it. The admin's own account is not a customer record,
+   * and the tabs below would query an empty wishlist and cart for it while showing the
+   * admin's email on a customer detail page.
+   */
+  if (user.role !== ROLES.CUSTOMER) throw new NotFoundError('User not found.')
+
+  const userId = BigInt(id)
+  const term = String(q ?? '').trim()
+  const take = Math.min(Math.max(1, perPage), 100)
+  const currentPage = Math.max(1, page)
+  const skip = (currentPage - 1) * take
+  const direction = String(dir).toLowerCase() === 'asc' ? 'asc' : 'desc'
+
+  const paginate = (total, items) => ({
+    items,
+    pagination: { page: currentPage, perPage: take, total, lastPage: Math.max(1, Math.ceil(total / take)) },
+  })
+
+  const PRODUCT_SELECT = { select: { id: true, title: true, featuredImage: true, sellingPrice: true } }
+
+  if (tab === 'profile') {
+    const [addresses, bankAccounts] = await Promise.all([
+      prisma.userAddress.findMany({ where: { userId }, orderBy: { id: 'desc' } }),
+      prisma.userBankAccount.findMany({ where: { userId }, orderBy: { id: 'desc' } }),
+    ])
+    return { user, tab, addresses, bankAccounts }
+  }
+
+  if (tab === 'cart') {
+    const where = {
+      userId,
+      ...(term ? { product: { title: { contains: term } } } : {}),
+    }
+    const orderBy =
+      sort === 'product'
+        ? { product: { title: direction } }
+        : sort === 'price' || sort === 'total'
+          ? { product: { sellingPrice: direction } }
+          : sort === 'quantity'
+            ? { quantity: direction }
+            : { createdAt: direction }
+
+    const [total, items] = await prisma.$transaction([
+      prisma.cartItem.count({ where }),
+      prisma.cartItem.findMany({ where, include: { product: PRODUCT_SELECT }, orderBy, skip, take }),
+    ])
+    return { user, tab, cart: paginate(total, items) }
+  }
+
+  if (tab === 'orders') {
+    const where = {
+      userId,
+      ...(term
+        ? {
+            OR: [
+              { orderNumber: { contains: term } },
+              { userName: { contains: term } },
+              { userPhone: { contains: term } },
+              { status: { contains: term } },
+            ],
+          }
+        : {}),
+    }
+    const columns = {
+      order_number: 'orderNumber',
+      user_name: 'userName',
+      user_phone: 'userPhone',
+      payable_amount: 'payableAmount',
+      ordered_at: 'orderedAt',
+      status: 'status',
+    }
+
+    const [total, rows] = await prisma.$transaction([
+      prisma.order.count({ where }),
+      prisma.order.findMany({
+        where,
+        orderBy: [{ [columns[sort] ?? 'orderedAt']: direction }, { id: 'desc' }],
+        skip,
+        take,
+      }),
+    ])
+
+    return {
+      user,
+      tab,
+      orders: paginate(
+        total,
+        rows.map((order) => ({
+          id: order.id,
+          orderNumber: order.orderNumber,
+          userName: order.userName,
+          userPhone: order.userPhone,
+          payableAmount: toNumber(order.payableAmount),
+          orderedAt: order.orderedAt ?? order.createdAt,
+          status: order.status,
+          statusLabel: statusLabel(order.status),
+          statusBadgeClass: statusBadgeClass(order.status),
+        })),
+      ),
+    }
+  }
+
+  if (tab === 'reviews') {
+    const where = {
+      userId,
+      ...(term
+        ? {
+            OR: [
+              { comment: { contains: term } },
+              { reviewerName: { contains: term } },
+              { product: { title: { contains: term } } },
+            ],
+          }
+        : {}),
+    }
+    const orderBy =
+      sort === 'product'
+        ? { product: { title: direction } }
+        : sort === 'rating'
+          ? { rating: direction }
+          : sort === 'comment'
+            ? { comment: direction }
+            : { createdAt: direction }
+
+    const [total, items] = await prisma.$transaction([
+      prisma.productReview.count({ where }),
+      prisma.productReview.findMany({ where, include: { product: PRODUCT_SELECT }, orderBy, skip, take }),
+    ])
+    return { user, tab, reviews: paginate(total, items) }
+  }
+
+  // wishlist — the default tab
+  const where = {
+    userId,
+    ...(term ? { product: { title: { contains: term } } } : {}),
+  }
+  const orderBy =
+    sort === 'product'
+      ? { product: { title: direction } }
+      : sort === 'price'
+        ? { product: { sellingPrice: direction } }
+        : { createdAt: direction }
+
+  const [total, items] = await prisma.$transaction([
+    prisma.wishlist.count({ where }),
+    prisma.wishlist.findMany({ where, include: { product: PRODUCT_SELECT }, orderBy, skip, take }),
+  ])
+  return { user, tab: 'wishlist', wishlist: paginate(total, items) }
 }
 
 async function assertEmailFree(email, ignoreId = null) {
@@ -599,7 +793,28 @@ export async function toggleCoupon(id) {
 
 // ══════════════════════════════════════════════ contacts
 
-export async function listSubscribers({ search = '', page = 1, perPage = 50 } = {}) {
+/** Both contact tables sort on their own columns; an unknown one falls back to the date. */
+const SUBSCRIBER_SORTS = { email: 'email', created_at: 'createdAt' }
+const MESSAGE_SORTS = {
+  name: 'name',
+  email: 'email',
+  subject: 'subject',
+  message: 'message',
+  created_at: 'createdAt',
+}
+
+const sortClause = (map, sort, dir, fallback = 'createdAt') => [
+  { [map[sort] ?? fallback]: String(dir).toLowerCase() === 'asc' ? 'asc' : 'desc' },
+  { id: 'desc' },
+]
+
+export async function listSubscribers({
+  search = '',
+  page = 1,
+  perPage = 10,
+  sort = 'created_at',
+  dir = 'desc',
+} = {}) {
   const term = String(search ?? '').trim()
   const where = term ? { email: { contains: term } } : {}
 
@@ -610,7 +825,7 @@ export async function listSubscribers({ search = '', page = 1, perPage = 50 } = 
     prisma.subscriber.count({ where }),
     prisma.subscriber.findMany({
       where,
-      orderBy: { id: 'desc' },
+      orderBy: sortClause(SUBSCRIBER_SORTS, sort, dir),
       skip: (currentPage - 1) * take,
       take,
     }),
@@ -622,7 +837,13 @@ export async function listSubscribers({ search = '', page = 1, perPage = 50 } = 
   }
 }
 
-export async function listContactMessages({ search = '', page = 1, perPage = 25 } = {}) {
+export async function listContactMessages({
+  search = '',
+  page = 1,
+  perPage = 10,
+  sort = 'created_at',
+  dir = 'desc',
+} = {}) {
   const term = String(search ?? '').trim()
   const where = term
     ? {
@@ -641,7 +862,7 @@ export async function listContactMessages({ search = '', page = 1, perPage = 25 
     prisma.contactMessage.count({ where }),
     prisma.contactMessage.findMany({
       where,
-      orderBy: { id: 'desc' },
+      orderBy: sortClause(MESSAGE_SORTS, sort, dir),
       skip: (currentPage - 1) * take,
       take,
     }),
@@ -745,6 +966,7 @@ export async function updateShippingSettings(data) {
 export default {
   listUsers,
   findUser,
+  findUserDetail,
   createUser,
   updateUser,
   deleteUser,

@@ -49,6 +49,24 @@ export function toDateTimeLocal(value) {
   return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`
 }
 
+/** `format('d-m-Y')` — "09-09-2026", the users and contacts lists' date format. */
+export function formatDateDMY(value) {
+  const parts = wallClockParts(value)
+  if (!parts) return ''
+
+  return `${parts.day}-${parts.month}-${parts.year}`
+}
+
+/** `format('h:i A')` — "08:22 AM", the time under the date in the order list. */
+export function formatTime12(value) {
+  const parts = wallClockParts(value)
+  if (!parts) return ''
+
+  const hour24 = Number(parts.hour)
+  const meridiem = hour24 >= 12 ? 'PM' : 'AM'
+  return `${String(hour24 % 12 || 12).padStart(2, '0')}:${parts.minute} ${meridiem}`
+}
+
 /**
  * `format('d-m-Y h:i A')` — "09-08-2026 08:27 PM", the coupon detail's date format.
  *

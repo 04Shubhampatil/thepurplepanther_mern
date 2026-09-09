@@ -5,6 +5,7 @@ import * as accountService from '../../services/account.service.js'
 import { ok, created, asyncHandler } from '../../utils/api-response.js'
 import { BANNER_SECTIONS } from '../../constants/cms.js'
 import { STATUS_LABELS } from '../../constants/order-statuses.js'
+import { ROLES } from '../../constants/roles.js'
 
 /** Admin handlers for the modules that need more than the CRUD factory. */
 
@@ -143,8 +144,12 @@ export const orderIndex = asyncHandler(async (req, res) =>
     await orderAdmin.listOrders({
       search: req.query.search ?? '',
       status: req.query.status ?? null,
+      // "DD-MM-YYYY" from the Filter by Date field, matching its placeholder.
+      date: req.query.date ?? null,
       page: intParam(req.query.page, 1),
-      perPage: intParam(req.query.per_page, 20),
+      perPage: intParam(req.query.per_page, 10),
+      sort: req.query.sort ?? 'ordered_at',
+      dir: req.query.dir ?? 'desc',
     }),
     'Orders',
   ),
@@ -208,9 +213,14 @@ export const userIndex = asyncHandler(async (req, res) =>
     res,
     await miscAdmin.listUsers({
       search: req.query.search ?? '',
-      role: req.query.role ?? null,
+      // `User::query()->where('role', 'customer')` — the admin's own account is not a row
+      // in the customer list, and letting `?role=` override that would expose it.
+      role: ROLES.CUSTOMER,
       page: intParam(req.query.page, 1),
-      perPage: intParam(req.query.per_page, 20),
+      // The per-page select offers 10/25/50/100 and Laravel defaulted to 10, not 20.
+      perPage: intParam(req.query.per_page, 10),
+      sort: req.query.sort ?? 'created_at',
+      dir: req.query.dir ?? 'desc',
     }),
     'Users',
   ),
@@ -218,6 +228,22 @@ export const userIndex = asyncHandler(async (req, res) =>
 
 export const userShow = asyncHandler(async (req, res) =>
   ok(res, { item: await miscAdmin.findUser(req.params.id) }, 'User'),
+)
+
+/** The detail screen — the user plus whichever tab is open, as UserController::show did. */
+export const userDetail = asyncHandler(async (req, res) =>
+  ok(
+    res,
+    await miscAdmin.findUserDetail(req.params.id, {
+      tab: req.query.tab ?? 'wishlist',
+      q: req.query.q ?? '',
+      page: intParam(req.query.page, 1),
+      perPage: intParam(req.query.per_page, 10),
+      sort: req.query.sort ?? 'created_at',
+      dir: req.query.dir ?? 'desc',
+    }),
+    'User detail',
+  ),
 )
 
 export const userStore = asyncHandler(async (req, res) =>
@@ -350,13 +376,24 @@ export const contactIndex = asyncHandler(async (req, res) =>
   ok(
     res,
     {
+      /*
+       * Both tabs are fetched together, as ContactController did — the tab is a view
+       * concern and switching it should not cost a round trip. Search, sort and per-page
+       * are per-tab, which is why each carries its own prefixed parameters.
+       */
       subscribers: await miscAdmin.listSubscribers({
-        search: req.query.search ?? '',
+        search: req.query.subscribers_search ?? req.query.search ?? '',
         page: intParam(req.query.subscribers_page, 1),
+        perPage: intParam(req.query.subscribers_per_page, 10),
+        sort: req.query.subscribers_sort ?? 'created_at',
+        dir: req.query.subscribers_dir ?? 'desc',
       }),
       messages: await miscAdmin.listContactMessages({
-        search: req.query.search ?? '',
+        search: req.query.messages_search ?? req.query.search ?? '',
         page: intParam(req.query.messages_page, 1),
+        perPage: intParam(req.query.messages_per_page, 10),
+        sort: req.query.messages_sort ?? 'created_at',
+        dir: req.query.messages_dir ?? 'desc',
       }),
     },
     'Contacts',
@@ -434,6 +471,7 @@ export default {
   orderStatuses,
   userIndex,
   userShow,
+  userDetail,
   userStore,
   userUpdate,
   userDestroy,

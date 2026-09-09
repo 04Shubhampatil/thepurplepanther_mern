@@ -48,7 +48,7 @@ const app = (await import('../src/app.js')).default
 const account = await import('../src/services/account.service.js')
 const { signAuthToken, AUTH_COOKIE } = await import('../src/utils/auth-token.js')
 const { hashPassword } = await import('../src/utils/password.js')
-const { nextOptions, canTransition, normaliseStatus, statusLabel } = await import(
+const { nextOptions, canTransition, normaliseStatus, statusLabel, statusBadgeClass } = await import(
   '../src/constants/order-statuses.js'
 )
 
@@ -594,10 +594,24 @@ describe('order status machine', () => {
     expect(canTransition('packed', 'placed')).toBe(false)
   })
 
-  it('folds legacy `pending` into `placed`', () => {
+  it('folds legacy `pending` into `placed` for TRANSITIONS only', () => {
     expect(normaliseStatus('pending')).toBe('placed')
-    expect(statusLabel('pending')).toBe('Placed')
     expect(canTransition('pending', 'packed')).toBe(true)
+  })
+
+  it('labels a pending order "Pending", not "Placed"', () => {
+    // OrderStatuses::label misses the map for `pending` and falls through to ucfirst, so
+    // every screen reads "Pending". Calling it "Placed" claims payment has gone through.
+    expect(statusLabel('pending')).toBe('Pending')
+    expect(statusLabel('placed')).toBe('Placed')
+  })
+
+  it('gives a pending order the placed pill, since badgeClass has no pending case', () => {
+    expect(statusBadgeClass('pending')).toBe('badge-placed')
+    expect(statusBadgeClass('placed')).toBe('badge-placed')
+    expect(statusBadgeClass('shipped')).toBe('badge-shipped')
+    expect(statusBadgeClass('delivered')).toBe('badge-delivered')
+    expect(statusBadgeClass('cancelled')).toBe('badge-cancelled')
   })
 })
 

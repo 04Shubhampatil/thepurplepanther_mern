@@ -6,6 +6,7 @@ import {
   PAYMENT_STATUSES,
   normaliseStatus,
   statusLabel,
+  statusBadgeClass,
   nextOptions,
   canTransition,
   defaultMessage,
@@ -30,11 +31,51 @@ const ORDER_INCLUDE = {
   user: { select: { id: true, name: true, email: true, phone: true } },
 }
 
-export async function listOrders({ search = '', status = null, page = 1, perPage = 20 } = {}) {
+/** The sortable columns of the admin order table, mapped to their Prisma names. */
+const ORDER_SORTS = {
+  order_number: 'orderNumber',
+  user_name: 'userName',
+  user_phone: 'userPhone',
+  ordered_at: 'orderedAt',
+  status: 'status',
+}
+
+/**
+ * The Date filter sends "DD-MM-YYYY", matching the field's own placeholder.
+ *
+ * It is a WHOLE DAY, so the comparison is a half-open range on the local day rather than an
+ * equality test — `ordered_at` is a timestamp and no order lands exactly on midnight.
+ * Read as a wall clock for the same reason the journal's dates are: the column carries no
+ * zone, so shifting by the server's offset would file an evening order under the next day.
+ */
+function dayRange(value) {
+  const match = /^(\d{2})-(\d{2})-(\d{4})$/.exec(String(value ?? '').trim())
+  if (!match) return null
+
+  const [, day, month, year] = match
+  const start = new Date(`${year}-${month}-${day}T00:00:00Z`)
+  if (Number.isNaN(start.getTime())) return null
+
+  const end = new Date(start)
+  end.setUTCDate(end.getUTCDate() + 1)
+  return { gte: start, lt: end }
+}
+
+export async function listOrders({
+  search = '',
+  status = null,
+  date = null,
+  page = 1,
+  perPage = 10,
+  sort = 'ordered_at',
+  dir = 'desc',
+} = {}) {
   const term = String(search ?? '').trim()
+  const orderedAt = dayRange(date)
 
   const where = {
     ...(status ? { status } : {}),
+    ...(orderedAt ? { orderedAt } : {}),
     ...(term
       ? {
           OR: [
@@ -50,13 +91,15 @@ export async function listOrders({ search = '', status = null, page = 1, perPage
 
   const take = Math.min(Math.max(1, perPage), 100)
   const currentPage = Math.max(1, page)
+  const column = ORDER_SORTS[sort] ?? 'orderedAt'
+  const direction = String(dir).toLowerCase() === 'asc' ? 'asc' : 'desc'
 
   const [total, rows] = await prisma.$transaction([
     prisma.order.count({ where }),
     prisma.order.findMany({
       where,
       include: { items: { select: { id: true, quantity: true } } },
-      orderBy: [{ orderedAt: 'desc' }, { id: 'desc' }],
+      orderBy: [{ [column]: direction }, { id: 'desc' }],
       skip: (currentPage - 1) * take,
       take,
     }),
@@ -71,6 +114,7 @@ export async function listOrders({ search = '', status = null, page = 1, perPage
       userPhone: order.userPhone,
       status: order.status,
       statusLabel: statusLabel(order.status),
+      statusBadgeClass: statusBadgeClass(order.status),
       paymentStatus: order.paymentStatus,
       paymentMode: order.paymentMode,
       payableAmount: toNumber(order.payableAmount),

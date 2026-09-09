@@ -96,6 +96,11 @@ packed `#e3f2fd/#1565c0`, shipped `#fff3e0/#ef6c00`, delivered `#e8f5e9/#2e7d32`
 | Coupons (index) | `latest()` ordering + 5-column search + `paginate(9)` | ✅ dark card grid | ✅ |
 | Coupons (detail) | unchanged | ✅ hero + definition grid | ✅ |
 | Coupons (create / edit) | offer-type enum, derived discount_type, conditional nulling, form-data | ✅ 20 rows + 5 conditionals | ✅ |
+| Users (index) | customer-only filter, sorting, platform + avatar | ✅ panel + bulk + sortable table | ✅ |
+| Users (detail) | new `/users/:id/detail`, one tab per request | ✅ banner + 5 tabs | ✅ |
+| Orders (index) | sorting, date filter, statusBadgeClass, pending label | ✅ filters + bulk + sortable table | ✅ |
+| Orders (status modal) | unchanged | ✅ delivery date + timeline + form | ✅ |
+| Contacts | per-tab search / sort / per-page | ✅ two tabs, two tables | ✅ |
 | Home Sections | unchanged | ✅ two-product picker | pending |
 
 ### Stylesheet isolation
@@ -296,6 +301,46 @@ Two seeded-data notes, both faithful rather than broken: `storage/coupons/seed-p
 is a 334-byte stub with no decodable image data, so the cards paint flat #333 and the form's
 preview shows its alt text — Laravel does the same, since `Storage::exists` is true and the
 browser simply cannot decode the file.
+
+### Users, Orders and Contacts — one shared table kit, and a label that was lying
+
+These three screens use `.admin-table`, NOT the `.table` the master-data screens use: 10px/12px
+cells at 13px on a #f0f0f0 rule, with a #fafafa head in 700 weight #666. Both exist in the
+source and they are not interchangeable, so components/admin/AdminTable.jsx carries the second
+set — plus `SortTh`, the 32px `.action-sq` squares, the per-page select, Select All and the
+bulk Action menu.
+
+`SortTh` is worth reading before changing: clicking an INACTIVE column starts it ascending,
+and only a second click on the already-active column flips it. That is `sort-link.blade.php`'s
+`$nextDir`, and it is not a plain toggle.
+
+**A pending order was being labelled "Placed".** `OrderStatuses::label` misses the map for
+`pending` and falls through to `ucfirst`, so Laravel showed PENDING; the port normalised first
+and showed PLACED — a different claim, that payment has gone through. Only TRANSITIONS fold
+pending into placed (`nextOptions`, `canTransition`); the label and the badge class both key
+off the RAW status, which is why a pending and a placed order share the grey pill while their
+labels differ. `statusBadgeClass` is now ported too, so the pills are the source's five
+colours rather than an approximation.
+
+**Sorting and filtering are server-side everywhere here**, because every one of these tables
+is paginated: ordering the ten rows on screen would order the wrong ten, and the order Date
+filter has to run against the whole set to find that day's orders at all. The date arrives as
+"DD-MM-YYYY" and is matched as a half-open range on the day — `ordered_at` is a timestamp and
+no order lands exactly on midnight — read as a wall clock for the same reason the journal's
+dates are.
+
+**Users are customers only.** `UserController` opens with `where('role', 'customer')` and
+every method calls `ensureCustomer`, which 404s anything else. The list now filters on the
+server rather than accepting `?role=`, and the detail endpoint refuses a non-customer — without
+it the admin's own account rendered as a customer page with an empty wishlist and cart.
+
+The user detail fetches ONE tab per request, as UserController queried one: a customer with
+hundreds of orders should not pay for their wishlist, cart and reviews to render a page that
+shows none of them.
+
+The status modal's hint is three fixed strings from order-admin.js, not a list built from the
+options — a packed or shipped order shows no hint at all — and Save is disabled outright once
+an order reaches a terminal status.
 
 ## 4. Known issues / blockers
 

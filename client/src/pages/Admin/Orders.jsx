@@ -1,459 +1,320 @@
-import { useState } from 'react'
-import { ArrowUpDown, Pencil, Eye, Trash2, ChevronDown } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { Wrench, Printer, Trash2 } from 'lucide-react'
 import { useApi } from '../../hooks/useApi.js'
+import { ConfirmDialog, Pagination } from '../../components/admin/AdminUI.jsx'
+import {
+  DataTable,
+  DataTh,
+  DataTd,
+  SortTh,
+  ActionSquare,
+  PanelSearch,
+  PerPageSelect,
+  SelectAll,
+  BulkActions,
+  PaginationInfo,
+} from '../../components/admin/AdminTable.jsx'
+import OrderStatusModal from '../../components/admin/OrderStatusModal.jsx'
+import { formatDateDMY, formatTime12 } from '../../utils/admin-date.js'
+import { usePageTitle } from '../../theme/page.js'
+import { toast } from '../../store/toast.js'
 import * as api from '../../services/endpoints.js'
-import Loading from '../../components/common/Loading.jsx'
-import ErrorMessage from '../../components/common/ErrorMessage.jsx'
-import Pagination from '../../components/common/Pagination.jsx'
-import Modal from '../../components/ui/Modal.jsx'
-import Alert from '../../components/ui/Alert.jsx'
-import { formatDate } from '../../utils/format.js'
-import { AdminPage, AdminButton, CONTROL } from '../../components/admin/AdminUI.jsx'
-
-const STATUSES = ['pending', 'placed', 'packed', 'shipped', 'delivered', 'cancelled']
 
 /**
- * Order management.
+ * admin/orders/index.blade.php.
  *
- * The status dropdown is populated from the SERVER's `nextOptions` for that order, so the
- * UI can only ever offer a legal transition — and the server refuses anything else
- * regardless. `delivered` and `cancelled` are terminal, so their option lists are empty.
+ * The `.product-panel` head carries search and per-page; the row below splits into the two
+ * `.order-filters` selects on the left and Select All plus the bulk Action menu on the
+ * right. Then `.admin-table.orders-table`.
+ *
+ * Filtering and sorting are BOTH server-side. The table is paginated, so ordering the ten
+ * rows on screen would order the wrong ten, and the Date filter has to run against the
+ * whole set to find the orders on that day at all.
+ *
+ * `status_label` and `status_badge_class` are accessors over OrderStatuses. Neither
+ * normalises `pending`, so a freshly created order reads PENDING in the placed pill —
+ * the label says payment has not landed while the colour says nothing has gone wrong.
  */
+const BULK_ITEMS = [{ value: 'delete', label: 'Delete', confirm: 'Action: Delete' }]
+
+/** `.status-badge` variants, straight from OrderStatuses::badgeClass. */
+const BADGE_CLASSES = {
+  'badge-placed': 'bg-[#eceff1] text-[#546e7a]',
+  'badge-packed': 'bg-[#e3f2fd] text-[#1565c0]',
+  'badge-shipped': 'bg-[#fff3e0] text-[#ef6c00]',
+  'badge-delivered': 'bg-[#e8f5e9] text-[#2e7d32]',
+  'badge-cancelled': 'bg-[#ffebee] text-[#c62828]',
+}
+
 export default function Orders() {
-  const [page, setPage] = useState(1)
+  usePageTitle('Order List - Purple Panther')
+
+  const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
   const [date, setDate] = useState('')
-  const [sort, setSort] = useState({ key: 'orderedAt', dir: 'desc' })
+  const [page, setPage] = useState(1)
+  const [perPage, setPerPage] = useState(10)
+  const [sort, setSort] = useState({ key: 'ordered_at', dir: 'desc' })
   const [checked, setChecked] = useState([])
-  const [actionOpen, setActionOpen] = useState(false)
-  const [selected, setSelected] = useState(null)
-  const [statusData, setStatusData] = useState(null)
-  const [notice, setNotice] = useState(null)
+  const [confirm, setConfirm] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [manageId, setManageId] = useState(null)
 
-  const { data, error, loading, refetch } = useApi(
+  const { data, loading, refetch } = useApi(
     () =>
       api.admin.orders.list({
-        page,
+        search,
         status: status || undefined,
         date: date || undefined,
+        page,
+        per_page: perPage,
         sort: sort.key,
         dir: sort.dir,
       }),
-    [page, status, date, sort],
+    [search, status, date, page, perPage, sort],
   )
+  const { data: statusList } = useApi(() => api.admin.orders.statuses(), [])
 
   const items = data?.items ?? []
-  const allChecked = items.length > 0 && items.every((o) => checked.includes(o.id))
+  const pagination = data?.pagination ?? { page: 1, lastPage: 1, total: 0, perPage }
+  const statuses = statusList?.statuses ?? []
 
-  const toggleAll = () => setChecked(allChecked ? [] : items.map((o) => o.id))
+  const ids = useMemo(() => items.map((order) => String(order.id)), [items])
+  const allChecked = ids.length > 0 && ids.every((id) => checked.includes(id))
+
+  const toggleAll = () => setChecked(allChecked ? [] : ids)
   const toggleOne = (id) =>
-    setChecked((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+    setChecked((prev) => (prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id]))
 
-  const toggleSort = (key) =>
-    setSort((prev) =>
-      prev.key === key ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' },
-    )
-
-  const openOrder = async (order) => {
-    const [detail, statuses] = await Promise.all([
-      api.admin.orders.show(order.id),
-      api.admin.orders.statusData(order.id),
-    ])
-    setSelected(detail.order)
-    setStatusData(statuses)
+  function onSort(key, dir) {
+    setSort({ key, dir })
+    setPage(1)
   }
 
-  const closeOrder = () => {
-    setSelected(null)
-    setStatusData(null)
-  }
-
-  const changeStatus = async (nextStatus) => {
-    setNotice(null)
-    try {
-      await api.admin.orders.updateStatus(selected.id, { status: nextStatus })
-      setNotice(`Order ${selected.orderNumber} updated. The customer has been emailed.`)
-      closeOrder()
-      refetch()
-    } catch (err) {
-      setNotice(err.message)
+  function onBulk(item) {
+    if (checked.length === 0) {
+      toast.error('Please select at least one order.')
+      return
     }
+    setConfirm({ kind: 'bulk', action: item.value, title: item.confirm })
   }
 
-  const setDeliveryDate = async (value) => {
-    setNotice(null)
+  async function runBulk(action) {
+    setBusy(true)
     try {
-      await api.admin.orders.updateDeliveryDate(selected.id, value)
-      setNotice('Delivery date updated. The customer has been emailed.')
-      refetch()
-    } catch (err) {
-      setNotice(err.message)
-    }
-  }
-
-  const deleteOrder = async (order) => {
-    if (!window.confirm(`Delete order ${order.orderNumber}? This cannot be undone.`)) return
-    setNotice(null)
-    try {
-      await api.admin.orders.remove(order.id)
-      setNotice(`Order ${order.orderNumber} deleted.`)
-      setChecked((prev) => prev.filter((id) => id !== order.id))
-      refetch()
-    } catch (err) {
-      setNotice(err.message)
-    }
-  }
-
-  const bulkDelete = async () => {
-    setActionOpen(false)
-    if (checked.length === 0) return
-    if (!window.confirm(`Delete ${checked.length} selected order(s)? This cannot be undone.`)) return
-    setNotice(null)
-    try {
-      await Promise.all(checked.map((id) => api.admin.orders.remove(id)))
-      setNotice(`${checked.length} order(s) deleted.`)
+      const res = await api.admin.orders.bulk(action, checked.map(Number))
+      toast.success(res.$message)
       setChecked([])
       refetch()
     } catch (err) {
-      setNotice(err.message)
+      toast.error(err.message)
+    } finally {
+      setBusy(false)
+      setConfirm(null)
     }
   }
 
-  if (loading && !data) return <Loading full />
-  if (error) return <ErrorMessage error={error} onRetry={refetch} />
-
-  const money = (value) => `₹ ${Number(value).toFixed(2)}`
-
-  const statusClass = (value) => {
-    if (value === 'shipped') return 'bg-amber-50 text-amber-600'
-    if (value === 'delivered') return 'bg-emerald-50 text-emerald-700'
-    if (value === 'cancelled') return 'bg-rose-50 text-rose-600'
-    return 'bg-gray-100 text-gray-600'
+  async function runDelete(id) {
+    setBusy(true)
+    try {
+      toast.success((await api.admin.orders.remove(id)).$message)
+      setChecked((prev) => prev.filter((v) => v !== String(id)))
+      refetch()
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setBusy(false)
+      setConfirm(null)
+    }
   }
 
-  const timeOf = (value) =>
-    new Date(value).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
-
   return (
-    <AdminPage title="Orders">
-      {notice && (
-        <Alert tone="info" className="mb-5">
-          {notice}
-        </Alert>
-      )}
+    <>
+      {/* `.product-panel` */}
+      <div className="mb-[18px] rounded-[10px] bg-white px-5 py-[18px] shadow-[0_1px_4px_rgba(0,0,0,0.04)] max-sm:p-3.5">
+        <div className="flex flex-wrap items-center justify-between gap-4 pb-4 max-sm:flex-col max-sm:items-stretch">
+          <h2 className="text-[22px] font-semibold text-[#444]">Order List</h2>
 
-      {/* Filter bar */}
-      <div className="mb-6 rounded-lg bg-white p-6 shadow-sm">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div className="flex flex-wrap gap-4">
-            <div>
-              <label htmlFor="order-status" className="mb-2 block text-[14px] text-gray-500">
+          <div className="flex flex-wrap items-center gap-3 max-sm:w-full">
+            <PanelSearch value={search} onChange={(v) => { setSearch(v); setPage(1) }} />
+            <PerPageSelect value={perPage} onChange={(n) => { setPerPage(n); setPage(1) }} />
+          </div>
+        </div>
+
+        {/* `.product-panel-bottom` — filters left, bulk actions right */}
+        <div className="flex flex-wrap items-end justify-between gap-4 pt-1">
+          {/* `.order-filters` — 38px controls at 4px radius, label 12px/600 #777 above */}
+          <div className="flex flex-wrap gap-3.5">
+            <div className="flex flex-col gap-1">
+              <label htmlFor="order-status" className="text-[12px] font-semibold text-[#777]">
                 Filter by Status
               </label>
               <select
                 id="order-status"
                 value={status}
-                onChange={(e) => {
-                  setStatus(e.target.value)
-                  setPage(1)
-                }}
-                className={`${CONTROL} h-12 w-[200px] capitalize`}
+                onChange={(event) => { setStatus(event.target.value); setPage(1) }}
+                className="h-[38px] min-w-[160px] rounded border border-[#ddd] bg-white px-3 text-[13px] text-[#555] outline-none"
               >
                 <option value="">---All---</option>
-                {STATUSES.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
+                {statuses.map((entry) => (
+                  <option key={entry.value} value={entry.value}>{entry.label}</option>
                 ))}
               </select>
             </div>
 
-            <div>
-              <label htmlFor="order-date" className="mb-2 block text-[14px] text-gray-500">
+            <div className="flex flex-col gap-1">
+              <label htmlFor="order-date" className="text-[12px] font-semibold text-[#777]">
                 Filter by Date
               </label>
+              {/*
+                A TEXT field, as in the Blade — Laravel bound a date picker to it and the
+                value it submits is DD-MM-YYYY. A native `date` input would submit
+                YYYY-MM-DD and show the browser's own format instead of the placeholder.
+              */}
               <input
                 id="order-date"
-                type="date"
+                type="text"
                 value={date}
+                onChange={(event) => { setDate(event.target.value); setPage(1) }}
                 placeholder="DD-MM-YYYY"
-                onChange={(e) => {
-                  setDate(e.target.value)
-                  setPage(1)
-                }}
-                className={`${CONTROL} h-12 w-[230px]`}
+                autoComplete="off"
+                className="h-[38px] min-w-[160px] rounded border border-[#ddd] bg-white px-3 text-[13px] text-[#555] outline-none"
               />
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            <label className="flex cursor-pointer items-center gap-2 text-[15px] font-medium text-gray-600">
-              <input
-                type="checkbox"
-                checked={allChecked}
-                onChange={toggleAll}
-                className="h-4 w-4 rounded border-gray-300"
-              />
-              Select All
-            </label>
-
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setActionOpen((v) => !v)}
-                aria-haspopup="menu"
-                aria-expanded={actionOpen}
-                className="flex h-12 items-center gap-2 rounded-md bg-pink-600 px-6 text-[15px] font-semibold text-white hover:bg-pink-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-300"
-              >
-                Action
-                <ChevronDown size={14} strokeWidth={2.5} aria-hidden="true" />
-              </button>
-              {actionOpen && (
-                <ul
-                  role="menu"
-                  className="absolute right-0 z-10 mt-2 w-44 overflow-hidden rounded-md border border-gray-200 bg-white py-1 text-[14px] shadow-lg"
-                >
-                  <li role="none">
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={bulkDelete}
-                      disabled={checked.length === 0}
-                      className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      Delete selected
-                    </button>
-                  </li>
-                </ul>
-              )}
-            </div>
+          <div className="flex flex-wrap items-center gap-3.5">
+            <SelectAll checked={allChecked} indeterminate={checked.length > 0} onChange={toggleAll} />
+            <BulkActions items={BULK_ITEMS} onSelect={onBulk} />
           </div>
         </div>
       </div>
 
-      {/* Orders table */}
-      <div className="rounded-lg bg-white p-6 shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-[15px]">
-            <caption className="sr-only">Orders</caption>
-            <thead className="bg-gray-50 text-gray-700">
+      <div className="rounded-[10px] bg-white p-[18px] shadow-admin-card">
+        <DataTable caption="Orders">
+          <thead>
+            <tr>
+              <DataTh className="w-10">
+                <span className="sr-only">Select</span>
+              </DataTh>
+              <SortTh column="order_number" label="Order ID" sort={sort.key} dir={sort.dir} onSort={onSort} />
+              <SortTh column="user_name" label="User Name" sort={sort.key} dir={sort.dir} onSort={onSort} />
+              <SortTh column="user_phone" label="User Phone" sort={sort.key} dir={sort.dir} onSort={onSort} />
+              <SortTh column="ordered_at" label="Ordered On" sort={sort.key} dir={sort.dir} onSort={onSort} />
+              <SortTh column="status" label="Status" sort={sort.key} dir={sort.dir} onSort={onSort} />
+              <DataTh>Action</DataTh>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
               <tr>
-                <th scope="col" className="w-12 px-4 py-4">
-                  <span className="sr-only">Select</span>
-                </th>
-                <SortTh label="Order ID" sortKey="orderNumber" sort={sort} onSort={toggleSort} />
-                <SortTh label="User Name" sortKey="userName" sort={sort} onSort={toggleSort} />
-                <SortTh label="User Phone" sortKey="userPhone" sort={sort} onSort={toggleSort} />
-                <SortTh label="Ordered On" sortKey="orderedAt" sort={sort} onSort={toggleSort} />
-                <SortTh label="Status" sortKey="status" sort={sort} onSort={toggleSort} />
-                <th scope="col" className="px-4 py-4 font-semibold">
-                  Action
-                </th>
+                <DataTd colSpan={7} className="py-6 text-center text-admin-muted">Loading…</DataTd>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {items.map((order) => (
-                <tr key={order.id} className="align-middle">
-                  <td className="px-4 py-4">
-                    <input
-                      type="checkbox"
-                      checked={checked.includes(order.id)}
-                      onChange={() => toggleOne(order.id)}
-                      aria-label={`Select order ${order.orderNumber}`}
-                      className="h-4 w-4 rounded border-gray-300"
-                    />
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-4">
-                    <button
-                      type="button"
-                      onClick={() => openOrder(order)}
-                      className="font-semibold text-blue-600 hover:underline"
-                    >
-                      {order.orderNumber}
-                    </button>
-                  </td>
-                  <td className="px-4 py-4 text-gray-700">{order.userName}</td>
-                  <td className="whitespace-nowrap px-4 py-4 text-gray-700">
-                    {order.userPhone ?? order.shippingPhone ?? '—'}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-4 text-gray-700">
-                    {formatDate(order.orderedAt)}
-                    <span className="mt-0.5 block text-[13px] text-gray-400">
-                      {timeOf(order.orderedAt)}
-                    </span>
-                  </td>
-                  <td className="px-4 py-4">
-                    <span
-                      className={`inline-block rounded-full px-3 py-1 text-[12px] font-bold uppercase tracking-wide ${statusClass(order.status)}`}
-                    >
-                      {order.statusLabel ?? order.status}
-                    </span>
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-4">
-                    <div className="flex items-center gap-2">
-                      <IconButton
-                        label={`Edit order ${order.orderNumber}`}
-                        className="bg-[#ff6f4e] hover:bg-[#f45c3a]"
-                        onClick={() => openOrder(order)}
+            ) : items.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="p-6 text-center text-[#888]">No orders found.</td>
+              </tr>
+            ) : (
+              items.map((order) => {
+                const id = String(order.id)
+                return (
+                  <tr key={id}>
+                    <DataTd>
+                      <input
+                        type="checkbox"
+                        checked={checked.includes(id)}
+                        onChange={() => toggleOne(id)}
+                        aria-label={`Select order ${order.orderNumber}`}
+                        className="size-[15px] accent-admin-primary"
+                      />
+                    </DataTd>
+                    <DataTd>
+                      <Link
+                        to={`/admin/orders/${id}`}
+                        className="font-semibold text-[#1e88e5] hover:underline"
                       >
-                        <Pencil size={14} />
-                      </IconButton>
-                      <IconButton
-                        label={`View order ${order.orderNumber}`}
-                        className="bg-[#4fc3f7] hover:bg-[#33b5f1]"
-                        onClick={() => openOrder(order)}
+                        {order.orderNumber}
+                      </Link>
+                    </DataTd>
+                    <DataTd>{order.userName || '—'}</DataTd>
+                    <DataTd className="whitespace-nowrap">{order.userPhone || '—'}</DataTd>
+                    {/* `.ordered-on-cell` — the date over a #888 time */}
+                    <DataTd className="whitespace-nowrap">
+                      <div className="flex flex-col gap-0.5">
+                        <span>{formatDateDMY(order.orderedAt)}</span>
+                        <small className="text-[#888]">{formatTime12(order.orderedAt)}</small>
+                      </div>
+                    </DataTd>
+                    <DataTd>
+                      {/* `.status-badge` — 11px/700 pill, uppercased in the Blade */}
+                      <span
+                        className={`inline-block rounded-full px-3 py-1 text-[11px] font-bold tracking-[0.02em] ${
+                          BADGE_CLASSES[order.statusBadgeClass] ?? BADGE_CLASSES['badge-placed']
+                        }`}
                       >
-                        <Eye size={14} />
-                      </IconButton>
-                      <IconButton
-                        label={`Delete order ${order.orderNumber}`}
-                        className="bg-[#ff6f4e] hover:bg-[#f45c3a]"
-                        onClick={() => deleteOrder(order)}
-                      >
-                        <Trash2 size={14} />
-                      </IconButton>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-
-              {items.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-gray-500">
-                    No orders found.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <Pagination pagination={data?.pagination} onPage={setPage} />
+                        {String(order.statusLabel ?? order.status).toUpperCase()}
+                      </span>
+                    </DataTd>
+                    <DataTd>
+                      <div className="flex items-center gap-1.5">
+                        {/* `.action-status` is #ff7043, the same orange as delete — the
+                            original's choice, and the icons are what separate them. */}
+                        <ActionSquare tone="delete" title="Update Status" onClick={() => setManageId(order.id)}>
+                          <Wrench size={15} />
+                        </ActionSquare>
+                        <ActionSquare
+                          as="a"
+                          href={`/admin/orders/${id}/print`}
+                          target="_blank"
+                          rel="noreferrer"
+                          tone="view"
+                          title="Print"
+                          className="!bg-[#4fc3f7] hover:!bg-[#29b6f6]"
+                        >
+                          <Printer size={15} />
+                        </ActionSquare>
+                        <ActionSquare
+                          tone="delete"
+                          title="Delete"
+                          onClick={() => setConfirm({ kind: 'row', id: order.id, title: 'Are you sure?' })}
+                        >
+                          <Trash2 size={15} />
+                        </ActionSquare>
+                      </div>
+                    </DataTd>
+                  </tr>
+                )
+              })
+            )}
+          </tbody>
+        </DataTable>
       </div>
 
-      {/* Manage order modal (unchanged behaviour) */}
-      <Modal
-        open={Boolean(selected && statusData)}
-        onClose={closeOrder}
-        title={selected ? `Order ${selected.orderNumber}` : ''}
-      >
-        {selected && statusData && (
-          <div className="space-y-7">
-            <p className="text-[14px] text-body">
-              {selected.shippingName} · {selected.shippingPhone} · {selected.shippingEmail}
-            </p>
-
-            <section>
-              <h3 className="pp-eyebrow text-ink">Items</h3>
-              <ul className="mt-3 divide-y divide-line border-y border-line">
-                {selected.items.map((item) => (
-                  <li key={item.id} className="flex justify-between gap-4 py-2.5 text-[14px]">
-                    <span className="text-ink">
-                      {item.productTitle}
-                      <span className="text-body"> × {item.quantity}</span>
-                    </span>
-                    <span className="shrink-0 text-ink">{money(item.totalPrice)}</span>
-                  </li>
-                ))}
-              </ul>
-            </section>
-
-            <section>
-              <h3 className="pp-eyebrow text-ink">Status</h3>
-              <p className="mt-2 text-[14px] text-body">
-                Current:{' '}
-                <strong className="font-semibold text-ink">{statusData.statusLabel}</strong>
-              </p>
-
-              {statusData.options.length > 0 ? (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {statusData.options.map((option) => (
-                    <AdminButton key={option.value} onClick={() => changeStatus(option.value)}>
-                      Mark {option.label}
-                    </AdminButton>
-                  ))}
-                </div>
-              ) : (
-                <p className="mt-2 text-[14px] text-body">
-                  This order is {statusData.statusLabel.toLowerCase()} and cannot be changed
-                  further.
-                </p>
-              )}
-            </section>
-
-            <section>
-              <h3 className="pp-eyebrow text-ink">Expected delivery</h3>
-              <label htmlFor="order-delivery-date" className="sr-only">
-                Expected delivery date
-              </label>
-              <input
-                id="order-delivery-date"
-                type="date"
-                defaultValue={
-                  statusData.expectedDeliveryDate
-                    ? new Date(statusData.expectedDeliveryDate).toISOString().slice(0, 10)
-                    : ''
-                }
-                onBlur={(e) => e.target.value && setDeliveryDate(e.target.value)}
-                className={`${CONTROL} mt-3 w-[220px]`}
-              />
-            </section>
-
-            <section>
-              <h3 className="pp-eyebrow text-ink">History</h3>
-              <ul className="mt-3 space-y-3">
-                {statusData.logs.map((log) => (
-                  <li key={log.id} className="border-l-2 border-line pl-4 text-[14px]">
-                    <strong className="font-semibold text-ink">{log.title}</strong>
-                    <span className="text-body"> — {log.description}</span>
-                    <span className="mt-0.5 block text-[12px] text-body">
-                      {formatDate(log.loggedAt)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          </div>
-        )}
-      </Modal>
-    </AdminPage>
-  )
-}
-
-function SortTh({ label, sortKey, sort, onSort }) {
-  const active = sort.key === sortKey
-  return (
-    <th
-      scope="col"
-      aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
-      className="px-4 py-4 font-semibold"
-    >
-      <button
-        type="button"
-        onClick={() => onSort(sortKey)}
-        className="inline-flex items-center gap-1.5 hover:text-gray-900"
-      >
-        {label}
-        <ArrowUpDown
-          size={12}
-          aria-hidden="true"
-          className={active ? 'text-gray-700' : 'text-gray-400'}
+      <div className="mt-[18px] flex w-full flex-wrap items-center justify-between gap-3">
+        <PaginationInfo pagination={pagination} />
+        <Pagination
+          page={pagination.page}
+          lastPage={pagination.lastPage}
+          total={pagination.total}
+          perPage={pagination.perPage}
+          onChange={setPage}
         />
-      </button>
-    </th>
-  )
-}
+      </div>
 
-function IconButton({ label, className, onClick, children }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={label}
-      title={label}
-      className={`inline-flex h-9 w-9 items-center justify-center rounded-md text-white shadow-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 ${className}`}
-    >
-      {children}
-    </button>
+      <OrderStatusModal
+        orderId={manageId}
+        onClose={() => setManageId(null)}
+        onSaved={refetch}
+      />
+
+      <ConfirmDialog
+        open={confirm !== null}
+        title={confirm?.title}
+        onCancel={() => setConfirm(null)}
+        onProceed={() => (confirm.kind === 'bulk' ? runBulk(confirm.action) : runDelete(confirm.id))}
+        busy={busy}
+      />
+    </>
   )
 }

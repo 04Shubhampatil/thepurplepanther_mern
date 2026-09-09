@@ -35,9 +35,37 @@ export function normaliseStatus(status) {
   return value === 'pending' ? ORDER_STATUSES.PLACED : value
 }
 
+/**
+ * `OrderStatuses::label` — and it does NOT normalise.
+ *
+ * `label('pending')` misses the map and falls through to `ucfirst`, so a freshly created
+ * order reads "Pending" everywhere it is displayed — the admin list, the account area and
+ * the order page alike. Normalising here showed those orders as "Placed", which is a
+ * different claim: that payment has gone through.
+ *
+ * Only TRANSITIONS fold pending into placed; that is `normaliseStatus`, used by
+ * `nextOptions` and `canTransition`.
+ */
 export function statusLabel(status) {
-  const value = normaliseStatus(status)
+  const value = String(status ?? '').toLowerCase()
   return STATUS_LABELS[value] ?? (value ? value.charAt(0).toUpperCase() + value.slice(1) : '')
+}
+
+/**
+ * `OrderStatuses::badgeClass` — the pill's colours, keyed by the RAW status.
+ *
+ * `pending` falls through to the placed pill, which is why a pending and a placed order
+ * look alike in the list while their labels differ.
+ */
+const BADGE_CLASSES = Object.freeze({
+  cancelled: 'badge-cancelled',
+  delivered: 'badge-delivered',
+  shipped: 'badge-shipped',
+  packed: 'badge-packed',
+})
+
+export function statusBadgeClass(status) {
+  return BADGE_CLASSES[String(status ?? '').toLowerCase()] ?? 'badge-placed'
 }
 
 /**
@@ -104,6 +132,7 @@ export default {
   PAYMENT_STATUSES,
   normaliseStatus,
   statusLabel,
+  statusBadgeClass,
   nextOptions,
   canTransition,
   defaultMessage,

@@ -199,6 +199,7 @@ export const admin = {
   },
 
   usersBulk: (action, ids) => post('/admin/users/bulk', { action, ids }),
+  userDetail: (id, params) => get(`/admin/users/${id}/detail`, { params }),
 
   homeSections: {
     get: (section) => get('/admin/home-sections', { params: { section } }),
