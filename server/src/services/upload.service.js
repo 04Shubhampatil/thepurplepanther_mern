@@ -35,6 +35,27 @@ export const UPLOAD_DIRS = Object.freeze({
 const IMAGE_MIME = new Set(['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/svg+xml'])
 const MAX_FILE_SIZE = 4 * 1024 * 1024 // 4MB, the largest limit Laravel used
 
+/**
+ * Banners are the one module that accepts video.
+ *
+ * `BannerController::validated` allowed `mimes:png,jpg,jpeg,mp4,webm,ogg,mov` at
+ * `max:51200` — 50 MB, not the 4 MB every other upload is held to — because the homepage
+ * hero plays a video file. Sharing the image-only instance here would reject the very
+ * uploads the form's own hint promises.
+ *
+ * Restricting videos to the Home — Main Hero SECTION is a separate check: multer's filter
+ * cannot see `section` reliably (a multipart field only reaches `req.body` if the client
+ * put it before the files), so the services enforce it once both are in hand.
+ */
+export const BANNER_VIDEO_MIME = new Set([
+  'video/mp4',
+  'video/webm',
+  'video/ogg',
+  'video/quicktime',
+])
+
+const MAX_BANNER_FILE_SIZE = 50 * 1024 * 1024
+
 function storageRoot() {
   if (!env.STORAGE_ROOT) {
     throw new BusinessError('File storage is not configured. Set STORAGE_ROOT.')
@@ -52,6 +73,19 @@ export const upload = multer({
   fileFilter(req, file, cb) {
     if (!IMAGE_MIME.has(file.mimetype)) {
       cb(new BusinessError('Only PNG, JPG, WEBP and SVG images are allowed.'))
+      return
+    }
+    cb(null, true)
+  },
+})
+
+/** The banner variant of the same instance: images or video, 50 MB apiece. */
+export const bannerUploader = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_BANNER_FILE_SIZE, files: 30 },
+  fileFilter(req, file, cb) {
+    if (!IMAGE_MIME.has(file.mimetype) && !BANNER_VIDEO_MIME.has(file.mimetype)) {
+      cb(new BusinessError('Only PNG, JPG, JPEG images and MP4, WEBM, OGG, MOV videos are allowed.'))
       return
     }
     cb(null, true)

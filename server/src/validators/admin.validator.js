@@ -45,6 +45,21 @@ const jsonArray = z
     }
   })
 
+/** A JSON object that may arrive as a real object or an encoded string. */
+const jsonObject = z
+  .union([z.record(z.string(), z.any()), z.string()])
+  .nullish()
+  .transform((v) => {
+    if (v == null || v === '') return {}
+    if (typeof v === 'object') return v
+    try {
+      const parsed = JSON.parse(v)
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
+    } catch {
+      return {}
+    }
+  })
+
 const idList = z
   .union([z.array(z.union([z.string(), z.number()])), z.string()])
   .transform((v) => (Array.isArray(v) ? v : String(v).split(',')))
@@ -261,12 +276,47 @@ export const bannerSchema = z.object({
   button_link_2: optStr(500),
   is_active: bool,
   sort_order: int0,
+
+  /*
+   * Per-slide metadata, exactly as BannerController handled it.
+   *
+   * The `image_*` arrays are POSITIONAL — index i describes the i-th newly uploaded file,
+   * which is why they are arrays and not maps. The `existing_*` maps are keyed by
+   * banner_images.id, because the admin edits slides that already have one.
+   *
+   * Both shapes reach us JSON-encoded: the form is multipart (it carries files), and
+   * toFormData stringifies anything that is not a scalar.
+   */
+  image_titles: jsonArray,
+  image_subtitles: jsonArray,
+  image_button_texts: jsonArray,
+  image_button_links: jsonArray,
+
+  existing_titles: jsonObject,
+  existing_subtitles: jsonObject,
+  existing_button_texts: jsonObject,
+  existing_button_links: jsonObject,
+  existing_sort: jsonObject,
+
+  /*
+   * Previously this split the value on commas, which silently discarded every id once the
+   * client started sending `JSON.stringify([1, 2])` — "[1" and "2]" are both NaN. Parsing
+   * the JSON first fixes the removals; the comma form still works for hand-made requests.
+   */
   remove_images: z
     .union([z.array(z.union([z.string(), z.number()])), z.string()])
     .nullish()
     .transform((v) => {
       if (v == null || v === '') return []
-      const arr = Array.isArray(v) ? v : String(v).split(',')
+      let arr = v
+      if (!Array.isArray(arr)) {
+        try {
+          const parsed = JSON.parse(arr)
+          arr = Array.isArray(parsed) ? parsed : String(v).split(',')
+        } catch {
+          arr = String(v).split(',')
+        }
+      }
       return arr.map((n) => Number(n)).filter((n) => Number.isInteger(n) && n > 0)
     }),
 })

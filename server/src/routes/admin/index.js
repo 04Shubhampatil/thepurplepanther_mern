@@ -5,7 +5,7 @@ import { createResourceController } from '../../controllers/admin/resource.contr
 import * as catalogAdmin from '../../services/admin/catalog-admin.service.js'
 import { validate } from '../../middleware/validate.middleware.js'
 import { attachUser, requireAuth, requireAdmin } from '../../middleware/auth.middleware.js'
-import { upload } from '../../services/upload.service.js'
+import { upload, bannerUploader } from '../../services/upload.service.js'
 import * as v from '../../validators/admin.validator.js'
 
 /**
@@ -137,7 +137,9 @@ router.delete('/users/:id', admin.userDestroy)
 router.patch('/users/:id/toggle', admin.userToggle)
 
 // ── banners & home sections ────────────────────────────────────────────────
-const bannerUpload = upload.fields([{ name: 'images', maxCount: 20 }])
+// bannerUploader, not `upload`: banners are the only module that accepts video, at 50 MB
+// rather than the 4 MB every other upload is held to.
+const bannerUpload = bannerUploader.fields([{ name: 'images', maxCount: 20 }])
 
 router.get('/banners', admin.bannerIndex)
 router.post('/banners', bannerUpload, validate(v.bannerSchema), admin.bannerStore)

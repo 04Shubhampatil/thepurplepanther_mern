@@ -45,6 +45,7 @@ const AdminColors = lazy(() => import('../pages/Admin/Colors.jsx'))
 const AdminSizes = lazy(() => import('../pages/Admin/Sizes.jsx'))
 const AdminOffers = lazy(() => import('../pages/Admin/Offers.jsx'))
 const AdminBanners = lazy(() => import('../pages/Admin/Banners.jsx'))
+const AdminBannerForm = lazy(() => import('../pages/Admin/BannerForm.jsx'))
 const AdminHomeSections = lazy(() => import('../pages/Admin/HomeSections.jsx'))
 
 /**
@@ -200,6 +201,8 @@ export default function AppRoutes() {
             <Route path="sizes" element={<AdminSizes />} />
             <Route path="offers" element={<AdminOffers />} />
             <Route path="banners" element={<AdminBanners />} />
+            <Route path="banners/create" element={<AdminBannerForm />} />
+            <Route path="banners/:id/edit" element={<AdminBannerForm />} />
             <Route path="home-sections" element={<AdminHomeSections />} />
 
             <Route path="products" element={<AdminProducts />} />

@@ -3,7 +3,7 @@ import { NotFoundError, ValidationError, ForbiddenError } from '../../utils/api-
 import { hashPassword } from '../../utils/password.js'
 import { toDecimal, toNumber } from '../../utils/money.js'
 import { stringifyJsonColumn } from '../../utils/json.js'
-import { persist, remove, UPLOAD_DIRS } from '../upload.service.js'
+import { persist, remove, UPLOAD_DIRS, BANNER_VIDEO_MIME } from '../upload.service.js'
 import { isValidSitePage, SITE_PAGES } from '../../constants/cms.js'
 import { ROLES } from '../../constants/roles.js'
 
@@ -205,20 +205,58 @@ const bannerScalars = (data) => ({
   sortOrder: Number(data.sort_order ?? 0),
 })
 
+/**
+ * BannerController's per-file closure: a video is only allowed on Home — Main Hero.
+ *
+ * Checked before anything is written, so a rejected upload leaves neither a row nor a file
+ * behind — the multer filter cannot do this itself, because `section` is a sibling field
+ * and only reaches `req.body` if the client happened to send it before the files.
+ */
+function assertVideosAllowed(section, files) {
+  if (section === 'home_hero') return
+
+  const video = (files.images ?? []).find((file) => BANNER_VIDEO_MIME.has(file.mimetype))
+  if (video) {
+    throw new ValidationError({
+      images: ['Videos can only be uploaded to the Home — Main Hero section.'],
+    })
+  }
+}
+
 export async function createBanner(data, files = {}) {
+  assertVideosAllowed(data.section, files)
+
   const banner = await prisma.banner.create({ data: bannerScalars(data) })
   await syncBannerImages(banner.id, data, files)
   return findBanner(banner.id)
 }
 
 export async function updateBanner(id, data, files = {}) {
+  assertVideosAllowed(data.section, files)
+
   await findBanner(id)
   await prisma.banner.update({ where: { id: BigInt(id) }, data: bannerScalars(data) })
   await syncBannerImages(BigInt(id), data, files)
   return findBanner(id)
 }
 
-/** Add uploaded slides and drop any the admin removed. */
+/** `null` for a blank string, so clearing a field in the form actually clears the column. */
+const slideText = (value) => {
+  const text = value == null ? '' : String(value).trim()
+  return text === '' ? null : text
+}
+
+/**
+ * Drop removed slides, re-save the metadata of the ones that stayed, then add the uploads.
+ *
+ * Mirrors BannerController::deleteImages + updateExistingImages + storeImages. The ordering
+ * differs from Laravel's only in that removals happen first, which saves a write to a row
+ * that is about to disappear; the end state is the same.
+ *
+ * The two metadata shapes are not interchangeable. `existing_*` are maps keyed by
+ * banner_images.id — the slide already has one. `image_*` are POSITIONAL arrays, because a
+ * file being uploaded has no id yet and index i simply describes the i-th file.
+ */
 async function syncBannerImages(bannerId, data, files) {
   const removeIds = (data.remove_images ?? []).map((v) => BigInt(v))
 
@@ -233,6 +271,8 @@ async function syncBannerImages(bannerId, data, files) {
     })
   }
 
+  await updateExistingSlides(bannerId, data)
+
   const uploads = files.images ?? []
   if (uploads.length) {
     const last = await prisma.bannerImage.findFirst({
@@ -242,16 +282,64 @@ async function syncBannerImages(bannerId, data, files) {
     })
     let sortOrder = (last?.sortOrder ?? -1) + 1
 
-    for (const file of uploads) {
+    const titles = data.image_titles ?? []
+    const subtitles = data.image_subtitles ?? []
+    const buttonTexts = data.image_button_texts ?? []
+    const buttonLinks = data.image_button_links ?? []
+
+    for (const [index, file] of uploads.entries()) {
       await prisma.bannerImage.create({
         data: {
           bannerId,
           image: persist(file, UPLOAD_DIRS.banners),
+          title: slideText(titles[index]),
+          subtitle: slideText(subtitles[index]),
+          buttonText: slideText(buttonTexts[index]),
+          buttonLink: slideText(buttonLinks[index]),
           isActive: true,
           sortOrder: sortOrder++,
         },
       })
     }
+  }
+}
+
+/**
+ * Laravel skipped any slide the form did not mention (`array_key_exists`), so a partial
+ * submit left the rest alone. The same guard is kept here: only ids present in one of the
+ * maps are written, and a key that is absent from a given map falls back to the stored
+ * value rather than to null.
+ */
+async function updateExistingSlides(bannerId, data) {
+  const titles = data.existing_titles ?? {}
+  const subtitles = data.existing_subtitles ?? {}
+  const buttonTexts = data.existing_button_texts ?? {}
+  const buttonLinks = data.existing_button_links ?? {}
+  const sorts = data.existing_sort ?? {}
+
+  const ids = new Set(
+    [titles, subtitles, buttonTexts, buttonLinks, sorts].flatMap((map) => Object.keys(map)),
+  )
+  if (!ids.size) return
+
+  const slides = await prisma.bannerImage.findMany({
+    where: { bannerId, id: { in: [...ids].map((id) => BigInt(id)) } },
+  })
+
+  for (const slide of slides) {
+    const key = String(slide.id)
+    const sort = sorts[key]
+
+    await prisma.bannerImage.update({
+      where: { id: slide.id },
+      data: {
+        title: key in titles ? slideText(titles[key]) : slide.title,
+        subtitle: key in subtitles ? slideText(subtitles[key]) : slide.subtitle,
+        buttonText: key in buttonTexts ? slideText(buttonTexts[key]) : slide.buttonText,
+        buttonLink: key in buttonLinks ? slideText(buttonLinks[key]) : slide.buttonLink,
+        sortOrder: sort === undefined || sort === '' ? slide.sortOrder : Number(sort) || 0,
+      },
+    })
   }
 }
 

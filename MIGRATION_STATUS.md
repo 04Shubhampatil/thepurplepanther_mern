@@ -88,7 +88,8 @@ packed `#e3f2fd/#1565c0`, shipped `#fff3e0/#ef6c00`, delivered `#e8f5e9/#2e7d32`
 | Sizes | unchanged | ✅ inline form + table | pending |
 | Offers | unchanged | ✅ card grid (shares Categories') | pending |
 | Products (index) | unchanged | ✅ panel + filters + bulk + card grid | pending |
-| Banners | `BANNER_SECTIONS` labels corrected | ✅ panel + section chips + card grid | pending |
+| Banners (index) | `BANNER_SECTIONS` labels corrected | ✅ panel + section chips + card grid | ✅ |
+| Banners (create / edit) | per-slide metadata + video uploads restored | ✅ two form cards + media repeater | ✅ |
 | Home Sections | unchanged | ✅ two-product picker | pending |
 
 ### Stylesheet isolation
@@ -138,6 +139,35 @@ factory returns Prisma rows untouched. So an admin screen sees Laravel's column 
 
 All of these fail SILENTLY — a placeholder image, a missing badge — so check the Prisma model
 before wiring a new admin screen rather than assuming the storefront's presented shape.
+
+### Banner form — three gaps closed in the backend
+
+The form was the first admin screen whose Laravel controller did MORE than the ported API,
+so this was a parity fix rather than a redesign:
+
+1. **Per-slide metadata.** `BannerController` read `existing_titles[id]` … `existing_sort[id]`
+   for slides that already exist and the POSITIONAL `image_titles[i]` … for slides being
+   uploaded; `syncBannerImages` wrote neither. Editing a slide's overlay text silently did
+   nothing. Both shapes are now validated (`jsonObject` / `jsonArray`) and applied, keeping
+   Laravel's `array_key_exists` guard so a partial submit still leaves untouched slides alone.
+
+2. **Video uploads.** Banners are the only module Laravel let past `mimes:…,mp4,webm,ogg,mov`
+   at `max:51200`. The route shared the image-only 4 MB `upload`, so every video the form's
+   own hint promises was rejected. `bannerUploader` accepts them at 50 MB, and
+   `assertVideosAllowed()` reproduces the controller's closure restricting video to
+   Home — Main Hero — in the SERVICE, because multer's `fileFilter` cannot see `section`
+   reliably (a multipart field only reaches `req.body` if it precedes the files).
+
+3. **`remove_images` never removed anything.** The validator split the value on commas, but
+   `toFormData` sends `JSON.stringify([1, 2])`, and `"[1"` / `"2]"` are both `NaN`. It now
+   parses JSON first and keeps the comma form as a fallback.
+
+Verified in the browser against `admin.css`: card 980px/10px/18px/`0 2px 10px rgba(0,0,0,.04)`,
+`.offer-form-row` `220px 1fr` at 16px with 14px padding on a #f0f0f0 rule, `.offer-label`
+14px/600 #555, controls 42px with 11px/12px on #ddd, hints #e53935/12px,
+`.banner-existing-item` `140px 1fr` at 14px on #eee/#fafafa, `.offer-form-actions` 18px.
+No horizontal overflow, no console errors, and the three client-side messages fire with
+banner-form.js's exact wording.
 
 ## 4. Known issues / blockers
 

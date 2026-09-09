@@ -131,7 +131,18 @@ export const admin = {
   blogPosts: resource('blog-posts'),
   coupons: resource('coupons'),
   users: resource('users'),
-  banners: resource('banners'),
+  /*
+   * Banners are multipart in both directions and update over POST.
+   *
+   * Laravel registered `admin.banners.update` as POST because Hostinger's ModSecurity
+   * rejects PUT/PATCH with a 500, and the Express router keeps both. Going through POST
+   * here means the panel behaves the same on that host as it does locally.
+   */
+  banners: {
+    ...resource('banners'),
+    save: (id, body, files) =>
+      post(id ? `/admin/banners/${id}` : '/admin/banners', toFormData(body, files)),
+  },
 
   products: {
     ...resource('products'),
