@@ -57,7 +57,7 @@ export default function Dashboard() {
       <PageHead title="Dashboard" />
 
       {/* .stats-grid — auto-fill minmax(200px, 1fr), 16px gap; 2 columns on mobile */}
-      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-[repeat(auto-fill,minmax(200px,1fr))] sm:gap-4">
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-[repeat(auto-fill,minmax(200px,1fr))] sm:gap-4 text-white ">
         {STAT_CARDS.map(({ key, label, to, tone, Icon, money: isMoney }) => (
           <Link
             key={label}
@@ -90,11 +90,11 @@ export default function Dashboard() {
             to="/admin/products"
             className="inline-flex items-center justify-center whitespace-nowrap rounded-md bg-admin-primary px-4 py-[10px] text-[13px] font-semibold text-white hover:bg-admin-primary-dark max-sm:w-full"
           >
-            Open Products →
+           <span className="text-white"> Open Products →</span>
           </Link>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(150px,1fr))]">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(150px,1fr))] text-white">
           {PM_TILES.filter((tile) => !tile.hidden).map((tile) => (
             <Link
               key={tile.label}
