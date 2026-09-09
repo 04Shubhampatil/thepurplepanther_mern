@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useApi } from '../../hooks/useApi.js'
-import { Card, Button, Alert } from '../../components/admin/AdminUI.jsx'
+import { Card, Button } from '../../components/admin/AdminUI.jsx'
 import { Toggle, FORM_CONTROL } from '../../components/admin/AdminControls.jsx'
 import { storageUrl, isVideoPath } from '../../utils/admin-media.js'
 import { usePageTitle } from '../../theme/page.js'
+import { toast } from '../../store/toast.js'
 import * as api from '../../services/endpoints.js'
 
 /**
@@ -89,7 +90,6 @@ export default function BannerForm() {
   const [files, setFiles] = useState([])
   const [newMeta, setNewMeta] = useState([])
   const [errors, setErrors] = useState({})
-  const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const fileRef = useRef(null)
 
@@ -194,7 +194,6 @@ export default function BannerForm() {
 
   async function onSubmit(event) {
     event.preventDefault()
-    setError('')
     if (!validate()) return
 
     setSaving(true)
@@ -204,7 +203,7 @@ export default function BannerForm() {
       Object.fromEntries(kept.map((slide) => [slide.id, slide[key]]))
 
     try {
-      await api.admin.banners.save(
+      const res = await api.admin.banners.save(
         id,
         {
           ...form,
@@ -223,9 +222,10 @@ export default function BannerForm() {
         { images: files },
       )
 
+      toast.success(res.$message)
       navigate('/admin/banners')
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message)
       setSaving(false)
     }
   }
@@ -242,9 +242,6 @@ export default function BannerForm() {
         </Link>
         <h2 className="text-[22px] font-bold text-[#333]">{isEdit ? 'Edit' : 'Add'} Banner</h2>
       </div>
-
-      <Alert onDismiss={() => setError('')}>{error}</Alert>
-
       <form onSubmit={onSubmit} noValidate>
         {/* .product-form-card — 980px cap, 16px below */}
         <Card className="mb-4 max-w-[980px]">

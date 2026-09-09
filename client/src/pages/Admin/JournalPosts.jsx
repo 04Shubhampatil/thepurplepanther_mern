@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useApi } from '../../hooks/useApi.js'
-import { Card, Button, Table, Th, Td, ConfirmDialog, Alert, Pagination } from '../../components/admin/AdminUI.jsx'
+import { Card, Button, Table, Th, Td, ConfirmDialog, Pagination } from '../../components/admin/AdminUI.jsx'
 import { AdminSearch, AddNewButton, Toggle } from '../../components/admin/AdminControls.jsx'
 import { storageUrl } from '../../utils/admin-media.js'
 import { formatDate } from '../../utils/admin-date.js'
 import { usePageTitle } from '../../theme/page.js'
+import { toast } from '../../store/toast.js'
 import * as api from '../../services/endpoints.js'
 
 /**
@@ -29,7 +30,6 @@ export default function JournalPosts() {
   const [page, setPage] = useState(1)
   const [confirmId, setConfirmId] = useState(null)
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
 
   const { data, loading, refetch } = useApi(
     () => api.admin.blogPosts.list({ search, news_type_id: typeId || undefined, page }),
@@ -42,24 +42,25 @@ export default function JournalPosts() {
   const newsTypes = typeData?.items ?? []
 
   async function onToggle(id, featured) {
-    setError('')
     try {
-      if (featured) await api.admin.blogPosts.toggleFeatured(id)
-      else await api.admin.blogPosts.toggle(id)
+      const res = featured
+        ? await api.admin.blogPosts.toggleFeatured(id)
+        : await api.admin.blogPosts.toggle(id)
+      toast.success(res.$message)
       refetch()
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message)
     }
   }
 
   async function onDelete() {
     setBusy(true)
     try {
-      await api.admin.blogPosts.remove(confirmId)
+      toast.success((await api.admin.blogPosts.remove(confirmId)).$message)
       setConfirmId(null)
       refetch()
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message)
       setConfirmId(null)
     } finally {
       setBusy(false)
@@ -79,9 +80,6 @@ export default function JournalPosts() {
           <AddNewButton to="/admin/blog-posts/create">Add Post</AddNewButton>
         </div>
       </div>
-
-      <Alert onDismiss={() => setError('')}>{error}</Alert>
-
       {/* `.product-filters` — a 38px select at 4px radius with its own caret, not 42px */}
       <Card className="mb-4">
         <div className="flex flex-wrap gap-3.5">

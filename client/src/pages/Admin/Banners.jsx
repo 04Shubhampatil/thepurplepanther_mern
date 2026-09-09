@@ -2,10 +2,11 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Pencil, Trash2, Search } from 'lucide-react'
 import { useApi } from '../../hooks/useApi.js'
-import { ConfirmDialog, Alert } from '../../components/admin/AdminUI.jsx'
+import { ConfirmDialog } from '../../components/admin/AdminUI.jsx'
 import { Toggle } from '../../components/admin/AdminControls.jsx'
 import { storageUrl, isVideoPath } from '../../utils/admin-media.js'
 import { usePageTitle } from '../../theme/page.js'
+import { toast } from '../../store/toast.js'
 import * as api from '../../services/endpoints.js'
 
 /**
@@ -32,7 +33,6 @@ export default function Banners() {
   const [section, setSection] = useState('')
   const [confirmId, setConfirmId] = useState(null)
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
 
   const { data, loading, refetch } = useApi(
     () => api.admin.banners.list({ section: section || undefined }),
@@ -52,23 +52,22 @@ export default function Banners() {
   const meta = (key) => sections.find((entry) => entry.key === key)
 
   async function onToggle(id) {
-    setError('')
     try {
-      await api.admin.banners.toggle(id)
+      toast.success((await api.admin.banners.toggle(id)).$message)
       refetch()
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message)
     }
   }
 
   async function onDelete() {
     setBusy(true)
     try {
-      await api.admin.banners.remove(confirmId)
+      toast.success((await api.admin.banners.remove(confirmId)).$message)
       setConfirmId(null)
       refetch()
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message)
       setConfirmId(null)
     } finally {
       setBusy(false)
@@ -123,9 +122,6 @@ export default function Banners() {
           </select>
         </div>
       </div>
-
-      <Alert onDismiss={() => setError('')}>{error}</Alert>
-
       {/* .section-legend — the chips double as the section filter */}
       <div className="mb-4 rounded-[10px] bg-white p-[18px] shadow-admin-card">
         <h3 className="mb-2.5 text-[18px] font-bold text-[#333]">Home &amp; Page Sections</h3>

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Search, Pencil, Trash2, Eye, Star } from 'lucide-react'
 import { useApi } from '../../hooks/useApi.js'
+import { toast } from '../../store/toast.js'
 import * as api from '../../services/endpoints.js'
 import Loading from '../../components/common/Loading.jsx'
 import ErrorMessage from '../../components/common/ErrorMessage.jsx'
@@ -9,7 +10,7 @@ import Pagination from '../../components/common/Pagination.jsx'
 import Alert from '../../components/ui/Alert.jsx'
 import Button from '../../components/ui/Button.jsx'
 import { Field, Input, Textarea, Select, Checkbox } from '../../components/ui/Field.jsx'
-import { Alert as AdminAlert, ConfirmDialog, CONTROL } from '../../components/admin/AdminUI.jsx'
+import { ConfirmDialog, CONTROL } from '../../components/admin/AdminUI.jsx'
 import { Toggle } from '../../components/admin/AdminControls.jsx'
 import { storageUrl, discountPercent } from '../../utils/admin-media.js'
 
@@ -38,7 +39,6 @@ export default function Products() {
   const [files, setFiles] = useState({})
   const [variants, setVariants] = useState({ colors: [], sizes: [] })
   const [selected, setSelected] = useState([])
-  const [notice, setNotice] = useState(null)
   const [categoryId, setCategoryId] = useState('')
   const [offerId, setOfferId] = useState('')
   const [bulkOpen, setBulkOpen] = useState(false)
@@ -126,25 +126,22 @@ export default function Products() {
   }
 
   const onSubmit = async (values) => {
-    setNotice(null)
     const payload = { ...values, colors: variants.colors, sizes: variants.sizes }
 
     try {
-      if (editing === 'new') {
-        await api.admin.products.create(payload, files)
-      } else {
-        await api.admin.products.update(editing, payload, files)
-      }
+      const res = editing === 'new'
+        ? await api.admin.products.create(payload, files)
+        : await api.admin.products.update(editing, payload, files)
       setEditing(null)
       refetch()
-      setNotice('Product saved.')
+      toast.success(res.$message)
     } catch (err) {
       if (err.errors) {
         Object.entries(err.errors).forEach(([field, messages]) =>
           setError(field, { type: 'server', message: messages[0] }),
         )
       }
-      setNotice(err.message)
+      toast.error(err.message)
     }
   }
 
@@ -154,10 +151,14 @@ export default function Products() {
       // eslint-disable-next-line no-alert
       if (!window.confirm(`Delete ${selected.length} product(s)? This cannot be undone.`)) return
     }
-    const result = await api.admin.products.bulk(action, selected)
-    setSelected([])
-    refetch()
-    setNotice(result?.message ?? 'Done.')
+    try {
+      const result = await api.admin.products.bulk(action, selected)
+      setSelected([])
+      refetch()
+      toast.success(result?.$message ?? 'Done.')
+    } catch (err) {
+      toast.error(err.message)
+    }
   }
 
   const toggleSelected = (id) =>
@@ -216,8 +217,6 @@ export default function Products() {
 
   return (
     <>
-      {notice && <AdminAlert tone="info" onDismiss={() => setNotice(null)}>{notice}</AdminAlert>}
-
       {/* .product-panel — white, 10px radius, 18px 20px, 0 1px 4px rgba(0,0,0,.04) */}
       <div className="mb-[18px] rounded-[10px] bg-white px-5 py-[18px] shadow-[0_1px_4px_rgba(0,0,0,0.04)] max-sm:p-3.5">
         <div className="flex flex-wrap items-center justify-between gap-4 pb-4 max-sm:flex-col max-sm:items-stretch">
@@ -514,8 +513,12 @@ export default function Products() {
                 title="Featured"
                 className={cardIcon(item.isFeatured)}
                 onClick={async () => {
-                  await api.admin.products.toggleFeatured(item.id)
-                  refetch()
+                  try {
+                    toast.success((await api.admin.products.toggleFeatured(item.id)).$message)
+                    refetch()
+                  } catch (err) {
+                    toast.error(err.message)
+                  }
                 }}
               >
                 <Star size={15} fill={item.isFeatured ? 'currentColor' : 'none'} />
@@ -533,8 +536,12 @@ export default function Products() {
                 checked={Boolean(item.isActive)}
                 title="Enable / Disable"
                 onChange={async () => {
-                  await api.admin.products.toggle(item.id)
-                  refetch()
+                  try {
+                    toast.success((await api.admin.products.toggle(item.id)).$message)
+                    refetch()
+                  } catch (err) {
+                    toast.error(err.message)
+                  }
                 }}
               />
             </div>
@@ -552,9 +559,13 @@ export default function Products() {
         open={confirmId !== null}
         onCancel={() => setConfirmId(null)}
         onProceed={async () => {
-          await api.admin.products.remove(confirmId)
+          try {
+            toast.success((await api.admin.products.remove(confirmId)).$message)
+            refetch()
+          } catch (err) {
+            toast.error(err.message)
+          }
           setConfirmId(null)
-          refetch()
         }}
       />
     </>

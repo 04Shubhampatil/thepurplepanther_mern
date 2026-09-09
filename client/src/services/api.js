@@ -57,8 +57,25 @@ api.interceptors.response.use(
   },
 )
 
-/** Unwrap the { success, data, message } envelope. */
-const unwrap = (promise) => promise.then((body) => body?.data ?? body)
+/**
+ * Unwrap the { success, data, message } envelope.
+ *
+ * `message` is carried through on a non-enumerable `$message` so the admin can show it.
+ * Laravel's panel toasted `session('success')` — the string the CONTROLLER wrote, never one
+ * the page invented — and keeping that property here is what lets the React panel do the
+ * same without every call site repeating the wording and drifting from the server's.
+ *
+ * Non-enumerable so it survives neither `JSON.stringify` nor a spread, and cannot be
+ * mistaken for part of the payload.
+ */
+const unwrap = (promise) =>
+  promise.then((body) => {
+    const data = body?.data ?? body
+    if (data && typeof data === 'object' && body?.message) {
+      Object.defineProperty(data, '$message', { value: body.message, enumerable: false })
+    }
+    return data
+  })
 
 export const get = (url, config) => unwrap(api.get(url, config))
 export const post = (url, body, config) => unwrap(api.post(url, body, config))

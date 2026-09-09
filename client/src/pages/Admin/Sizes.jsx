@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useApi } from '../../hooks/useApi.js'
-import { Card, Table, Th, Td, Button, Alert, Pagination, ConfirmDialog } from '../../components/admin/AdminUI.jsx'
+import { Card, Table, Th, Td, Button, Pagination, ConfirmDialog } from '../../components/admin/AdminUI.jsx'
 import {
   AdminSearch,
   Toggle,
@@ -11,6 +11,7 @@ import {
   EditButton,
 } from '../../components/admin/AdminControls.jsx'
 import { usePageTitle } from '../../theme/page.js'
+import { toast } from '../../store/toast.js'
 import * as api from '../../services/endpoints.js'
 
 /**
@@ -33,7 +34,6 @@ export default function Sizes() {
   const [editing, setEditing] = useState(null)
   const [name, setName] = useState('')
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
   const [confirmId, setConfirmId] = useState(null)
   const [busy, setBusy] = useState(false)
 
@@ -50,38 +50,38 @@ export default function Sizes() {
   async function onSave(event) {
     event.preventDefault()
     setSaving(true)
-    setError('')
 
     try {
-      if (editing) await api.admin.sizes.update(editing, { name })
-      else await api.admin.sizes.create({ name })
+      const res = editing
+        ? await api.admin.sizes.update(editing, { name })
+        : await api.admin.sizes.create({ name })
+      toast.success(res.$message)
       reset()
       refetch()
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message)
     } finally {
       setSaving(false)
     }
   }
 
   async function onToggle(id) {
-    setError('')
     try {
-      await api.admin.sizes.toggle(id)
+      toast.success((await api.admin.sizes.toggle(id)).$message)
       refetch()
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message)
     }
   }
 
   async function onDelete() {
     setBusy(true)
     try {
-      await api.admin.sizes.remove(confirmId)
+      toast.success((await api.admin.sizes.remove(confirmId)).$message)
       setConfirmId(null)
       refetch()
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message)
       setConfirmId(null)
     } finally {
       setBusy(false)
@@ -96,9 +96,6 @@ export default function Sizes() {
           <AdminSearch value={search} onChange={(v) => { setSearch(v); setPage(1) }} />
         </div>
       </div>
-
-      <Alert onDismiss={() => setError('')}>{error}</Alert>
-
       <Card className="mb-[18px]">
         <h3 className="mb-3 text-[18px] font-bold text-[#333]">{editing ? 'Edit Size' : 'Add Size'}</h3>
 

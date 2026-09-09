@@ -263,7 +263,7 @@ export const bannerShow = asyncHandler(async (req, res) =>
 )
 
 export const bannerStore = asyncHandler(async (req, res) =>
-  created(res, { item: await miscAdmin.createBanner(req.body, req.files ?? {}) }, 'Banner created.'),
+  created(res, { item: await miscAdmin.createBanner(req.body, req.files ?? {}) }, 'Banner created successfully.'),
 )
 
 /**
@@ -277,13 +277,13 @@ export const bannerUpdate = asyncHandler(async (req, res) =>
   ok(
     res,
     { item: await miscAdmin.updateBanner(req.params.id, req.body, req.files ?? {}) },
-    'Banner updated.',
+    'Banner updated successfully.',
   ),
 )
 
 export const bannerDestroy = asyncHandler(async (req, res) => {
   await miscAdmin.deleteBanner(req.params.id)
-  return ok(res, {}, 'Banner deleted.')
+  return ok(res, {}, 'Banner deleted successfully.')
 })
 
 export const bannerToggle = asyncHandler(async (req, res) =>
@@ -302,7 +302,7 @@ export const homeSectionUpdate = asyncHandler(async (req, res) =>
   ok(
     res,
     { items: await miscAdmin.updateHomeSection(req.body.section, req.body.product_ids ?? []) },
-    'Home section updated.',
+    'Shop the Look products updated.',
   ),
 )
 

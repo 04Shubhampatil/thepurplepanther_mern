@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useApi } from '../../hooks/useApi.js'
-import { Card, Table, Th, Td, Button, Alert, Pagination, ConfirmDialog } from '../../components/admin/AdminUI.jsx'
+import { Card, Table, Th, Td, Button, Pagination, ConfirmDialog } from '../../components/admin/AdminUI.jsx'
 import {
   AdminSearch,
   Toggle,
@@ -13,6 +13,7 @@ import {
 } from '../../components/admin/AdminControls.jsx'
 import { closestColorName, normalizeHex } from '../../utils/color-names.js'
 import { usePageTitle } from '../../theme/page.js'
+import { toast } from '../../store/toast.js'
 import * as api from '../../services/endpoints.js'
 
 /**
@@ -40,7 +41,6 @@ export default function Colors() {
   const [name, setName] = useState('')
   const [code, setCode] = useState('#000000')
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
   const [confirmId, setConfirmId] = useState(null)
   const [busy, setBusy] = useState(false)
 
@@ -74,38 +74,38 @@ export default function Colors() {
   async function onSave(event) {
     event.preventDefault()
     setSaving(true)
-    setError('')
 
     try {
-      if (editing) await api.admin.colors.update(editing, { name, code })
-      else await api.admin.colors.create({ name, code })
+      const res = editing
+        ? await api.admin.colors.update(editing, { name, code })
+        : await api.admin.colors.create({ name, code })
+      toast.success(res.$message)
       reset()
       refetch()
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message)
     } finally {
       setSaving(false)
     }
   }
 
   async function onToggle(id) {
-    setError('')
     try {
-      await api.admin.colors.toggle(id)
+      toast.success((await api.admin.colors.toggle(id)).$message)
       refetch()
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message)
     }
   }
 
   async function onDelete() {
     setBusy(true)
     try {
-      await api.admin.colors.remove(confirmId)
+      toast.success((await api.admin.colors.remove(confirmId)).$message)
       setConfirmId(null)
       refetch()
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message)
       setConfirmId(null)
     } finally {
       setBusy(false)
@@ -120,9 +120,6 @@ export default function Colors() {
           <AdminSearch value={search} onChange={(v) => { setSearch(v); setPage(1) }} />
         </div>
       </div>
-
-      <Alert onDismiss={() => setError('')}>{error}</Alert>
-
       <Card className="mb-[18px]">
         <h3 className="mb-1.5 text-[18px] font-bold text-[#333]">{editing ? 'Edit Color' : 'Add Color'}</h3>
         <p className="mb-3 text-[12px] leading-[1.3] text-[#888]">

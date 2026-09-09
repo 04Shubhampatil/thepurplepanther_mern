@@ -2,10 +2,11 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Pencil, Trash2, Home, Search } from 'lucide-react'
 import { useApi } from '../../hooks/useApi.js'
-import { ConfirmDialog, Alert, Pagination } from '../../components/admin/AdminUI.jsx'
+import { ConfirmDialog, Pagination } from '../../components/admin/AdminUI.jsx'
 import { AdminSearch, AddNewButton, Toggle } from '../../components/admin/AdminControls.jsx'
 import { usePageTitle } from '../../theme/page.js'
 import { storageUrl } from '../../utils/admin-media.js'
+import { toast } from '../../store/toast.js'
 import * as api from '../../services/endpoints.js'
 
 /**
@@ -42,7 +43,6 @@ export default function Categories() {
   const [page, setPage] = useState(1)
   const [confirmId, setConfirmId] = useState(null)
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
 
   const { data, loading, refetch } = useApi(
     () => api.admin.categories.list({ search, page }),
@@ -53,24 +53,22 @@ export default function Categories() {
   const pagination = data?.pagination ?? { page: 1, lastPage: 1, total: 0, perPage: 25 }
 
   async function onToggle(id) {
-    setError('')
     try {
-      await api.admin.categories.toggle(id)
+      toast.success((await api.admin.categories.toggle(id)).$message)
       refetch()
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message)
     }
   }
 
   async function onDelete() {
     setBusy(true)
-    setError('')
     try {
-      await api.admin.categories.remove(confirmId)
+      toast.success((await api.admin.categories.remove(confirmId)).$message)
       setConfirmId(null)
       refetch()
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message)
       setConfirmId(null)
     } finally {
       setBusy(false)
@@ -93,9 +91,6 @@ export default function Categories() {
           <AddNewButton to="/admin/categories/create">Add New</AddNewButton>
         </div>
       </div>
-
-      <Alert onDismiss={() => setError('')}>{error}</Alert>
-
       {loading ? (
         <div className="rounded-[10px] bg-white p-6 text-center text-admin-muted">Loading…</div>
       ) : items.length === 0 ? (

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useApi } from '../../hooks/useApi.js'
-import { Card, Button, Alert } from '../../components/admin/AdminUI.jsx'
+import { Card, Button } from '../../components/admin/AdminUI.jsx'
 import { FormGroup, FORM_CONTROL } from '../../components/admin/AdminControls.jsx'
 import { usePageTitle } from '../../theme/page.js'
+import { toast } from '../../store/toast.js'
 import * as api from '../../services/endpoints.js'
 
 /**
@@ -29,8 +30,6 @@ export default function HomeSections() {
   const [first, setFirst] = useState('')
   const [second, setSecond] = useState('')
   const [saving, setSaving] = useState(false)
-  const [message, setMessage] = useState(null)
-  const [error, setError] = useState('')
 
   const { data, refetch } = useApi(() => api.admin.homeSections.get(SECTION), [])
   const { data: productData } = useApi(() => api.admin.products.list({ per_page: 100 }), [])
@@ -47,15 +46,13 @@ export default function HomeSections() {
   async function onSave(event) {
     event.preventDefault()
     setSaving(true)
-    setError('')
-    setMessage(null)
 
     try {
-      await api.admin.homeSections.update(SECTION, [first, second].filter(Boolean))
-      setMessage('Home section updated.')
+      const res = await api.admin.homeSections.update(SECTION, [first, second].filter(Boolean))
+      toast.success(res.$message)
       refetch()
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message)
     } finally {
       setSaving(false)
     }
@@ -82,10 +79,6 @@ export default function HomeSections() {
         </Link>
         <h2 className="text-[26px] font-bold text-[#333]">Home Section Products</h2>
       </div>
-
-      <Alert onDismiss={() => setError('')}>{error}</Alert>
-      {message ? <Alert tone="success" onDismiss={() => setMessage(null)}>{message}</Alert> : null}
-
       {/* .product-form-card — 16px below, capped at 980px */}
       <Card className="mb-4 max-w-[980px]">
         <h3 className="mb-1.5 text-[18px] font-bold text-[#333]">Shop the Look</h3>

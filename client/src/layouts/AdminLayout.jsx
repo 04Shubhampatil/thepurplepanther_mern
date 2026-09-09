@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import AdminSidebar from '../components/admin/AdminSidebar.jsx'
 import AdminHeader from '../components/admin/AdminHeader.jsx'
+import Toaster from '../components/admin/Toaster.jsx'
 import { useAuthStore } from '../store/index.js'
 import { useAdminStylesheets } from '../theme/adminChrome.js'
 import '../admin.css'
@@ -60,6 +61,9 @@ export default function AdminLayout() {
           <Outlet />
         </main>
       </div>
+
+      {/* app.blade.php loaded toast.js for every admin page, so the host belongs to the shell */}
+      <Toaster />
     </div>
   )
 }

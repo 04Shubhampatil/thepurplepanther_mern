@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useApi } from '../../hooks/useApi.js'
-import { Card, Button, Alert } from '../../components/admin/AdminUI.jsx'
+import { Card, Button } from '../../components/admin/AdminUI.jsx'
 import { Toggle, FORM_CONTROL } from '../../components/admin/AdminControls.jsx'
 import RichTextEditor from '../../components/admin/RichTextEditor.jsx'
 import { storageUrl } from '../../utils/admin-media.js'
 import { toDateTimeLocal, nowDateTimeLocal } from '../../utils/admin-date.js'
 import { usePageTitle } from '../../theme/page.js'
+import { toast } from '../../store/toast.js'
 import * as api from '../../services/endpoints.js'
 
 /**
@@ -108,7 +109,6 @@ export default function JournalPostForm() {
   const [currentImage, setCurrentImage] = useState('')
   const [currentBanner, setCurrentBanner] = useState('')
   const [errors, setErrors] = useState({})
-  const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
 
   const { data: typeData } = useApi(() => api.admin.newsTypes.list({ per_page: 100 }), [])
@@ -162,12 +162,11 @@ export default function JournalPostForm() {
 
   async function onSubmit(event) {
     event.preventDefault()
-    setError('')
     if (!validate()) return
 
     setSaving(true)
     try {
-      await api.admin.blogPosts.save(
+      const res = await api.admin.blogPosts.save(
         id,
         {
           ...form,
@@ -176,9 +175,10 @@ export default function JournalPostForm() {
         },
         { image, banner_image: bannerImage },
       )
+      toast.success(res.$message)
       navigate('/admin/blog-posts')
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message)
       setSaving(false)
     }
   }
@@ -195,9 +195,6 @@ export default function JournalPostForm() {
           Back
         </Link>
       </div>
-
-      <Alert onDismiss={() => setError('')}>{error}</Alert>
-
       <Card>
         {/* `.form-grid` — 14px gap, capped at 640px */}
         <form onSubmit={onSubmit} noValidate className="grid max-w-[640px] gap-3.5">

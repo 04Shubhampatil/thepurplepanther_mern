@@ -75,18 +75,32 @@ router.patch('/products/:id/reviews/:reviewId/toggle', admin.reviewToggle)
 router.delete('/products/:id/reviews/:reviewId', admin.reviewDestroy)
 
 // ── simple taxonomies via the shared factory ───────────────────────────────
+/*
+ * The messages are the LARAVEL controllers' own flash strings, because the admin's toast
+ * shows whatever the response carries — `Toast.success(session('success'))` in
+ * layouts/app.blade.php. They are deliberately not uniform: Color, Size, Sub-category and
+ * Brand flash a bare "Status updated." on a toggle while the others name the resource, and
+ * every create/update/delete ends "successfully.".
+ */
+const say = (label, toggled = `${label} status updated.`) => ({
+  created: `${label} created successfully.`,
+  updated: `${label} updated successfully.`,
+  deleted: `${label} deleted successfully.`,
+  toggled,
+})
+
 const resources = [
-  ['categories', catalogAdmin.categories, 'Category', v.categorySchema, 'image'],
-  ['sub-categories', catalogAdmin.subCategories, 'Sub-category', v.subCategorySchema, 'image'],
-  ['brands', catalogAdmin.brands, 'Brand', v.brandSchema, 'image'],
-  ['colors', catalogAdmin.colors, 'Color', v.colorSchema, null],
-  ['sizes', catalogAdmin.sizes, 'Size', v.sizeSchema, null],
-  ['offers', catalogAdmin.offers, 'Offer', v.offerSchema, 'image'],
-  ['news-types', catalogAdmin.newsTypes, 'News type', v.newsTypeSchema, null],
+  ['categories', catalogAdmin.categories, 'Category', v.categorySchema, 'image', say('Category')],
+  ['sub-categories', catalogAdmin.subCategories, 'Sub-category', v.subCategorySchema, 'image', say('Sub-category', 'Status updated.')],
+  ['brands', catalogAdmin.brands, 'Brand', v.brandSchema, 'image', say('Brand', 'Status updated.')],
+  ['colors', catalogAdmin.colors, 'Color', v.colorSchema, null, say('Color', 'Status updated.')],
+  ['sizes', catalogAdmin.sizes, 'Size', v.sizeSchema, null, say('Size', 'Status updated.')],
+  ['offers', catalogAdmin.offers, 'Offer', v.offerSchema, 'image', say('Offer')],
+  ['news-types', catalogAdmin.newsTypes, 'News type', v.newsTypeSchema, null, say('News type')],
 ]
 
-for (const [path, service, label, schema, imageField] of resources) {
-  const controller = createResourceController(service, label, { imageField })
+for (const [path, service, label, schema, imageField, messages] of resources) {
+  const controller = createResourceController(service, label, { imageField, messages })
   const withUpload = imageField ? [upload.single(imageField)] : []
 
   router.get(`/${path}`, controller.index)
@@ -151,7 +165,7 @@ router.post('/blog-posts', blogPostUpload, validate(v.blogPostSchema), async (re
     }
 
     const item = await catalogAdmin.blogPosts.create(req.body, files)
-    res.status(201).json({ success: true, data: { item }, message: 'Blog post created.' })
+    res.status(201).json({ success: true, data: { item }, message: 'Journal post created successfully.' })
   } catch (error) {
     next(error)
   }
@@ -160,7 +174,7 @@ router.post('/blog-posts', blogPostUpload, validate(v.blogPostSchema), async (re
 router.patch('/blog-posts/:id', blogPostUpload, validate(v.blogPostSchema), async (req, res, next) => {
   try {
     const item = await catalogAdmin.blogPosts.update(req.params.id, req.body, blogPostFiles(req))
-    res.json({ success: true, data: { item }, message: 'Blog post updated.' })
+    res.json({ success: true, data: { item }, message: 'Journal post updated successfully.' })
   } catch (error) {
     next(error)
   }
@@ -169,7 +183,7 @@ router.patch('/blog-posts/:id', blogPostUpload, validate(v.blogPostSchema), asyn
 router.delete('/blog-posts/:id', async (req, res, next) => {
   try {
     await catalogAdmin.blogPosts.destroy(req.params.id)
-    res.json({ success: true, data: {}, message: 'Blog post deleted.' })
+    res.json({ success: true, data: {}, message: 'Journal post deleted successfully.' })
   } catch (error) {
     next(error)
   }
@@ -178,7 +192,7 @@ router.delete('/blog-posts/:id', async (req, res, next) => {
 router.patch('/blog-posts/:id/toggle', async (req, res, next) => {
   try {
     const isActive = await catalogAdmin.blogPosts.toggle(req.params.id)
-    res.json({ success: true, data: { isActive }, message: 'Blog post status updated.' })
+    res.json({ success: true, data: { isActive }, message: 'Post status updated.' })
   } catch (error) {
     next(error)
   }
@@ -191,7 +205,7 @@ router.patch('/blog-posts/:id/featured', async (req, res, next) => {
     const updated = await catalogAdmin.blogPosts.update(req.params.id, {
       isFeatured: !post.isFeatured,
     })
-    res.json({ success: true, data: { isFeatured: updated.isFeatured }, message: 'Updated.' })
+    res.json({ success: true, data: { isFeatured: updated.isFeatured }, message: 'Featured status updated.' })
   } catch (error) {
     next(error)
   }

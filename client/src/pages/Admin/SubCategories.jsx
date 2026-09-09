@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useApi } from '../../hooks/useApi.js'
-import { Card, Table, Th, Td, Button, Alert, Pagination, ConfirmDialog } from '../../components/admin/AdminUI.jsx'
+import { Card, Table, Th, Td, Button, Pagination, ConfirmDialog } from '../../components/admin/AdminUI.jsx'
 import { AdminSearch, Toggle } from '../../components/admin/AdminControls.jsx'
 import { usePageTitle } from '../../theme/page.js'
+import { toast } from '../../store/toast.js'
 import * as api from '../../services/endpoints.js'
 
 /**
@@ -34,7 +35,6 @@ export default function SubCategories() {
   const [image, setImage] = useState(null)
   const [imageKey, setImageKey] = useState(0)
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
   const [confirmId, setConfirmId] = useState(null)
   const [busy, setBusy] = useState(false)
 
@@ -54,44 +54,42 @@ export default function SubCategories() {
   async function onSave(event) {
     event.preventDefault()
     setSaving(true)
-    setError('')
 
     try {
-      await api.admin.subCategories.create(
+      const res = await api.admin.subCategories.create(
         { category_id: categoryId, title },
         image ? { image } : null,
       )
+      toast.success(res.$message)
       setCategoryId('')
       setTitle('')
       setImage(null)
       setImageKey((key) => key + 1)
       refetch()
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message)
     } finally {
       setSaving(false)
     }
   }
 
   async function onToggle(id) {
-    setError('')
     try {
-      await api.admin.subCategories.toggle(id)
+      toast.success((await api.admin.subCategories.toggle(id)).$message)
       refetch()
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message)
     }
   }
 
   async function onDelete() {
     setBusy(true)
-    setError('')
     try {
-      await api.admin.subCategories.remove(confirmId)
+      toast.success((await api.admin.subCategories.remove(confirmId)).$message)
       setConfirmId(null)
       refetch()
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message)
       setConfirmId(null)
     } finally {
       setBusy(false)
@@ -116,9 +114,6 @@ export default function SubCategories() {
           />
         </div>
       </div>
-
-      <Alert onDismiss={() => setError('')}>{error}</Alert>
-
       <Card className="mb-[18px]">
         <h3 className="mb-3 text-[18px] font-bold text-[#333]">Add Sub-Category</h3>
 

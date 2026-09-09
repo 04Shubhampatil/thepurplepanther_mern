@@ -214,6 +214,31 @@ recognises a `frontend/` path as bundled theme art rather than prefixing it with
 which is how `resolveMediaUrl` ordered its checks — the journal's seeded rows all point at
 `frontend/images/blogs/blog-N.jpg`, so every thumbnail was broken.
 
+### Toasts
+
+public/js/toast.js and `.toast-container` in admin.css, driven the way layouts/app.blade.php
+drove them: every write redirected and the layout turned the flash bag into a toast —
+`Toast.success(session('success'))`, `Toast.error(session('error'))`,
+`Toast.error($errors->first())`. The Laravel panel had no inline alert banners on these
+screens at all, so the rebuilt pages no longer render one either.
+
+The message shown is the SERVER's, never one the page invents. `unwrap()` in services/api.js
+carries the envelope's `message` through on a non-enumerable `$message`, so a page writes
+`toast.success(res.$message)` and the wording stays in one place. That mattered enough to
+align the API's strings with the controllers' own: they are not uniform in the source —
+Color, Size, Sub-category and Brand flash a bare "Status updated." on a toggle while the
+others name the resource, journal posts say "Post status updated." and "Featured status
+updated.", and every create/update/delete ends "successfully.".
+
+Geometry is admin.css's: fixed 18px from the top and right at z-index 2000, cards
+`min(380px, 100vw - 24px)` wide, 10px apart, white at 8px radius under
+`0 10px 30px rgba(0,0,0,.15)` with a 4px left border carrying the tone (#43a047 success,
+#e53935 error, #1e88e5 info). The enter animation needs the element to be in the DOM at
+`opacity:0` for one frame before the transition can run, which is what toast.js's
+`requestAnimationFrame` was for and why the component tracks a mount flag rather than
+rendering the final state immediately. Auto-dismiss is 4s, with the 250ms removal timer
+outlasting the 200ms fade so the card is gone before it leaves the DOM.
+
 ## 4. Known issues / blockers
 
 - **Visual QA is blocked on an admin credential.** One admin exists

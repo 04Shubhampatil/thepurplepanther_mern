@@ -7,8 +7,22 @@ import { ok, created, asyncHandler } from '../../utils/api-response.js'
  * become one implementation, configured per resource. Each still has its own Zod schema,
  * so validation rules and messages remain per-resource.
  */
-export function createResourceController(service, label, { imageField = null } = {}) {
+export function createResourceController(service, label, { imageField = null, messages = {} } = {}) {
   const file = (req) => (imageField && req.file ? req.file : null)
+
+  /*
+   * These strings are USER-FACING: the admin's toast shows the message this response
+   * carries, exactly as Laravel's layout showed `session('success')`. So they are the
+   * controllers' own wording, not a generic template — and the wording is not uniform in
+   * the source, which is why it is passed in per resource. ColorController, SizeController
+   * and SubCategoryController flash a bare "Status updated."; the others name the resource.
+   */
+  const say = {
+    created: messages.created ?? `${label} created.`,
+    updated: messages.updated ?? `${label} updated.`,
+    deleted: messages.deleted ?? `${label} deleted.`,
+    toggled: messages.toggled ?? `${label} status updated.`,
+  }
 
   return {
     index: asyncHandler(async (req, res) => {
@@ -25,20 +39,20 @@ export function createResourceController(service, label, { imageField = null } =
     ),
 
     store: asyncHandler(async (req, res) =>
-      created(res, { item: await service.create(req.body, file(req)) }, `${label} created.`),
+      created(res, { item: await service.create(req.body, file(req)) }, say.created),
     ),
 
     update: asyncHandler(async (req, res) =>
-      ok(res, { item: await service.update(req.params.id, req.body, file(req)) }, `${label} updated.`),
+      ok(res, { item: await service.update(req.params.id, req.body, file(req)) }, say.updated),
     ),
 
     destroy: asyncHandler(async (req, res) => {
       await service.destroy(req.params.id)
-      return ok(res, {}, `${label} deleted.`)
+      return ok(res, {}, say.deleted)
     }),
 
     toggle: asyncHandler(async (req, res) =>
-      ok(res, { isActive: await service.toggle(req.params.id) }, `${label} status updated.`),
+      ok(res, { isActive: await service.toggle(req.params.id) }, say.toggled),
     ),
   }
 }

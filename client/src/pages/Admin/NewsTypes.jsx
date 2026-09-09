@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useApi } from '../../hooks/useApi.js'
-import { Card, Button, Table, Th, Td, ConfirmDialog, Alert, Pagination } from '../../components/admin/AdminUI.jsx'
+import { Card, Button, Table, Th, Td, ConfirmDialog, Pagination } from '../../components/admin/AdminUI.jsx'
 import {
   AdminSearch,
   Toggle,
@@ -10,6 +10,7 @@ import {
   FORM_CONTROL,
 } from '../../components/admin/AdminControls.jsx'
 import { usePageTitle } from '../../theme/page.js'
+import { toast } from '../../store/toast.js'
 import * as api from '../../services/endpoints.js'
 
 /**
@@ -35,7 +36,6 @@ export default function NewsTypes() {
   const [saving, setSaving] = useState(false)
   const [confirmId, setConfirmId] = useState(null)
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
 
   const { data, loading, refetch } = useApi(
     () => api.admin.newsTypes.list({ search, page }),
@@ -49,46 +49,45 @@ export default function NewsTypes() {
     setEditing(null)
     setTitle('')
     setSortOrder('0')
-    setError('')
   }
 
   async function onSave(event) {
     event.preventDefault()
-    setError('')
     setSaving(true)
 
     const body = { title: title.trim(), sort_order: Number(sortOrder) || 0 }
 
     try {
-      if (editing) await api.admin.newsTypes.update(editing, body)
-      else await api.admin.newsTypes.create(body)
+      const res = editing
+        ? await api.admin.newsTypes.update(editing, body)
+        : await api.admin.newsTypes.create(body)
+      toast.success(res.$message)
       reset()
       refetch()
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message)
     } finally {
       setSaving(false)
     }
   }
 
   async function onToggle(id) {
-    setError('')
     try {
-      await api.admin.newsTypes.toggle(id)
+      toast.success((await api.admin.newsTypes.toggle(id)).$message)
       refetch()
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message)
     }
   }
 
   async function onDelete() {
     setBusy(true)
     try {
-      await api.admin.newsTypes.remove(confirmId)
+      toast.success((await api.admin.newsTypes.remove(confirmId)).$message)
       setConfirmId(null)
       refetch()
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message)
       setConfirmId(null)
     } finally {
       setBusy(false)
@@ -103,9 +102,6 @@ export default function NewsTypes() {
           <AdminSearch value={search} onChange={(v) => { setSearch(v); setPage(1) }} />
         </div>
       </div>
-
-      <Alert onDismiss={() => setError('')}>{error}</Alert>
-
       <Card className="mb-[18px]">
         <h3 className="mb-3 text-[18px] font-bold text-[#333]">
           {editing ? 'Edit News Type' : 'Add News Type'}

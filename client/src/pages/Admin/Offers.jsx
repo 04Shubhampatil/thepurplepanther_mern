@@ -2,10 +2,11 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Pencil, Trash2 } from 'lucide-react'
 import { useApi } from '../../hooks/useApi.js'
-import { ConfirmDialog, Alert, Pagination } from '../../components/admin/AdminUI.jsx'
+import { ConfirmDialog, Pagination } from '../../components/admin/AdminUI.jsx'
 import { AdminSearch, AddNewButton, Toggle } from '../../components/admin/AdminControls.jsx'
 import { usePageTitle } from '../../theme/page.js'
 import { storageUrl } from '../../utils/admin-media.js'
+import { toast } from '../../store/toast.js'
 import * as api from '../../services/endpoints.js'
 
 /**
@@ -30,7 +31,6 @@ export default function Offers() {
   const [page, setPage] = useState(1)
   const [confirmId, setConfirmId] = useState(null)
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
 
   const { data, loading, refetch } = useApi(() => api.admin.offers.list({ search, page }), [search, page])
 
@@ -38,23 +38,22 @@ export default function Offers() {
   const pagination = data?.pagination ?? { page: 1, lastPage: 1, total: 0, perPage: 25 }
 
   async function onToggle(id) {
-    setError('')
     try {
-      await api.admin.offers.toggle(id)
+      toast.success((await api.admin.offers.toggle(id)).$message)
       refetch()
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message)
     }
   }
 
   async function onDelete() {
     setBusy(true)
     try {
-      await api.admin.offers.remove(confirmId)
+      toast.success((await api.admin.offers.remove(confirmId)).$message)
       setConfirmId(null)
       refetch()
     } catch (err) {
-      setError(err.message)
+      toast.error(err.message)
       setConfirmId(null)
     } finally {
       setBusy(false)
@@ -73,9 +72,6 @@ export default function Offers() {
           <AddNewButton to="/admin/offers/create">Add New</AddNewButton>
         </div>
       </div>
-
-      <Alert onDismiss={() => setError('')}>{error}</Alert>
-
       {loading ? (
         <div className="rounded-[10px] bg-white p-6 text-center text-admin-muted">Loading…</div>
       ) : items.length === 0 ? (
