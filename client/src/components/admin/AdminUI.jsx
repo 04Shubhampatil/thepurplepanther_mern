@@ -43,8 +43,17 @@ export function PageHead({ title, children }) {
 
 // ── buttons ───────────────────────────────────────────────────────────────
 
+/*
+ * No `border-0` here.
+ *
+ * `.btn` sets `border: none` and `.btn-light` / `.btn-danger` then add one, which works in
+ * CSS because the later rule wins. Tailwind utilities are all one class, so `border-0` and
+ * `border` are the same specificity and EMISSION order decides — and `border-0` is emitted
+ * last, so it silently flattened every bordered variant. The borderless variants say so
+ * themselves instead.
+ */
 const BUTTON_BASE =
-  'inline-flex items-center justify-center gap-1.5 rounded-md border-0 font-semibold no-underline transition-colors disabled:cursor-not-allowed disabled:opacity-60'
+  'inline-flex items-center justify-center gap-1.5 rounded-md font-semibold no-underline transition-colors disabled:cursor-not-allowed disabled:opacity-60'
 
 const BUTTON_SIZES = {
   md: 'px-4 py-[10px] text-[13px]',
@@ -52,10 +61,10 @@ const BUTTON_SIZES = {
 }
 
 const BUTTON_VARIANTS = {
-  primary: 'bg-admin-primary text-white hover:bg-admin-primary-dark',
+  primary: 'border-0 bg-admin-primary text-white hover:bg-admin-primary-dark',
   light: 'border border-[#ddd] bg-white text-[#555] hover:bg-[#f7f7f7]',
   danger: 'border border-[#f8bbd0] bg-white text-admin-primary hover:bg-[#fff5f8]',
-  dark: 'bg-[#2a3140] text-white hover:bg-[#1f2430]',
+  dark: 'border-0 bg-[#2a3140] text-white hover:bg-[#1f2430]',
 }
 
 export function Button({ variant = 'primary', size = 'md', className = '', loading, children, ...props }) {

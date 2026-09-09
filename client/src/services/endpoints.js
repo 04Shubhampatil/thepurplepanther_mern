@@ -128,7 +128,20 @@ export const admin = {
   sizes: resource('sizes'),
   offers: resource('offers'),
   newsTypes: resource('news-types'),
-  blogPosts: resource('blog-posts'),
+
+  /*
+   * Journal posts carry two uploads and filter by news type, so they need more than the
+   * generated resource: `save` posts both files as multipart, and `toggleFeatured` hits the
+   * separate endpoint behind the Featured column.
+   */
+  blogPosts: {
+    ...resource('blog-posts'),
+    save: (id, body, files) =>
+      id
+        ? patch(`/admin/blog-posts/${id}`, toFormData(body, files))
+        : post('/admin/blog-posts', toFormData(body, files)),
+    toggleFeatured: (id) => patch(`/admin/blog-posts/${id}/featured`),
+  },
   coupons: resource('coupons'),
   users: resource('users'),
   /*

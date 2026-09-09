@@ -5,8 +5,9 @@ import { createResourceController } from '../../controllers/admin/resource.contr
 import * as catalogAdmin from '../../services/admin/catalog-admin.service.js'
 import { validate } from '../../middleware/validate.middleware.js'
 import { attachUser, requireAuth, requireAdmin } from '../../middleware/auth.middleware.js'
-import { upload, bannerUploader } from '../../services/upload.service.js'
+import { upload, bannerUploader, blogPostUploader } from '../../services/upload.service.js'
 import * as v from '../../validators/admin.validator.js'
+import { ValidationError } from '../../utils/api-error.js'
 
 /**
  * Admin API: /api/v1/admin
@@ -82,7 +83,6 @@ const resources = [
   ['sizes', catalogAdmin.sizes, 'Size', v.sizeSchema, null],
   ['offers', catalogAdmin.offers, 'Offer', v.offerSchema, 'image'],
   ['news-types', catalogAdmin.newsTypes, 'News type', v.newsTypeSchema, null],
-  ['blog-posts', catalogAdmin.blogPosts, 'Blog post', v.blogPostSchema, 'image'],
 ]
 
 for (const [path, service, label, schema, imageField] of resources) {
@@ -96,6 +96,93 @@ for (const [path, service, label, schema, imageField] of resources) {
   router.delete(`/${path}/:id`, controller.destroy)
   router.patch(`/${path}/:id/toggle`, controller.toggle)
 }
+
+/*
+ * Journal posts sit outside the loop for two reasons the factory cannot express: they carry
+ * TWO uploads (the 448x448 card thumbnail and the wide detail banner, stored in different
+ * directories), and their index filters by news type as well as by search — the `news_type_id`
+ * dropdown above the table in blog-posts/index.blade.php.
+ */
+const blogPostUpload = blogPostUploader.fields([
+  { name: 'image', maxCount: 1 },
+  { name: 'banner_image', maxCount: 1 },
+])
+
+// multer keys the map by FIELD name; the service writes Prisma COLUMNS.
+const blogPostFiles = (req) => ({
+  image: req.files?.image?.[0] ?? null,
+  bannerImage: req.files?.banner_image?.[0] ?? null,
+})
+
+router.get('/blog-posts', async (req, res, next) => {
+  try {
+    const typeId = req.query.news_type_id
+    const result = await catalogAdmin.blogPosts.list({
+      search: req.query.search ?? '',
+      page: Number.parseInt(req.query.page ?? '1', 10) || 1,
+      perPage: Number.parseInt(req.query.per_page ?? '25', 10) || 25,
+      where: typeId ? { newsTypeId: BigInt(typeId) } : {},
+    })
+    res.json({ success: true, data: result, message: 'Blog post list' })
+  } catch (error) {
+    next(error)
+  }
+})
+
+router.get('/blog-posts/:id', async (req, res, next) => {
+  try {
+    res.json({
+      success: true,
+      data: { item: await catalogAdmin.blogPosts.find(req.params.id) },
+      message: 'Blog post',
+    })
+  } catch (error) {
+    next(error)
+  }
+})
+
+router.post('/blog-posts', blogPostUpload, validate(v.blogPostSchema), async (req, res, next) => {
+  try {
+    const files = blogPostFiles(req)
+    // `'image' => [$post ? 'nullable' : 'required', ...]` — required on create only. It is a
+    // file rather than a body field, so the schema cannot see it.
+    if (!files.image) {
+      throw new ValidationError({ image: ['Please choose a card image.'] })
+    }
+
+    const item = await catalogAdmin.blogPosts.create(req.body, files)
+    res.status(201).json({ success: true, data: { item }, message: 'Blog post created.' })
+  } catch (error) {
+    next(error)
+  }
+})
+
+router.patch('/blog-posts/:id', blogPostUpload, validate(v.blogPostSchema), async (req, res, next) => {
+  try {
+    const item = await catalogAdmin.blogPosts.update(req.params.id, req.body, blogPostFiles(req))
+    res.json({ success: true, data: { item }, message: 'Blog post updated.' })
+  } catch (error) {
+    next(error)
+  }
+})
+
+router.delete('/blog-posts/:id', async (req, res, next) => {
+  try {
+    await catalogAdmin.blogPosts.destroy(req.params.id)
+    res.json({ success: true, data: {}, message: 'Blog post deleted.' })
+  } catch (error) {
+    next(error)
+  }
+})
+
+router.patch('/blog-posts/:id/toggle', async (req, res, next) => {
+  try {
+    const isActive = await catalogAdmin.blogPosts.toggle(req.params.id)
+    res.json({ success: true, data: { isActive }, message: 'Blog post status updated.' })
+  } catch (error) {
+    next(error)
+  }
+})
 
 // Blog posts additionally have a featured toggle.
 router.patch('/blog-posts/:id/featured', async (req, res, next) => {

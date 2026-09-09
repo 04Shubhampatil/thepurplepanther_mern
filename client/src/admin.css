@@ -133,3 +133,42 @@
 .admin-stat-green  { background: linear-gradient(135deg, #66bb6a, #43a047); }
 .admin-stat-cyan   { background: linear-gradient(135deg, #26c6da, #00acc1); }
 .admin-stat-pink   { background: linear-gradient(135deg, #ec407a, #d81b60); }
+
+/*
+ * The rich-text editing area, and anywhere a post body is rendered back.
+ *
+ * The admin reset above flattens heading margins and strips list markers, which is right
+ * for the panel's own chrome and wrong inside authored content — a bulleted list has to
+ * look bulleted while it is being written. These rules restore the document defaults for
+ * that subtree only, so what the editor shows matches what the journal will render.
+ */
+.admin-rte :where(h1, h2, h3, h4, h5, h6) { margin: 0.6em 0 0.3em; font-weight: 700; line-height: 1.25; }
+.admin-rte :where(h1) { font-size: 1.8em; }
+.admin-rte :where(h2) { font-size: 1.5em; }
+.admin-rte :where(h3) { font-size: 1.3em; }
+.admin-rte :where(h4) { font-size: 1.15em; }
+.admin-rte :where(h5) { font-size: 1em; }
+.admin-rte :where(h6) { font-size: 0.9em; }
+.admin-rte :where(p) { margin: 0 0 0.8em; }
+.admin-rte :where(ul) { margin: 0 0 0.8em; padding-left: 1.6em; list-style: disc; }
+.admin-rte :where(ol) { margin: 0 0 0.8em; padding-left: 1.6em; list-style: decimal; }
+.admin-rte :where(li) { margin-bottom: 0.2em; }
+.admin-rte :where(blockquote) {
+  margin: 0 0 0.8em;
+  padding: 6px 0 6px 14px;
+  border-left: 3px solid #e0e0e0;
+  color: #555;
+}
+.admin-rte :where(pre) {
+  margin: 0 0 0.8em;
+  padding: 10px 12px;
+  background: #f6f6f6;
+  border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: pre-wrap;
+}
+.admin-rte :where(a) { color: #1e88e5; text-decoration: underline; }
+.admin-rte :where(img) { display: inline-block; max-width: 100%; height: auto; }
+.admin-rte :where(hr) { margin: 1em 0; border: none; border-top: 1px solid #ddd; }
+.admin-rte :where(table) { margin-bottom: 0.8em; }
+.admin-rte :where(th, td) { border: 1px solid #ddd; padding: 6px; }

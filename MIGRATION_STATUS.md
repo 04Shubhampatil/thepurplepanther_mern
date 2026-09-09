@@ -90,6 +90,9 @@ packed `#e3f2fd/#1565c0`, shipped `#fff3e0/#ef6c00`, delivered `#e8f5e9/#2e7d32`
 | Products (index) | unchanged | ✅ panel + filters + bulk + card grid | pending |
 | Banners (index) | `BANNER_SECTIONS` labels corrected | ✅ panel + section chips + card grid | ✅ |
 | Banners (create / edit) | per-slide metadata + video uploads restored | ✅ two form cards + media repeater | ✅ |
+| News Types | snake_case keys now reach Prisma | ✅ inline form + table, inline edit | ✅ |
+| Journal Posts (index) | news-type filter added | ✅ filter card + thumbnail table | ✅ |
+| Journal Posts (create / edit) | second image column, comments_count, naive dates | ✅ 640px form grid + editor | ✅ |
 | Home Sections | unchanged | ✅ two-product picker | pending |
 
 ### Stylesheet isolation
@@ -168,6 +171,48 @@ Verified in the browser against `admin.css`: card 980px/10px/18px/`0 2px 10px rg
 `.banner-existing-item` `140px 1fr` at 14px on #eee/#fafafa, `.offer-form-actions` 18px.
 No horizontal overflow, no console errors, and the three client-side messages fire with
 banner-form.js's exact wording.
+
+### The journal — four backend gaps and one editor decision
+
+**`sort_order` and every other snake_case field never reached the database.** Zod hands back
+the request's own field names (Laravel's columns, snake_case); Prisma's client uses the
+camelCase names from schema.prisma, and nothing bridged them. Every resource behind the
+shared CRUD factory was affected — `short_description`, `has_color`, `is_active`,
+`news_type_id` — but only fields the rebuilt screens actually submit would have shown it, and
+until now those were all single-word (`name`, `code`, `title`). `camelizeKeys` in
+crud.service.js converts the KEYS only, and only those containing an underscore.
+
+**Journal posts have two images.** `image` is the 448x448 card thumbnail and `banner_image`
+the wide detail banner, stored in separate directories with separate size limits (4 MB and
+5 MB). The factory understood one, and `persist()` stripped the slash out of
+`blog-posts/banners`. Both now handle a nested directory and a map of column -> file, and
+blog-posts is registered outside the resource loop because it also filters by news type.
+
+**`comments_count` was not in the schema**, so the field on the form was silently discarded.
+
+**Every journal date was a day late.** MySQL `timestamp` columns carry no zone; Laravel read
+them in the app timezone and printed them straight back. Prisma reads the same column as UTC
+and serialises it with a `Z`, so `new Date(...)` in an Asia/Kolkata browser added the offset a
+second time — `2026-08-09 20:27` displayed as 10 Aug. utils/admin-date.js reads the wall-clock
+parts out of the string without constructing a Date, and the validator appends the `Z` on the
+way IN so a save writes back the digits the admin typed rather than walking them back 5h30m.
+
+**The content editor is local, not CKEditor.** blog-posts/edit.blade.php pulls 4.22.1 off
+cdn.ckeditor.com, and that build prints its own "This CKEditor 4.22.1 version is not secure"
+banner into the editing area — visible in the reference screenshot. Re-adding an unpatched
+third-party script to an app that has just had its whole vendor stack removed, running against
+an authenticated admin session, is not a trade worth making for a toolbar. RichTextEditor.jsx
+reproduces the toolbar and edits the same HTML in both directions, so existing post bodies
+load and save unchanged. The clipboard group (Cut / Copy / Paste / Paste as text / Paste from
+Word) is left out: browsers refuse those commands from a script, so in the Laravel panel they
+only ever opened a "your browser doesn't allow" dialog — the keyboard shortcuts are unchanged.
+
+**Two shared fixes fell out of this work.** `Button`'s base class carried `border-0`, which
+is the same specificity as the `border` in the `light` and `danger` variants and is emitted
+later, so every bordered button in the panel had been rendering flat. And `storageUrl()` now
+recognises a `frontend/` path as bundled theme art rather than prefixing it with `/storage/`,
+which is how `resolveMediaUrl` ordered its checks — the journal's seeded rows all point at
+`frontend/images/blogs/blog-N.jpg`, so every thumbnail was broken.
 
 ## 4. Known issues / blockers
 

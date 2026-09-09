@@ -16,7 +16,17 @@ export function storageUrl(path, fallback = '') {
   const value = String(path)
   if (value.startsWith('http://') || value.startsWith('https://')) return value
 
-  return `/storage/${value.replace(/^\/+/, '')}`
+  const normalized = value.replace(/^\/+/, '')
+
+  /*
+   * `resolveMediaUrl` checks for a `frontend/` prefix BEFORE it reaches the storage disk,
+   * because several seeded rows point at bundled theme art rather than an upload — the
+   * journal's posts are all `frontend/images/blogs/blog-N.jpg`. Prefixing those with
+   * `/storage/` gives a 404 and a broken thumbnail, which is exactly how this surfaced.
+   */
+  if (normalized.startsWith('frontend/')) return `/${normalized}`
+
+  return `/storage/${normalized}`
 }
 
 /**

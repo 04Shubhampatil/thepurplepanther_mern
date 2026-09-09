@@ -15,6 +15,35 @@ import { persist, remove } from '../upload.service.js'
  * one's own rules and messages.
  */
 
+/**
+ * Zod hands back the request's own field names, which are Laravel's column names in
+ * snake_case; Prisma's client uses the camelCase names from schema.prisma. Nothing bridged
+ * the two, so any resource field with an underscore — `sort_order`, `is_active`,
+ * `short_description`, `news_type_id` — reached `prisma.create` as an unknown argument.
+ *
+ * Only the KEYS are touched, and only those containing an underscore, so a value is never
+ * reinterpreted. Doing it here rather than in eight schemas keeps the request contract
+ * (snake_case, matching the Laravel forms) separate from the storage contract.
+ */
+function camelizeKeys(data) {
+  const out = {}
+  for (const [key, value] of Object.entries(data)) {
+    out[key.replace(/_([a-z0-9])/g, (_, c) => c.toUpperCase())] = value
+  }
+  return out
+}
+
+/**
+ * Callers pass either a single multer file (the common case, `upload.single`) or a map of
+ * column -> file (`upload.fields`, used where a resource has more than one image). Both are
+ * normalised to a map so the write paths below have one shape to handle.
+ */
+function normaliseFiles(file, primaryField = 'image') {
+  if (!file) return {}
+  if (file.buffer) return { [primaryField]: file }
+  return file
+}
+
 /** Laravel's Str::slug. */
 export function slugify(value) {
   return String(value ?? '')
@@ -46,6 +75,12 @@ export function createCrudService(config) {
     hasSlug = true,
     imageField = 'image',
     imageDir = null,
+    /**
+     * Extra file columns, as `{ column: directory }`. Journal posts are the only resource
+     * with two — `image` is the 448x448 card thumbnail and `bannerImage` the wide detail
+     * banner, stored in different directories exactly as BlogPostController stored them.
+     */
+    extraImageDirs = {},
     searchFields = [nameField],
     uniqueFields = [],
     include = undefined,
@@ -116,21 +151,27 @@ export function createCrudService(config) {
     },
 
     async create(data, file = null) {
-      const payload = { ...data }
+      const payload = camelizeKeys(data)
 
       if (hasSlug && !payload.slug) payload.slug = slugify(payload[nameField])
       if (hasSlug) uniqueFields.includes('slug') || uniqueFields.push('slug')
 
       await assertUnique(payload)
 
-      if (file && imageDir) payload[imageField] = persist(file, imageDir)
+      const uploads = normaliseFiles(file, imageField)
+      if (uploads[imageField] && imageDir) {
+        payload[imageField] = persist(uploads[imageField], imageDir)
+      }
+      for (const [column, dir] of Object.entries(extraImageDirs)) {
+        if (uploads[column]) payload[column] = persist(uploads[column], dir)
+      }
 
       return table().create({ data: payload, include })
     },
 
     async update(id, data, file = null) {
       const existing = await this.find(id)
-      const payload = { ...data }
+      const payload = camelizeKeys(data)
 
       // The slug follows the name when the name changes, matching Str::slug on save.
       if (hasSlug && payload[nameField] && !payload.slug) {
@@ -139,11 +180,17 @@ export function createCrudService(config) {
 
       await assertUnique(payload, id)
 
-      if (file && imageDir) {
-        payload[imageField] = persist(file, imageDir)
+      const uploads = normaliseFiles(file, imageField)
+      if (uploads[imageField] && imageDir) {
+        payload[imageField] = persist(uploads[imageField], imageDir)
         // Replace, then delete the old file — never the other way round, or a failed
         // write leaves the row pointing at nothing.
         if (existing[imageField]) remove(existing[imageField])
+      }
+      for (const [column, dir] of Object.entries(extraImageDirs)) {
+        if (!uploads[column]) continue
+        payload[column] = persist(uploads[column], dir)
+        if (existing[column]) remove(existing[column])
       }
 
       return table().update({ where: { id: BigInt(id) }, data: payload, include })
@@ -153,6 +200,9 @@ export function createCrudService(config) {
       const existing = await this.find(id)
       await table().delete({ where: { id: BigInt(id) } })
       if (imageDir && existing[imageField]) remove(existing[imageField])
+      for (const column of Object.keys(extraImageDirs)) {
+        if (existing[column]) remove(existing[column])
+      }
     },
 
     /** Flip `is_active`. Returns the new value so the UI does not need to re-read. */

@@ -30,6 +30,7 @@ export const UPLOAD_DIRS = Object.freeze({
   coupons: 'coupons',
   users: 'users',
   blogPosts: 'blog-posts',
+  blogPostBanners: 'blog-posts/banners',
 })
 
 const IMAGE_MIME = new Set(['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/svg+xml'])
@@ -79,6 +80,25 @@ export const upload = multer({
   },
 })
 
+/**
+ * Journal posts: images only, but 5 MB rather than 4.
+ *
+ * `BlogPostController` validated the card image at `max:4096` and the detail banner at
+ * `max:5120`. multer's ceiling is per-instance, so the looser of the two is used here and
+ * the form states each limit — the same place Laravel stated them.
+ */
+export const blogPostUploader = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024, files: 2 },
+  fileFilter(req, file, cb) {
+    if (!IMAGE_MIME.has(file.mimetype)) {
+      cb(new BusinessError('Only PNG, JPG, JPEG and WEBP images are allowed.'))
+      return
+    }
+    cb(null, true)
+  },
+})
+
 /** The banner variant of the same instance: images or video, 50 MB apiece. */
 export const bannerUploader = multer({
   storage: multer.memoryStorage(),
@@ -102,7 +122,14 @@ export const bannerUploader = multer({
 export function persist(file, directory) {
   if (!file?.buffer) return null
 
-  const dir = String(directory).replace(/[^a-z0-9-]/gi, '')
+  // Slashes are allowed so a nested target like 'blog-posts/banners' survives — Laravel
+  // stored the journal's banner images there. Everything else is still stripped, and each
+  // segment is re-checked, so no value can walk up out of the storage root.
+  const dir = String(directory)
+    .split('/')
+    .map((segment) => segment.replace(/[^a-z0-9-]/gi, ''))
+    .filter(Boolean)
+    .join('/')
   if (!dir) throw new BusinessError('Invalid upload directory.')
 
   const absoluteDir = path.join(storageRoot(), dir)

@@ -89,7 +89,9 @@ export const blogPosts = createCrudService({
   label: 'Blog post',
   nameField: 'title',
   imageDir: UPLOAD_DIRS.blogPosts,
-  searchFields: ['title', 'slug'],
+  // BlogPostController stored the wide detail banner under a nested directory.
+  extraImageDirs: { bannerImage: UPLOAD_DIRS.blogPostBanners },
+  searchFields: ['title', 'slug', 'authorName'],
   uniqueFields: [],
   include: { newsType: { select: { id: true, title: true } } },
   orderBy: [{ sortOrder: 'asc' }, { id: 'desc' }],

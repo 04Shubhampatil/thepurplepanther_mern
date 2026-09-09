@@ -125,14 +125,36 @@ export const newsTypeSchema = z.object({
 export const blogPostSchema = z.object({
   title: str(255, 'Please enter a title.'),
   slug: optStr(255),
-  news_type_id: z.coerce.number().int().positive().nullish(),
-  author_name: optStr(255),
+  // Required, as in BlogPostController — a post with no type disappears from the journal's
+  // type filter and from the storefront's category strip.
+  news_type_id: z.coerce.number({ error: 'Please choose a news type.' }).int().positive(),
+  // Laravel defaulted the author to 'Admin' on save rather than leaving it null.
+  author_name: optStr(255).transform((v) => v || 'Admin'),
   excerpt: optStr(2000),
-  content: z.string().nullish(),
+  content: str(16777215, 'Please write the post content.'),
+  comments_count: int0,
   is_featured: bool,
   is_active: bool,
   sort_order: int0,
-  published_at: z.string().nullish(),
+  /*
+   * `datetime-local` sends "2026-08-09T20:27" — a string Prisma will not accept for a
+   * DateTime column, and a WALL CLOCK with no zone attached.
+   *
+   * `new Date("2026-08-09T20:27")` reads it as LOCAL time, and Prisma then writes the UTC
+   * equivalent, so on an Asia/Kolkata server every save would walk the stored value back by
+   * 5h30m. Laravel wrote the digits the admin typed straight into the column, so the 'Z' is
+   * appended to keep them: the column ends up holding exactly what the field showed, which
+   * is what utils/admin-date.js reads back out.
+   */
+  published_at: z
+    .string()
+    .nullish()
+    .transform((v) => {
+      if (v == null || v === '') return null
+      const wallClock = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(v)
+      return new Date(wallClock ? `${v}${v.length === 16 ? ':00' : ''}Z` : v)
+    })
+    .refine((v) => v === null || !Number.isNaN(v.getTime()), 'Please enter a valid date.'),
 })
 
 // ── products ───────────────────────────────────────────────────────────────
