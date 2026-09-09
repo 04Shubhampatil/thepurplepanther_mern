@@ -5,6 +5,7 @@ import { useApi } from '../../hooks/useApi.js'
 import { ConfirmDialog, Alert, Pagination } from '../../components/admin/AdminUI.jsx'
 import { AdminSearch, AddNewButton, Toggle } from '../../components/admin/AdminControls.jsx'
 import { usePageTitle } from '../../theme/page.js'
+import { storageUrl } from '../../utils/admin-media.js'
 import * as api from '../../services/endpoints.js'
 
 /**
@@ -31,8 +32,8 @@ import * as api from '../../services/endpoints.js'
  */
 const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=600&q=80'
 
-/** Blade: `asset('storage/'.$category->image)`. */
-const imageUrl = (image) => (image ? `/storage/${String(image).replace(/^\/+/, '')}` : FALLBACK_IMAGE)
+/** Blade: `asset('storage/'.$category->image)`. Category stores the path in `image`. */
+const imageUrl = (image) => storageUrl(image, FALLBACK_IMAGE)
 
 export default function Categories() {
   usePageTitle('Categories - Purple Panther')

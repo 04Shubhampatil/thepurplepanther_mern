@@ -11,6 +11,7 @@ import Button from '../../components/ui/Button.jsx'
 import { Field, Input, Textarea, Select, Checkbox } from '../../components/ui/Field.jsx'
 import { Alert as AdminAlert, ConfirmDialog, CONTROL } from '../../components/admin/AdminUI.jsx'
 import { Toggle } from '../../components/admin/AdminControls.jsx'
+import { storageUrl, discountPercent } from '../../utils/admin-media.js'
 
 /** Blade's placeholder when a product has no featured image. */
 const PRODUCT_FALLBACK = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&q=80'
@@ -483,11 +484,11 @@ export default function Products() {
             {/* .product-card-media — a fixed 200px band, cover, #f0f0f0 behind it */}
             <div
               className="relative h-[200px] bg-[#f0f0f0] bg-cover bg-center"
-              style={{ backgroundImage: `url('${item.image || PRODUCT_FALLBACK}')` }}
+              style={{ backgroundImage: `url('${storageUrl(item.featuredImage, PRODUCT_FALLBACK)}')` }}
             >
-              {item.discountPercent > 0 ? (
+              {discountPercent(item) > 0 ? (
                 <span className="absolute left-0 top-2.5 rounded-r bg-admin-primary px-2.5 py-1 text-[11px] font-bold text-white">
-                  {item.discountPercent}% OFF
+                  {discountPercent(item)}% OFF
                 </span>
               ) : null}
 

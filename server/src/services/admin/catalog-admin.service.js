@@ -137,7 +137,10 @@ export async function listProducts({ search = '', categoryId, brandId, offerId, 
         category: { select: { id: true, title: true } },
         subCategory: { select: { id: true, title: true } },
         brand: { select: { id: true, name: true } },
-        offer: { select: { id: true, title: true } },
+        // `discountPercent` is needed by the listing card's badge: Product's
+        // getDiscountPercentAttribute prefers the OFFER's percent and only falls back to
+        // mrp/selling_price. Without it the badge silently under-reports discounted items.
+        offer: { select: { id: true, title: true, discountPercent: true } },
       },
       orderBy: { id: 'desc' }, // latest()
       skip: (currentPage - 1) * take,
