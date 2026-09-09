@@ -142,7 +142,19 @@ export const admin = {
         : post('/admin/blog-posts', toFormData(body, files)),
     toggleFeatured: (id) => patch(`/admin/blog-posts/${id}/featured`),
   },
-  coupons: resource('coupons'),
+  /*
+   * Coupons carry an image, so writes are multipart; `formData` fills the offer-type
+   * dropdown and the category/product multi-selects from one call, as
+   * CouponController::formData did.
+   */
+  coupons: {
+    ...resource('coupons'),
+    formData: () => get('/admin/coupons/form-data'),
+    save: (id, body, files) =>
+      id
+        ? patch(`/admin/coupons/${id}`, toFormData(body, files))
+        : post('/admin/coupons', toFormData(body, files)),
+  },
   users: resource('users'),
   /*
    * Banners are multipart in both directions and update over POST.

@@ -323,6 +323,10 @@ export const couponShow = asyncHandler(async (req, res) =>
   ok(res, { item: await miscAdmin.findCoupon(req.params.id) }, 'Coupon'),
 )
 
+export const couponFormData = asyncHandler(async (req, res) =>
+  ok(res, await miscAdmin.couponFormData(), 'Coupon form data'),
+)
+
 export const couponStore = asyncHandler(async (req, res) =>
   created(res, { item: await miscAdmin.createCoupon(req.body, req.file) }, 'Coupon created successfully.'),
 )
@@ -444,6 +448,7 @@ export default {
   homeSectionShow,
   homeSectionUpdate,
   couponIndex,
+  couponFormData,
   couponShow,
   couponStore,
   couponUpdate,

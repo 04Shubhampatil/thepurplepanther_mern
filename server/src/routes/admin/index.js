@@ -257,7 +257,17 @@ router.post('/home-sections', validate(v.homeSectionSchema), admin.homeSectionUp
 
 // ── coupons ────────────────────────────────────────────────────────────────
 router.get('/coupons', admin.couponIndex)
-router.post('/coupons', upload.single('image'), validate(v.couponSchema), admin.couponStore)
+// Literal before /:id, or "form-data" is parsed as a coupon id.
+router.get('/coupons/form-data', admin.couponFormData)
+router.post('/coupons', upload.single('image'), validate(v.couponSchema), (req, res, next) => {
+  // `'image' => [$coupon ? 'nullable' : 'required', ...]`. A file cannot be validated by the
+  // schema, and CouponController stores it unconditionally on create — without it the
+  // coupon card has no art at all.
+  if (!req.file) {
+    return next(new ValidationError({ image: ['Please select a coupon image.'] }))
+  }
+  return admin.couponStore(req, res, next)
+})
 router.get('/coupons/:id', admin.couponShow)
 router.patch('/coupons/:id', upload.single('image'), validate(v.couponSchema), admin.couponUpdate)
 router.delete('/coupons/:id', admin.couponDestroy)

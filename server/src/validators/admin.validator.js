@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { BANNER_SECTION_KEYS } from '../constants/cms.js'
+import { COUPON_OFFER_TYPES } from '../constants/coupons.js'
 import { STATUS_KEYS } from '../constants/order-statuses.js'
 import { ROLES } from '../constants/roles.js'
 
@@ -360,9 +361,19 @@ export const homeSectionSchema = z.object({
 export const couponSchema = z
   .object({
     code: str(50, 'Please enter a coupon code.'),
-    offer_type: z.enum(['coupon', 'bogo']).optional(),
+    /*
+     * All thirteen of Coupon::OFFER_TYPES, not just the two the discount engine branches on.
+     * The form's dropdown offers every one of them, so narrowing the enum here rejected a
+     * perfectly ordinary "Seasonal / festival sale" at the door.
+     */
+    offer_type: z.enum(COUPON_OFFER_TYPES, { error: 'Please choose an offer type.' }).optional(),
     description: z.string().nullish(),
-    discount_type: z.enum(['percent', 'amount']).optional(),
+    /*
+     * DERIVED, never submitted — CouponController computes
+     * `$discountType = $percent !== null ? 'percent' : 'amount'`, and the form has no such
+     * field. Accepting it from the client let the two disagree, which decides how the
+     * storefront prices the coupon.
+     */
     discount_percent: num,
     discount_amount: num,
     max_discount_status: bool,
@@ -392,16 +403,54 @@ export const couponSchema = z
     (d) =>
       d.offer_type === 'bogo' ||
       d.free_shipping ||
-      (d.discount_type === 'amount' ? Number(d.discount_amount) > 0 : Number(d.discount_percent) > 0),
-    { message: 'Enter a discount, or enable free shipping.', path: ['discount_percent'] },
+      Number(d.discount_percent) > 0 ||
+      Number(d.discount_amount) > 0,
+    {
+      message: 'Enter discount in % OR amount, or enable free shipping.',
+      path: ['discount_amount'],
+    },
   )
   .refine(
     (d) => d.offer_type !== 'bogo' || (Number(d.bogo_buy_quantity) > 0 && Number(d.bogo_get_quantity) > 0),
     { message: 'Buy and Get quantities are required for a BOGO offer.', path: ['bogo_buy_quantity'] },
   )
-  .refine((d) => !d.starts_at || !d.ends_at || new Date(d.ends_at) > new Date(d.starts_at), {
+  .refine((d) => !d.starts_at || !d.ends_at || new Date(d.ends_at) >= new Date(d.starts_at), {
     message: 'The end date must be after the start date.',
     path: ['ends_at'],
+  })
+  // "Use either discount in % OR amount, not both." — BOGO is exempt, since it carries
+  // neither.
+  .refine(
+    (d) =>
+      d.offer_type === 'bogo' ||
+      d.discount_percent == null ||
+      d.discount_amount == null,
+    { message: 'Use either discount in % OR amount, not both.', path: ['discount_amount'] },
+  )
+  // A percentage discount with a cap switched on needs the cap. An amount discount does
+  // not, which is why the percent check is part of the condition rather than beside it.
+  .refine(
+    (d) =>
+      d.offer_type === 'bogo' ||
+      !d.max_discount_status ||
+      d.discount_percent == null ||
+      d.max_discount_amount != null,
+    {
+      message: 'Maximum discount amount is required when status is True.',
+      path: ['max_discount_amount'],
+    },
+  )
+  .refine((d) => !d.min_cart_status || d.min_cart_amount != null, {
+    message: 'Minimum cart amount is required when status is True.',
+    path: ['min_cart_amount'],
+  })
+  .refine((d) => d.applies_to !== 'categories' || (d.category_ids ?? []).length > 0, {
+    message: 'Select at least one category.',
+    path: ['category_ids'],
+  })
+  .refine((d) => d.applies_to !== 'products' || (d.product_ids ?? []).length > 0, {
+    message: 'Select at least one product.',
+    path: ['product_ids'],
   })
 
 // ── settings & bulk ────────────────────────────────────────────────────────

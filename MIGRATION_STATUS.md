@@ -95,6 +95,7 @@ packed `#e3f2fd/#1565c0`, shipped `#fff3e0/#ef6c00`, delivered `#e8f5e9/#2e7d32`
 | Journal Posts (create / edit) | second image column, comments_count, naive dates | ✅ 640px form grid + editor | ✅ |
 | Coupons (index) | `latest()` ordering + 5-column search + `paginate(9)` | ✅ dark card grid | ✅ |
 | Coupons (detail) | unchanged | ✅ hero + definition grid | ✅ |
+| Coupons (create / edit) | offer-type enum, derived discount_type, conditional nulling, form-data | ✅ 20 rows + 5 conditionals | ✅ |
 | Home Sections | unchanged | ✅ two-product picker | pending |
 
 ### Stylesheet isolation
@@ -259,6 +260,42 @@ Three server fixes: the list ordered by `id` where CouponController wrote a bare
 which reversed the coupons sharing a timestamp; it searched only `code` where the controller
 searches five columns, so "10" could not find FLAT10; and it paginated 20 where the
 controller paginates 9, the number that fills three rows of three.
+
+### The coupon form — four server gaps
+
+**`offer_type` was an enum of two.** The schema allowed only `coupon` and `bogo` — the values
+the discount engine branches on — while the form's dropdown offers all thirteen of
+`Coupon::OFFER_TYPES`. Picking "Seasonal / festival sale" was rejected at the door. The list
+now lives in constants/coupons.js and fills both the validator and the form.
+
+**`discount_type` was accepted from the client.** It is not a form field:
+`CouponController::validated` derives it as `$percent !== null ? 'percent' : 'amount'`. Taking
+it from the request let it disagree with the figure actually stored, which decides how the
+storefront prices the coupon. It is derived in `couponScalars` now.
+
+**The conditional nulling was missing, and it is the substance of that method.** A field the
+form HID must be stored as null, not as whatever the browser last held, or a coupon keeps
+applying a rule its own edit screen no longer shows: BOGO clears both discount figures and
+the cap, the cap survives only alongside a percentage, the cart minimum only with its status
+on, and each id list only for the `applies_to` that uses it.
+
+**Four of the controller's guards had no equivalent** — both-figures-at-once, the cap required
+with a percentage, the cart minimum required with its status, and at least one
+category/product for a scoped coupon — plus the create-time image requirement, which is a
+file and so cannot live in the schema.
+
+`starts_at` / `ends_at` get the same wall-clock treatment as the journal's `published_at`:
+`datetime-local` sends digits with no zone, and reading them as local would walk the stored
+value back by the server's offset on every save.
+
+The five conditional rows from public/js/coupon-form.js are reproduced by NOT RENDERING the
+hidden rows rather than by `display:none`, so a hidden field cannot be submitted — which is
+what made the nulling above necessary in the first place.
+
+Two seeded-data notes, both faithful rather than broken: `storage/coupons/seed-placeholder.jpg`
+is a 334-byte stub with no decodable image data, so the cards paint flat #333 and the form's
+preview shows its alt text — Laravel does the same, since `Storage::exists` is true and the
+browser simply cannot decode the file.
 
 ## 4. Known issues / blockers
 

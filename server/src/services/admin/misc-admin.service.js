@@ -5,6 +5,7 @@ import { toDecimal, toNumber } from '../../utils/money.js'
 import { stringifyJsonColumn } from '../../utils/json.js'
 import { persist, remove, UPLOAD_DIRS, BANNER_VIDEO_MIME } from '../upload.service.js'
 import { isValidSitePage, SITE_PAGES } from '../../constants/cms.js'
+import { COUPON_OFFER_TYPE_LABELS } from '../../constants/coupons.js'
 import { ROLES } from '../../constants/roles.js'
 
 /**
@@ -451,35 +452,78 @@ export async function findCoupon(id) {
   return coupon
 }
 
+/**
+ * The tail of `CouponController::validated` — the part that runs AFTER validation passes.
+ *
+ * It is not a straight field copy, and the conditionals are the point: a field the form
+ * hid must be stored as null rather than as whatever the browser last held, or a coupon
+ * keeps applying a rule its own edit screen no longer shows. So BOGO clears both discount
+ * figures and the cap; the cap survives only alongside a PERCENT discount; the cart minimum
+ * survives only with its status on; and the id lists are kept only for the `applies_to`
+ * that uses them.
+ *
+ * `discount_type` is derived here for the same reason — it is not a form field, and letting
+ * a client send it lets it disagree with the figure actually stored.
+ */
 function couponScalars(data) {
+  const isBogo = data.offer_type === 'bogo'
+  const percent = data.discount_percent == null ? null : Number(data.discount_percent)
+  const amount = data.discount_amount == null ? null : Number(data.discount_amount)
+  const maxDiscountStatus = !isBogo && Boolean(data.max_discount_status)
+  const minCartStatus = Boolean(data.min_cart_status)
+  const appliesTo = data.applies_to ?? 'all'
+
   return {
     code: String(data.code).trim().toUpperCase(),
     offerType: data.offer_type ?? 'coupon',
     description: data.description ?? null,
-    discountType: data.discount_type ?? 'percent',
-    discountPercent: data.discount_percent == null ? null : toDecimal(data.discount_percent),
-    discountAmount: data.discount_amount == null ? null : toDecimal(data.discount_amount),
-    maxDiscountStatus: Boolean(data.max_discount_status),
-    maxDiscountAmount: data.max_discount_amount == null ? null : toDecimal(data.max_discount_amount),
-    minCartStatus: Boolean(data.min_cart_status),
-    minCartAmount: data.min_cart_amount == null ? null : toDecimal(data.min_cart_amount),
-    appliesTo: data.applies_to ?? 'all',
-    categoryIds: stringifyJsonColumn(data.category_ids ?? null),
-    productIds: stringifyJsonColumn(data.product_ids ?? null),
+    discountType: percent !== null ? 'percent' : 'amount',
+    discountPercent: isBogo || percent === null ? null : toDecimal(percent),
+    discountAmount: isBogo || amount === null ? null : toDecimal(amount),
+    maxDiscountStatus,
+    maxDiscountAmount:
+      maxDiscountStatus && percent !== null && data.max_discount_amount != null
+        ? toDecimal(data.max_discount_amount)
+        : null,
+    minCartStatus,
+    minCartAmount:
+      minCartStatus && data.min_cart_amount != null ? toDecimal(data.min_cart_amount) : null,
+    appliesTo,
+    categoryIds:
+      appliesTo === 'categories'
+        ? stringifyJsonColumn((data.category_ids ?? []).map(Number))
+        : null,
+    productIds:
+      appliesTo === 'products' ? stringifyJsonColumn((data.product_ids ?? []).map(Number)) : null,
     minQuantity: data.min_quantity == null ? null : Number(data.min_quantity),
-    bogoBuyQuantity: data.bogo_buy_quantity == null ? null : Number(data.bogo_buy_quantity),
-    bogoGetQuantity: data.bogo_get_quantity == null ? null : Number(data.bogo_get_quantity),
+    bogoBuyQuantity: isBogo && data.bogo_buy_quantity != null ? Number(data.bogo_buy_quantity) : null,
+    bogoGetQuantity: isBogo && data.bogo_get_quantity != null ? Number(data.bogo_get_quantity) : null,
     newCustomersOnly: Boolean(data.new_customers_only),
     membersOnly: Boolean(data.members_only),
     freeShipping: Boolean(data.free_shipping),
     prepaidOnly: Boolean(data.prepaid_only),
-    startsAt: data.starts_at ? new Date(data.starts_at) : null,
-    endsAt: data.ends_at ? new Date(data.ends_at) : null,
+    // Wall clocks from `datetime-local`, stored as typed — see utils/admin-date.js on the
+    // client for the other half of this.
+    startsAt: wallClockDate(data.starts_at),
+    endsAt: wallClockDate(data.ends_at),
     usageLimit: data.usage_limit == null ? null : Number(data.usage_limit),
     maxUsePerUser: Boolean(data.max_use_per_user),
     isActive: data.is_active === undefined ? true : Boolean(data.is_active),
     isPublic: data.is_public === undefined ? true : Boolean(data.is_public),
   }
+}
+
+/**
+ * "2026-08-09T20:27" is a wall clock with no zone. Read as local it would be written back
+ * shifted by the server's offset, so the Z is appended to store the digits the admin typed
+ * — the same treatment blogPostSchema gives `published_at`.
+ */
+function wallClockDate(value) {
+  if (!value) return null
+  const text = String(value)
+  const bare = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(text)
+  const date = new Date(bare ? `${text}${text.length === 16 ? ':00' : ''}Z` : text)
+  return Number.isNaN(date.getTime()) ? null : date
 }
 
 async function assertCodeFree(code, ignoreId = null) {
@@ -493,6 +537,20 @@ async function assertCodeFree(code, ignoreId = null) {
       'This coupon code already exists.',
     )
   }
+}
+
+/**
+ * `CouponController::formData` — every category and product, id and title only, ordered by
+ * title. Unpaginated on purpose: these fill the form's two multi-selects, and a page of ten
+ * would silently hide the rest.
+ */
+export async function couponFormData() {
+  const [categories, products] = await Promise.all([
+    prisma.category.findMany({ select: { id: true, title: true }, orderBy: { title: 'asc' } }),
+    prisma.product.findMany({ select: { id: true, title: true }, orderBy: { title: 'asc' } }),
+  ])
+
+  return { offerTypes: COUPON_OFFER_TYPE_LABELS, categories, products }
 }
 
 export async function createCoupon(data, file = null) {
@@ -701,6 +759,7 @@ export default {
   getHomeSection,
   updateHomeSection,
   listCoupons,
+  couponFormData,
   findCoupon,
   createCoupon,
   updateCoupon,

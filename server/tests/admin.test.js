@@ -476,7 +476,75 @@ describe('coupon administration', () => {
       .send({ code: 'DEAD', discount_type: 'percent', discount_percent: 0 })
 
     expect(res.status).toBe(422)
-    expect(JSON.stringify(res.body.errors)).toContain('Enter a discount')
+    // CouponController's own wording, so the admin's toast reads as it always did.
+    expect(JSON.stringify(res.body.errors)).toContain('Enter discount in % OR amount')
+  })
+
+  it('rejects a coupon carrying both a percentage and an amount', async () => {
+    const res = await request(app)
+      .post('/api/v1/admin/coupons')
+      .set('Cookie', cookieFor(ADMIN))
+      .send({ code: 'BOTH', discount_percent: 10, discount_amount: 50 })
+
+    expect(res.status).toBe(422)
+    expect(JSON.stringify(res.body.errors)).toContain('not both')
+  })
+
+  it('accepts every offer type the coupon form offers, not just coupon and bogo', async () => {
+    prismaMock.coupon.findFirst.mockResolvedValue(null)
+    prismaMock.coupon.create.mockResolvedValue({ id: 9n })
+
+    const res = await request(app)
+      .post('/api/v1/admin/coupons')
+      .set('Cookie', cookieFor(ADMIN))
+      .field('code', 'DIWALI')
+      .field('offer_type', 'seasonal')
+      .field('discount_percent', '15')
+      .field('max_discount_status', '0')
+      .field('min_cart_status', '0')
+      .attach('image', Buffer.from('x'), { filename: 'c.jpg', contentType: 'image/jpeg' })
+
+    expect(res.status).not.toBe(422)
+  })
+
+  it('nulls the fields a BOGO coupon hides rather than keeping stale values', async () => {
+    prismaMock.coupon.findFirst.mockResolvedValue(null)
+    prismaMock.coupon.create.mockResolvedValue({ id: 10n })
+
+    await miscAdmin.createCoupon({
+      code: 'B1G1',
+      offer_type: 'bogo',
+      discount_percent: 25,
+      discount_amount: 99,
+      max_discount_status: true,
+      max_discount_amount: 200,
+      bogo_buy_quantity: 1,
+      bogo_get_quantity: 1,
+      applies_to: 'all',
+      category_ids: [3],
+    })
+
+    const data = prismaMock.coupon.create.mock.calls.at(-1)[0].data
+    expect(data.discountPercent).toBeNull()
+    expect(data.discountAmount).toBeNull()
+    expect(data.maxDiscountStatus).toBe(false)
+    expect(data.maxDiscountAmount).toBeNull()
+    // applies_to is 'all', so the category list is dropped too.
+    expect(data.categoryIds).toBeNull()
+  })
+
+  it('stores a datetime-local wall clock as the digits the admin typed', async () => {
+    prismaMock.coupon.findFirst.mockResolvedValue(null)
+    prismaMock.coupon.create.mockResolvedValue({ id: 11n })
+
+    await miscAdmin.createCoupon({
+      code: 'TIMED',
+      discount_percent: 10,
+      starts_at: '2026-08-09T20:27',
+    })
+
+    const data = prismaMock.coupon.create.mock.calls.at(-1)[0].data
+    expect(data.startsAt.toISOString()).toBe('2026-08-09T20:27:00.000Z')
   })
 
   it('rejects a BOGO coupon without buy/get quantities', async () => {
