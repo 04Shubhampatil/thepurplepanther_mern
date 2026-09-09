@@ -8,13 +8,18 @@
  *
  * Anyone who prefers no motion gets none: the animation is skipped entirely rather than
  * played faster, and the element is simply shown.
+ *
+ * EVERY RULE IS SCOPED TO `html.js-reveal`, which theme/reveal.js sets. Hiding content from
+ * a stylesheet is only safe while something is guaranteed to unhide it; if the hook is not
+ * mounted — an error boundary, a page outside StoreLayout, JS disabled — the class is
+ * absent and `.wow` elements simply render, which is what they did before any of this.
  */
-.wow {
+.js-reveal .wow {
   animation-name: none;
   visibility: hidden;
 }
 
-.wow.is-revealed {
+.js-reveal .wow.is-revealed {
   visibility: visible;
   animation-name: inherit;
 }
@@ -24,24 +29,24 @@
  * markup uses is re-declared here for the revealed state. These are the only ones the
  * ported pages ask for.
  */
-.wow.fadeInUp.is-revealed {
+.js-reveal .wow.fadeInUp.is-revealed {
   animation-name: fadeInUp;
 }
 
-.wow.fadeInDown.is-revealed {
+.js-reveal .wow.fadeInDown.is-revealed {
   animation-name: fadeInDown;
 }
 
-.wow.fadeIn.is-revealed {
+.js-reveal .wow.fadeIn.is-revealed {
   animation-name: fadeIn;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .wow,
-  .wow.is-revealed,
-  .wow.fadeInUp.is-revealed,
-  .wow.fadeInDown.is-revealed,
-  .wow.fadeIn.is-revealed {
+  .js-reveal .wow,
+  .js-reveal .wow.is-revealed,
+  .js-reveal .wow.fadeInUp.is-revealed,
+  .js-reveal .wow.fadeInDown.is-revealed,
+  .js-reveal .wow.fadeIn.is-revealed {
     visibility: visible;
     animation-name: none;
   }

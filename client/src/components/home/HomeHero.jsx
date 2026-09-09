@@ -17,6 +17,15 @@ import ThemeSwiper, { SwiperSlide } from '../ui/ThemeSwiper.jsx'
  *   - `prefers-reduced-motion` stops the rotation entirely rather than speeding it up
  *   - a video whose `play()` is rejected — an autoplay policy, a codec — falls back to the
  *     image timer instead of leaving the hero stuck on one slide forever
+ *
+ * ADVANCING IS DONE WITH `slideTo`, NOT `slideNext`, and that is not a style choice. The
+ * fade effect runs on `virtualTranslate`, so the wrapper never actually moves; Swiper reads
+ * a translate of 0 against a three-snap grid and concludes the slider does not overflow —
+ * `isBeginning` and `isEnd` are BOTH true and `allowSlideNext` is false, so `slideNext()`
+ * returns without doing anything and the hero sits on slide one forever. `slideTo` has no
+ * such guard. The wrap-around is therefore ours, which also means neither `loop` nor
+ * `rewind` is needed: Swiper 6 duplicated slides to loop, Swiper 11+ reorders them, and
+ * with three fading slides that reordering leaves `activeIndex` stranded on the last one.
  */
 const IMAGE_HOLD_MS = 3500
 const HOVER_RECHECK_MS = 500
@@ -30,6 +39,17 @@ export default function HomeHero({ heroImages, homeHero }) {
     typeof window !== 'undefined' &&
     window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 
+  /** Next slide, wrapping — see the note above on why this is not `slideNext()`. */
+  const advanceSlide = useCallback(() => {
+    const swiper = swiperRef.current
+    if (!swiper || swiper.destroyed) return
+
+    const count = swiper.slides?.length ?? 0
+    if (count < 2) return
+
+    swiper.slideTo((swiper.realIndex + 1) % count)
+  }, [])
+
   const scheduleImageAdvance = useCallback(() => {
     window.clearTimeout(timerRef.current)
     if (reducedMotion) return
@@ -41,42 +61,55 @@ export default function HomeHero({ heroImages, homeHero }) {
         timerRef.current = window.setTimeout(advance, HOVER_RECHECK_MS)
         return
       }
-      swiperRef.current?.slideNext()
+      advanceSlide()
     }
 
     timerRef.current = window.setTimeout(advance, IMAGE_HOLD_MS)
-  }, [reducedMotion])
+  }, [reducedMotion, advanceSlide])
 
   const activateMedia = useCallback(() => {
     window.clearTimeout(timerRef.current)
 
-    const root = rootRef.current
-    if (!root) return
+    const swiper = swiperRef.current
+    if (!swiper) return
 
+    // `rootRef` is NOT used to find the videos. swiper/react can call `onSwiper` before the
+    // parent's ref is attached, and an early return there left the hero with no video
+    // playing and no timer pending — permanently stuck on slide one. The slider's own
+    // element is always available by the time there is a swiper at all.
+    const root = rootRef.current ?? swiper.el
     root.querySelectorAll('video.home21-banner-video').forEach((video) => {
       video.pause()
       video.onended = null
     })
 
-    const swiper = swiperRef.current
-    const activeSlide = swiper?.slides?.[swiper.activeIndex]
+    const activeSlide = swiper.slides?.[swiper.activeIndex]
     const activeVideo = activeSlide?.querySelector('video.home21-banner-video')
 
-    if (!activeVideo) {
+    if (!activeVideo || reducedMotion) {
+      // A video slide under reduced motion holds for the image interval rather than
+      // freezing the hero on a paused first frame forever.
       scheduleImageAdvance()
       return
     }
 
     activeVideo.currentTime = 0
-    activeVideo.onended = () => swiperRef.current?.slideNext()
-
-    if (reducedMotion) return
+    activeVideo.onended = () => advanceSlide()
 
     const played = activeVideo.play()
     if (played && typeof played.catch === 'function') {
+      // Autoplay refused, or the file will not decode: fall back to the image timer so the
+      // hero keeps moving instead of stopping on a still frame.
       played.catch(() => scheduleImageAdvance())
     }
-  }, [reducedMotion, scheduleImageAdvance])
+  }, [reducedMotion, scheduleImageAdvance, advanceSlide])
+
+  // Runs after the first commit, when both refs are certainly attached. `onSwiper` may have
+  // fired earlier than this; calling twice is harmless because the first thing this does is
+  // clear the pending timer.
+  useEffect(() => {
+    activateMedia()
+  }, [activateMedia])
 
   useEffect(() => () => window.clearTimeout(timerRef.current), [])
 
@@ -90,7 +123,6 @@ export default function HomeHero({ heroImages, homeHero }) {
           slidesPerView={1}
           speed={900}
           spaceBetween={0}
-          loop={slides.length > 1}
           effect="fade"
           fadeEffect={{ crossFade: true }}
           parallax={false}
