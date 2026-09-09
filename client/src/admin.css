@@ -1,230 +1,130 @@
 /*
  * Admin panel styles. Loaded on demand by AdminLayout, never by the storefront.
- */
-/*
- * Webfonts first: CSS requires @import to precede every rule except @charset/@layer.
- * DM Sans and Plus Jakarta Sans are the families the live site uses.
- */
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
-
-/*
- * Utilities and theme ONLY — deliberately not `@import 'tailwindcss'`, which also pulls in
- * Preflight.
  *
- * The storefront is the Laravel theme, rendered against bootstrap.min.css and style.css
- * loaded in index.html. Preflight is a global reset: it would strip the theme's heading
- * sizes, list bullets and button borders the moment this file entered the document, and
- * this file enters the document as soon as anyone opens the admin panel. Utilities alone
- * add classes and reset nothing, so the two stylesheets can coexist in one SPA.
+ * Utilities and theme ONLY — deliberately not `@import 'tailwindcss'`, which also pulls in
+ * Preflight. Preflight is a global reset and this file enters a document that may still
+ * have the storefront's stylesheets attached; utilities add classes and reset nothing, so
+ * the two can coexist while a route change swaps between them.
  */
 @import 'tailwindcss/theme.css';
 @import 'tailwindcss/utilities.css';
 
 /*
- * Design tokens, measured from the live site (https://thepurplepanther.in) rather than
- * invented. The brief is explicit that the existing site is the visual source of truth:
- * React and Tailwind are an implementation change, not a redesign.
+ * Design tokens read from public/css/admin.css in the Laravel app — the admin panel's own
+ * stylesheet, which is the visual source of truth for this rebuild. These are its literal
+ * values, not an interpretation of them:
  *
- *   brand purple  #3A1651   hero heading, buttons, active states
- *   ink           #1D1D1D   headings
- *   body          #767676   body copy (14px / 28px)
- *   sand          #F6F4F1   footer and editorial section backgrounds
- *   container     1430px with 15px gutters
- *   section       90px vertical rhythm
- *   buttons       square corners (border-radius: 0)
+ *   --primary        #e91e63   buttons, active nav, avatar
+ *   --primary-dark   #c2185b   hover
+ *   --sidebar        #1f2430   sidebar background
+ *   --sidebar-2      #262c3a   nav hover
+ *   --bg             #f4f5f7   page background
+ *   topbar           #2a3140
+ *   nav-sub          #181c26
+ *
+ * Geometry is equally literal: a 250px sidebar, a 58px topbar, 22px content padding, cards
+ * at 10px radius with `0 2px 10px rgba(0,0,0,.04)`, buttons at 6px radius / 13px / 600, and
+ * table cells at 12px 10px over a 1px #eee rule. The brief asks for parity, so these are
+ * measurements rather than choices.
  */
 @theme {
-  --color-brand: #3a1651;
-  --color-brand-soft: #4d2069;
-  --color-brand-tint: #f3eef6;
-  --color-ink: #1d1d1d;
-  --color-body: #767676;
-  --color-sand: #f6f4f1;
-  --color-line: #e6e2dd;
+  --color-admin-primary: #e91e63;
+  --color-admin-primary-dark: #c2185b;
+  --color-admin-sidebar: #1f2430;
+  --color-admin-sidebar-2: #262c3a;
+  --color-admin-sidebar-sub: #181c26;
+  --color-admin-topbar: #2a3140;
+  --color-admin-bg: #f4f5f7;
+  --color-admin-nav: #d7d9de;
+  --color-admin-nav-sub: #b8bbc4;
+  --color-admin-muted: #777777;
+  --color-admin-line: #eeeeee;
 
-  --font-sans: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
-  --font-display: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
-  --font-alt: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
-
-  --spacing-section: 90px;
-  --container-site: 1430px;
+  --shadow-admin-card: 0 2px 10px rgba(0, 0, 0, 0.04);
+  --shadow-admin-stat: 0 6px 18px rgba(0, 0, 0, 0.08);
+  --shadow-admin-stat-hover: 0 10px 24px rgba(0, 0, 0, 0.14);
 }
 
 /*
- * (font import hoisted to the top of the file — @import must precede other rules)
- * The only webfonts the site needs. The legacy stack pulled ~2.3MB of CSS and 8.7MB of
- * icon fonts for this; three families from Google Fonts replace all of it.
+ * A MINIMAL RESET, scoped to the admin root.
+ *
+ * Preflight is excluded (see above), so the handful of element defaults the admin markup
+ * relies on are set here instead: borderless buttons that inherit their font, tables that
+ * collapse their borders, images that behave as blocks. Scoping to `.admin-root` keeps it
+ * off the storefront if both ever render in one document.
  */
-
-@layer base {
-  html {
-    -webkit-text-size-adjust: 100%;
-    /*
-     * No global smooth scrolling: it animates the scroll-to-top that runs on every route
-     * change, so a new page visibly slides up from wherever the last one was left. Smooth
-     * behaviour is opted into per interaction (pagination) instead.
-     */
-  }
-
-  body {
-    @apply bg-white font-sans text-[14px] leading-[28px] text-body antialiased;
-  }
-
-  h1,
-  h2,
-  h3,
-  h4,
-  h5 {
-    @apply text-ink;
-    text-wrap: balance;
-  }
-
-  /* Visible focus for keyboard users only — the legacy CSS removed outlines entirely. */
-  :focus-visible {
-    @apply outline-2 outline-offset-2 outline-brand;
-  }
-
-  ::selection {
-    @apply bg-brand text-white;
-  }
-
-  img,
-  video {
-    @apply block max-w-full;
-  }
+.admin-root {
+  background: var(--color-admin-bg);
+  color: #333;
+  font-family: 'DM Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
 
-@layer components {
-  /*
-   * Two typographic scales lifted from the live site. They are components rather than
-   * repeated utility strings because every section reuses them and the fluid clamp is
-   * not readable inline.
-   */
-  .pp-display {
-    /* 3.2vw reproduces the 33.5px the live site renders at a ~1075px viewport. */
-    font-size: clamp(30px, 3.2vw, 48px);
-    font-weight: 500;
-    letter-spacing: -0.03em;
-    line-height: 1.3;
-    text-transform: uppercase;
-  }
-
-  .pp-heading {
-    /* Live H2 is 30px at desktop, easing down on narrow viewports. */
-    font-size: clamp(22px, 2.4vw, 30px);
-    font-weight: 600;
-    letter-spacing: 0.03em;
-    line-height: 1.26;
-  }
-
-  .pp-eyebrow {
-    @apply text-[12px] font-semibold uppercase tracking-[0.16em];
-  }
-
-  /*
-   * CMS-authored HTML — journal posts, policy pages, "Our Story".
-   *
-   * Tailwind's Preflight strips the default margins and sizes browsers give headings,
-   * lists and paragraphs, so admin-authored content rendered through
-   * dangerouslySetInnerHTML would otherwise collapse into one undifferentiated block.
-   * These rules restore a typographic scale to that content only, without reintroducing
-   * global element styles. (Written by hand rather than via @tailwindcss/typography: the
-   * plugin's opinionated defaults do not match the site's type.)
-   */
-  .pp-prose {
-    @apply text-body;
-  }
-
-  .pp-prose > * + * {
-    @apply mt-4;
-  }
-
-  .pp-prose h1,
-  .pp-prose h2 {
-    @apply mt-10 text-[22px] font-semibold leading-snug text-ink md:text-[26px];
-  }
-
-  .pp-prose h3,
-  .pp-prose h4 {
-    @apply mt-8 text-[17px] font-semibold leading-snug text-ink md:text-[19px];
-  }
-
-  .pp-prose p,
-  .pp-prose li {
-    @apply text-[15px] leading-[1.9];
-  }
-
-  .pp-prose a {
-    @apply text-brand underline underline-offset-2;
-  }
-
-  .pp-prose strong,
-  .pp-prose b {
-    @apply font-semibold text-ink;
-  }
-
-  .pp-prose ul,
-  .pp-prose ol {
-    @apply space-y-1.5 pl-5;
-  }
-
-  .pp-prose ul {
-    @apply list-disc;
-  }
-
-  .pp-prose ol {
-    @apply list-decimal;
-  }
-
-  .pp-prose img {
-    @apply my-6 h-auto w-full;
-  }
-
-  .pp-prose blockquote {
-    @apply border-l-2 border-brand pl-5 text-ink italic;
-  }
-
-  .pp-prose hr {
-    @apply my-8 border-line;
-  }
-
-  .pp-prose table {
-    @apply w-full border-collapse text-[14px];
-  }
-
-  .pp-prose th,
-  .pp-prose td {
-    @apply border border-line px-3 py-2 text-left;
-  }
-
-  .pp-prose th {
-    @apply bg-sand font-semibold text-ink;
-  }
+.admin-root *,
+.admin-root *::before,
+.admin-root *::after {
+  box-sizing: border-box;
 }
 
-@layer utilities {
-  /* Multi-line clamp for product titles and journal excerpts. */
-  .line-clamp-2 {
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-
-  .line-clamp-3 {
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-
-  /* Respect a reduced-motion preference across every Motion animation. */
-  @media (prefers-reduced-motion: reduce) {
-    *,
-    *::before,
-    *::after {
-      animation-duration: 0.01ms !important;
-      transition-duration: 0.01ms !important;
-    }
-  }
+.admin-root h1,
+.admin-root h2,
+.admin-root h3,
+.admin-root h4,
+.admin-root h5,
+.admin-root h6,
+.admin-root p,
+.admin-root figure {
+  margin: 0;
 }
+
+.admin-root ul,
+.admin-root ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-root button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.admin-root input,
+.admin-root select,
+.admin-root textarea {
+  font: inherit;
+  color: inherit;
+}
+
+.admin-root table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.admin-root img,
+.admin-root svg {
+  display: block;
+  max-width: 100%;
+}
+
+.admin-root a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/*
+ * The dashboard's stat cards are gradients in the original (admin.css `.stat-orange` and
+ * friends). The brief says not to invent gradients — these are not invented, they are
+ * copied, so they stay.
+ */
+.admin-stat-orange { background: linear-gradient(135deg, #ff9800, #f57c00); }
+.admin-stat-red    { background: linear-gradient(135deg, #ef5350, #e53935); }
+.admin-stat-purple { background: linear-gradient(135deg, #ab47bc, #8e24aa); }
+.admin-stat-green  { background: linear-gradient(135deg, #66bb6a, #43a047); }
+.admin-stat-cyan   { background: linear-gradient(135deg, #26c6da, #00acc1); }
+.admin-stat-pink   { background: linear-gradient(135deg, #ec407a, #d81b60); }

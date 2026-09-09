@@ -259,6 +259,12 @@ export async function dashboardStats() {
     revenue,
     monthRevenue,
     byStatus,
+    categoryCount,
+    subCategoryCount,
+    brandCount,
+    colorCount,
+    sizeCount,
+    offerCount,
     recentOrders,
   ] = await prisma.$transaction([
     prisma.product.count(),
@@ -274,6 +280,12 @@ export async function dashboardStats() {
       _sum: { payableAmount: true },
     }),
     prisma.order.groupBy({ by: ['status'], _count: { _all: true } }),
+    prisma.category.count(),
+    prisma.subCategory.count(),
+    prisma.brand.count(),
+    prisma.color.count(),
+    prisma.size.count(),
+    prisma.offer.count(),
     prisma.order.findMany({
       orderBy: [{ orderedAt: 'desc' }, { id: 'desc' }],
       take: 10,
@@ -290,6 +302,25 @@ export async function dashboardStats() {
   ])
 
   return {
+    /**
+     * `stats` mirrors DashboardController's array one key at a time, because the admin
+     * dashboard's six cards and seven tiles read straight from it. `transactions` is the
+     * SUM of payable_amount over PAID orders only — not order count, and not every order —
+     * which is the figure the pink card has always shown.
+     */
+    stats: {
+      categories: categoryCount,
+      sub_categories: subCategoryCount,
+      products: productCount,
+      users: customerCount,
+      orders: orderCount,
+      transactions: toNumber(revenue._sum.payableAmount),
+      brands: brandCount,
+      colors: colorCount,
+      sizes: sizeCount,
+      offers: offerCount,
+    },
+
     products: { total: productCount, active: activeProductCount },
     orders: {
       total: orderCount,
