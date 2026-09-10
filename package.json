@@ -1,0 +1,35 @@
+{
+  "name": "purple-panther",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The Purple Panther — React storefront and admin, Express API, Prisma/MySQL. One deployable process.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "setup": "npm install --prefix server && npm install --prefix client && npm run prisma:generate",
+
+    "dev": "concurrently -n api,web -c cyan,magenta \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "npm run dev --prefix server",
+    "dev:web": "npm run dev --prefix client",
+
+    "build": "npm run build --prefix client && npm run prisma:generate",
+    "start": "npm run start --prefix server",
+    "serve": "npm run build && cross-env NODE_ENV=production SERVE_CLIENT=true npm run start --prefix server",
+
+    "test": "npm run test --prefix server && npm run test --prefix client",
+    "test:api": "npm run test --prefix server",
+    "test:web": "npm run test --prefix client",
+
+    "prisma:generate": "npm run prisma:generate --prefix server",
+    "prisma:studio": "npm run prisma:studio --prefix server",
+    "verify": "npm run verify --prefix server",
+
+    "clean": "node -e \"import('node:fs').then(fs=>{fs.rmSync('client/dist',{recursive:true,force:true});console.log('removed client/dist')})\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "cross-env": "^10.1.0"
+  }
+}

@@ -54,6 +54,17 @@ const schema = z.object({
   SESSION_LIFETIME_MINUTES: z.coerce.number().int().positive().default(120),
   SESSION_SECRET: required('SESSION_SECRET').min(32, 'SESSION_SECRET must be at least 32 characters'),
 
+  /*
+   * Serving the built React app from this same process is what makes the deployment a
+   * single unit: one port, one origin, and therefore no CORS and no cross-site cookie
+   * problem in production. Empty means "decide by NODE_ENV" — on in production, off in
+   * development, where Vite serves the client with hot reload instead and this process
+   * would only ever hand back a stale build.
+   */
+  SERVE_CLIENT: optional(''),
+  /* Defaults to ../client/dist relative to the server package. */
+  CLIENT_DIST: optional(''),
+
   COOKIE_DOMAIN: optional(''),
   COOKIE_SECURE: bool(false),
   COOKIE_SAME_SITE: z.enum(['lax', 'strict', 'none']).default('lax'),

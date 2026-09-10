@@ -16,9 +16,12 @@ async function start() {
   }
 
   const server = app.listen(env.PORT, () => {
+    // Built from the port actually bound, not APP_URL — those disagree the moment PORT is
+    // overridden, and a startup line pointing at the wrong port sends you debugging the
+    // wrong process.
     logger.info(
       { port: env.PORT, env: env.NODE_ENV, tz: env.TZ },
-      `API listening on ${env.APP_URL} (health: /api/v1/health)`,
+      `Listening on http://localhost:${env.PORT} (health: /api/v1/health)`,
     )
   })
 

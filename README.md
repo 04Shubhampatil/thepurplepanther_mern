@@ -42,12 +42,41 @@ cd server && npm run db:restore
 node ../scripts/verification/verify-schema.js
 node ../scripts/verification/verify-data.js
 
-# 4. Run
-npm run dev                       # API  → http://localhost:5000
-cd ../client && npm run dev       # Site → http://localhost:5173
+# 4. Run — from the REPOSITORY ROOT
+npm run setup                     # installs client + server, generates Prisma client
+npm run dev                       # API :5000 and Vite :5173 together, with hot reload
 ```
 
 Health check: `GET http://localhost:5000/api/v1/health`
+
+### One process, one origin
+
+The app deploys as a SINGLE Node process: Express serves the built React bundle alongside
+the API, so the site and its endpoints share an origin. That is not cosmetic — auth and the
+guest cart ride on `SameSite=Lax` cookies, which are only first-party when the page and the
+API agree on origin. Vite's dev proxy fakes the same arrangement on :5173.
+
+```bash
+npm run build     # vite build + prisma generate
+npm start         # serves API + client from one port
+npm run serve     # build, then start in production mode (one command)
+```
+
+`SERVE_CLIENT` decides whether this process serves the bundle. Empty means "by NODE_ENV":
+on in production, off in development, where Vite owns the client and this process would
+only ever hand back the last build. `CLIENT_DIST` overrides the build location
+(default `client/dist`).
+
+Everything else stays where it was — `client/` and `server/` keep their own
+`package.json` and `node_modules`; the root package only orchestrates them.
+
+| From the root | Does |
+|---|---|
+| `npm run dev` | Both dev servers, hot reload |
+| `npm run build` | Build client + generate Prisma client |
+| `npm start` | Start the single production process |
+| `npm test` | Server suite, then client suite |
+| `npm run clean` | Remove `client/dist` |
 
 ---
 
