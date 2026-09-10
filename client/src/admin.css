@@ -7,29 +7,41 @@
  * the two can coexist while a route change swaps between them.
  */
 @import 'tailwindcss/theme.css';
-@import 'tailwindcss/utilities.css';
+@import 'tailwindcss/utilities.css' source(none);
 
 /*
- * Tailwind's own `.container` utility collides head-on with Bootstrap's.
+ * `source(none)` + an explicit list, because Tailwind's automatic detection scans the WHOLE
+ * project — and the storefront's JSX is full of Bootstrap class names.
  *
- * The storefront's markup is the theme's, so `class="container"` there means BOOTSTRAP's
- * container — 1430px at >=1400px in `frontend/css/bootstrap.min.css`. But Tailwind's scanner
- * reads that same literal out of the JSX and emits its own `.container` (96rem = 1536px at
- * the top end), and because this file arrives as an injected <style> AFTER the theme's
- * <link>s, at equal specificity — both are a single class — source order handed the win to
- * Tailwind. The home banner's heading sat at the viewport edge instead of on the theme's
- * gutter, because the container had stopped being 1430px wide.
+ * Tailwind emits a utility for any candidate string it finds, so scanning the storefront
+ * made it generate its own `.collapse`, `.container`, `.h-100`, `.w-100`, `.top-50`,
+ * `.col-12`, `.table`, `.mb-3`, `.p-4` … — 91 names that Bootstrap and the theme already
+ * define, with different values. This file is injected as a <style> AFTER the theme's
+ * <link>s and both are a single class, so source order handed every one of those to
+ * Tailwind: `.collapse` became `visibility: collapse` and blanked the whole footer, and
+ * `h-100`/`w-100` became 25rem instead of 100%.
  *
- * `@utility container` does NOT help: an override is emitted ALONGSIDE the built-in, not in
- * place of it, so the width and max-width survive. And no cascade trick can undo them from
- * here either — `revert` reaches the user-agent origin, never an earlier author sheet.
- *
- * So the candidate is excluded at the source instead: Tailwind only emits `.container`
- * because its scanner reads that literal out of the storefront JSX, and `@source not inline`
- * strikes it off the generated set. Bootstrap's `.container` is then the only one in the
- * document. Nothing in the admin uses a bare `.container`, so nothing here loses anything.
+ * Blacklisting the names is not an option — the ADMIN uses `mb-3`, `p-4`, `border`,
+ * `rounded` and the rest as genuine utilities. Scoping the scan is what separates them: the
+ * admin's own files still produce every utility it uses, and no storefront class name ever
+ * becomes one. Any new admin directory has to be added here, which is the cost of the fix.
+ */
+@source './pages/Admin';
+@source './components/admin';
+@source './components/common';
+@source './components/ui';
+@source './layouts/AdminLayout.jsx';
+
+/*
+ * Two names survive the scoping because Tailwind's extractor also reads SUBSTRINGS: the
+ * admin's own `border-collapse` yields `collapse`, and `toast-container` yields
+ * `container`. Neither is used as a bare utility anywhere in the admin — the only other
+ * occurrences are prose in comments and a `borderCollapse: 'collapse'` style value — while
+ * both are load-bearing Bootstrap classes on the storefront, where `.collapse` drives every
+ * footer column and `.container` sets the 1430px page width.
  */
 @source not inline("container");
+@source not inline("collapse");
 
 /*
  * Design tokens read from public/css/admin.css in the Laravel app — the admin panel's own
