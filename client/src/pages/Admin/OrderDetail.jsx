@@ -15,6 +15,16 @@ import * as api from '../../services/endpoints.js'
  *
  * Two cards: a two-column summary, then the items table with its totals block.
  *
+ * BILLING SHOWS EIGHT ROWS, not the three in the Blade file on disk. Migration
+ * 2026_08_11_000001_add_checkout_fields_to_orders_table added shipping_email, _city,
+ * _state, _pincode and _country, and the live admin displays them — but the copy of
+ * show.blade.php in this checkout was never updated to match, so it still renders only
+ * Name / Phone / Address. The live page is the reference here. Labels are the checkout
+ * form's own ("Town / City", "Country / Region"), so the admin reads back what the
+ * customer filled in under the same names.
+ *
+ * The API already returned every one of these fields; only the view was behind.
+ *
  * `.status-text` is NOT the `.status-badge` pill the list uses — it shares the badge-*
  * class names but renders as bold coloured TEXT with no background. Same classes, different
  * component, so the colours below are the `.status-text` set and `placed` is #ef6c00 here
@@ -135,7 +145,12 @@ export default function OrderDetail() {
                     <DetailRow label="Phone number">
                       {order.shippingPhone || order.userPhone || '—'}
                     </DetailRow>
+                    <DetailRow label="Email">{order.shippingEmail || order.userEmail || '—'}</DetailRow>
                     <DetailRow label="Address">{order.shippingAddress || '—'}</DetailRow>
+                    <DetailRow label="Town / City">{order.shippingCity || '—'}</DetailRow>
+                    <DetailRow label="State">{order.shippingState || '—'}</DetailRow>
+                    <DetailRow label="Zip / PIN Code">{order.shippingPincode || '—'}</DetailRow>
+                    <DetailRow label="Country / Region">{order.shippingCountry || '—'}</DetailRow>
                   </tbody>
                 </table>
               </div>
