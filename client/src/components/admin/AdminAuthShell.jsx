@@ -162,7 +162,7 @@ export default function AdminAuthShell({ children }) {
   return (
     <div className="flex min-h-screen items-center justify-center p-5 font-[system-ui,'Segoe_UI',Tahoma,sans-serif] max-[480px]:items-start max-[480px]:p-3 max-[480px]:pt-10">
       {/* `.auth-card` — 420px, 8px radius, 0 8px 30px rgba(0,0,0,.08) */}
-      <div className="w-full max-w-[420px] rounded-lg bg-white px-9 pb-9 pt-10 shadow-[0_8px_30px_rgba(0,0,0,0.08)] max-[480px]:rounded-md max-[480px]:px-[18px] max-[480px]:pb-6 max-[480px]:pt-7">
+      <div className="w-full max-w-[350px] rounded-lg bg-white px-9 pb-9 pt-10 shadow-[0_8px_30px_rgba(0,0,0,0.08)] max-[480px]:rounded-md max-[350px]:px-[18px] max-[480px]:pb-6 max-[480px]:pt-7">
         <div className="mx-auto mb-1 text-center">
           <img
             src="/images/brand/logo-dark.png"
