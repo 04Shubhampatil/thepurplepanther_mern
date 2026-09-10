@@ -10,6 +10,28 @@
 @import 'tailwindcss/utilities.css';
 
 /*
+ * Tailwind's own `.container` utility collides head-on with Bootstrap's.
+ *
+ * The storefront's markup is the theme's, so `class="container"` there means BOOTSTRAP's
+ * container — 1430px at >=1400px in `frontend/css/bootstrap.min.css`. But Tailwind's scanner
+ * reads that same literal out of the JSX and emits its own `.container` (96rem = 1536px at
+ * the top end), and because this file arrives as an injected <style> AFTER the theme's
+ * <link>s, at equal specificity — both are a single class — source order handed the win to
+ * Tailwind. The home banner's heading sat at the viewport edge instead of on the theme's
+ * gutter, because the container had stopped being 1430px wide.
+ *
+ * `@utility container` does NOT help: an override is emitted ALONGSIDE the built-in, not in
+ * place of it, so the width and max-width survive. And no cascade trick can undo them from
+ * here either — `revert` reaches the user-agent origin, never an earlier author sheet.
+ *
+ * So the candidate is excluded at the source instead: Tailwind only emits `.container`
+ * because its scanner reads that literal out of the storefront JSX, and `@source not inline`
+ * strikes it off the generated set. Bootstrap's `.container` is then the only one in the
+ * document. Nothing in the admin uses a bare `.container`, so nothing here loses anything.
+ */
+@source not inline("container");
+
+/*
  * Design tokens read from public/css/admin.css in the Laravel app — the admin panel's own
  * stylesheet, which is the visual source of truth for this rebuild. These are its literal
  * values, not an interpretation of them:
