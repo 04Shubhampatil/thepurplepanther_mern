@@ -40,6 +40,8 @@ const AdminProductForm = lazy(() => import('../pages/Admin/ProductForm.jsx'))
 const AdminProductReviews = lazy(() => import('../pages/Admin/ProductReviews.jsx'))
 const AdminOfferForm = lazy(() => import('../pages/Admin/OfferForm.jsx'))
 const AdminOrderDetail = lazy(() => import('../pages/Admin/OrderDetail.jsx'))
+const AdminOrderPrint = lazy(() => import('../pages/Admin/OrderPrint.jsx'))
+const AdminBrands = lazy(() => import('../pages/Admin/Brands.jsx'))
 const AdminOrders = lazy(() => import('../pages/Admin/Orders.jsx'))
 const AdminResource = lazy(() => import('../pages/Admin/Resource.jsx'))
 const AdminContacts = lazy(() => import('../pages/Admin/Contacts.jsx'))
@@ -206,6 +208,10 @@ export default function AppRoutes() {
         {/* Admin. The login page is outside the guard so an admin can reach it. */}
         <Route path="admin/login" element={<AdminLogin />} />
         <Route path="admin" element={<RequireAdmin />}>
+          {/* print.blade.php is its own `<html>` with no admin chrome, so this one route
+              sits inside the guard but OUTSIDE the shell. */}
+          <Route path="orders/:id/print" element={<AdminOrderPrint />} />
+
           <Route element={<AdminLayout />}>
             <Route index element={<Navigate to="/admin/dashboard" replace />} />
             <Route path="dashboard" element={<Dashboard />} />
@@ -215,6 +221,7 @@ export default function AppRoutes() {
             <Route path="categories/create" element={<AdminCategoryForm />} />
             <Route path="categories/:id/edit" element={<AdminCategoryForm />} />
             <Route path="sub-categories" element={<AdminSubCategories />} />
+            <Route path="brands" element={<AdminBrands />} />
             <Route path="colors" element={<AdminColors />} />
             <Route path="sizes" element={<AdminSizes />} />
             <Route path="offers" element={<AdminOffers />} />

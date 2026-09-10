@@ -95,6 +95,8 @@ packed `#e3f2fd/#1565c0`, shipped `#fff3e0/#ef6c00`, delivered `#e8f5e9/#2e7d32`
 | Orders (detail) | `statusLabel` / `statusBadgeClass` on findOrder | ✅ summary + items + totals | ✅ |
 | Page Settings | unchanged | ✅ tabbed CMS editor | ✅ |
 | Shipping Settings | unchanged | ✅ two fields + note | ✅ |
+| Brands | unchanged | ✅ inline form + table | ✅ |
+| Orders (print) | unchanged | ✅ standalone document | ✅ |
 | Banners (index) | `BANNER_SECTIONS` labels corrected | ✅ panel + section chips + card grid | ✅ |
 | Banners (create / edit) | per-slide metadata + video uploads restored | ✅ two form cards + media repeater | ✅ |
 | News Types | snake_case keys now reach Prisma | ✅ inline form + table, inline edit | ✅ |
@@ -469,13 +471,30 @@ value is `getPublicUrlAttribute` (`url('/page/'.$slug)`), an accessor, so it is 
 client. The two shipping numbers drive live pricing: the threshold is compared against the
 product subtotal at checkout, so a stray 0 ships every order free.
 
-**Resource.jsx stays, and so do its four aliases in AdminUI.jsx.** Every screen with a Blade
-counterpart has now been rebuilt against it. Resource.jsx is not one of those — it is the
-generic `/admin/:resource` fallback, and what it actually serves is the Brands module, which
-`layouts/app.blade.php` hides behind `$showBrands = false`. Rebuilding a hidden screen
-against a view nobody can reach would be work for its own sake.
+**Brands IS rebuilt** — an earlier note here argued it was not worth doing because
+`layouts/app.blade.php` hides it behind `$showBrands = false`. That was wrong: hidden from the
+NAV is not the same as unused, and the screen is reached by URL and in use. Resource.jsx and
+its four aliases in AdminUI.jsx stay on as the `/admin/:resource` fallback for anything that
+has no page of its own.
 
 Every admin route was walked afterwards: 18 list screens render with zero failed requests.
+
+### Brands, and the print view
+
+Brands is the `.inline-form` + table pair again, but two details separate it from the News
+Types screen it otherwise mirrors: the table is `.table` (14px cells on #eee) rather than
+`.admin-table` (13px on #f0f0f0), and the row actions are `.btn-edit` (blue) and `.btn-danger`
+(white with a pink border) rather than two `.btn-light`s. The sidebar still hides the entry —
+`SHOW_BRANDS = false` reproduces `$showBrands = false`, and the live panel hides it too.
+
+The print view is a STANDALONE document in Laravel: its own `<html>`, its own `<style>`, no
+admin chrome. So `orders/:id/print` is the one admin route inside the guard but OUTSIDE
+AdminLayout. `useAdminStylesheets` still runs so the storefront theme cannot bleed in, and
+every rule is applied inline from the Blade's own stylesheet rather than the panel's tokens.
+
+`onload="window.print()"` is reproduced, but fires only once the order has arrived — Blade had
+its data before the document existed, and printing an empty page would be faithful to the
+letter and useless. A ref guards it so a re-render cannot reopen the dialog.
 
 ## 4. Known issues / blockers
 
