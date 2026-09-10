@@ -17,10 +17,10 @@ const PRODUCT_FALLBACK = 'https://images.unsplash.com/photo-1523275335684-37898b
 /**
  * admin/products/index.blade.php — the LIST only.
  *
- * Add New, View and Edit all navigate to ProductForm; this page used to carry its own
- * inline editor, which is why the full form was unreachable from the UI even once it
- * existed. The Blade has the same split: index.blade.php links to create/edit rather than
- * editing in place.
+ * Add New and Edit navigate to ProductForm, View to ProductDetail; this page used to carry
+ * its own inline editor, which is why the full form was unreachable from the UI even once it
+ * existed. The Blade has the same split: index.blade.php links to create/edit/show rather
+ * than editing in place.
  */
 export default function Products() {
   const [page, setPage] = useState(1)
@@ -243,7 +243,9 @@ export default function Products() {
             </div>
 
             <div className="flex items-center justify-between gap-1.5 border-t border-[#f0f0f0] px-3 py-2.5">
-              <Link to={`/admin/products/${item.id}/edit`} title="View" className={cardIcon(false)}>
+              {/* `_items.blade.php` sends the eye to `products.show`, NOT to the edit form —
+                  they are different screens and this one was pointing at the wrong route. */}
+              <Link to={`/admin/products/${item.id}`} title="View" className={cardIcon(false)}>
                 <Eye size={15} />
               </Link>
 

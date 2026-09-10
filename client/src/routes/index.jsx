@@ -39,6 +39,7 @@ const AdminResetPassword = lazy(() => import('../pages/Admin/AdminResetPassword.
 const Dashboard = lazy(() => import('../pages/Admin/Dashboard.jsx'))
 const AdminProducts = lazy(() => import('../pages/Admin/Products.jsx'))
 const AdminProductForm = lazy(() => import('../pages/Admin/ProductForm.jsx'))
+const AdminProductDetail = lazy(() => import('../pages/Admin/ProductDetail.jsx'))
 const AdminProductReviews = lazy(() => import('../pages/Admin/ProductReviews.jsx'))
 const AdminOfferForm = lazy(() => import('../pages/Admin/OfferForm.jsx'))
 const AdminOrderDetail = lazy(() => import('../pages/Admin/OrderDetail.jsx'))
@@ -258,6 +259,9 @@ export default function AppRoutes() {
 
             <Route path="products" element={<AdminProducts />} />
             <Route path="products/create" element={<AdminProductForm />} />
+            {/* `Route::resource('products')` registers show; ':id' must stay BELOW 'create'
+                so the literal segment is not swallowed by the parameter. */}
+            <Route path="products/:id" element={<AdminProductDetail />} />
             <Route path="products/:id/edit" element={<AdminProductForm />} />
             <Route path="products/:id/reviews" element={<AdminProductReviews />} />
             <Route path="orders" element={<AdminOrders />} />

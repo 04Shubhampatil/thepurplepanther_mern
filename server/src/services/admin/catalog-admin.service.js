@@ -162,10 +162,18 @@ export async function listProducts({ search = '', categoryId, brandId, offerId, 
   }
 }
 
+/*
+ * `_count` rides along on TOP of PRODUCT_INCLUDE rather than inside it.
+ *
+ * `show.blade.php` loads `reviews` only to print `$product->reviews->count()` in its header,
+ * so a count is all the view ever needed — pulling the rows themselves would ship every
+ * review body to render one number. The two write paths share PRODUCT_INCLUDE and have no
+ * use for the count, which is why it is added here and not there.
+ */
 export async function findProduct(id) {
   const product = await prisma.product.findUnique({
     where: { id: BigInt(id) },
-    include: PRODUCT_INCLUDE,
+    include: { ...PRODUCT_INCLUDE, _count: { select: { reviews: true } } },
   })
   if (!product) throw new NotFoundError('Product not found.')
   return product
