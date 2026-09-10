@@ -37,7 +37,7 @@ export default function About() {
 
             <div className="about-editorial__feature about2 container container-1630">
 
-
+ 
               <article className="about-editorial__content">
                 <h2>OUR STRENGTH</h2>
                 <p className="about-editorial__eyebrow">Finest Fabrics</p>
