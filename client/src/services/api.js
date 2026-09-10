@@ -93,7 +93,7 @@ export const raw = {
 export function toFormData(values, files = {}) {
   const form = new FormData()
 
-  for (const [key, value] of Object.entries(values)) {
+  for (const [key, value] of Object.entries(values ?? {})) {
     if (value === undefined || value === null) continue
     if (typeof value === 'boolean') {
       form.append(key, value ? '1' : '0')
@@ -104,7 +104,10 @@ export function toFormData(values, files = {}) {
     }
   }
 
-  for (const [key, value] of Object.entries(files)) {
+  // `files ?? {}` — the default parameter only covers `undefined`, and callers pass an
+  // explicit `null` when nothing was picked (`image ? { image } : null`). Object.entries(null)
+  // throws, which surfaced as "Cannot convert undefined or null to object" in the toast.
+  for (const [key, value] of Object.entries(files ?? {})) {
     if (!value) continue
     if (value instanceof FileList || Array.isArray(value)) {
       Array.from(value).forEach((file) => form.append(key, file))

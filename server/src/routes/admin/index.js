@@ -31,7 +31,12 @@ router.use(attachUser, requireAuth, requireAdmin)
 
 router.get('/dashboard', admin.dashboard)
 router.get('/profile', admin.profile)
-router.patch('/profile', admin.updateProfile)
+router.patch(
+  '/profile',
+  upload.single('avatar'),
+  validate(v.adminProfileSchema),
+  admin.updateProfile,
+)
 
 // ── products (literals BEFORE /:id) ────────────────────────────────────────
 router.get('/products/check-title', admin.checkTitle)

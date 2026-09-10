@@ -18,11 +18,21 @@ export const dashboard = asyncHandler(async (req, res) =>
 )
 
 export const profile = asyncHandler(async (req, res) =>
-  ok(res, { user: accountService.customerPayload(req.user) }, 'Profile'),
+  ok(res, { user: await miscAdmin.findUser(req.user.id) }, 'Profile'),
 )
 
+/*
+ * NOT accountService.updateProfile — that is the CUSTOMER form's updater. It builds `name`
+ * from first_name/last_name, knows nothing of `username` or `avatar`, and demands the
+ * current password before changing it. Pointed at this form it silently blanked the admin's
+ * name and dropped every other field.
+ */
 export const updateProfile = asyncHandler(async (req, res) =>
-  ok(res, { user: await accountService.updateProfile(req.user, req.body) }, 'Profile updated.'),
+  ok(
+    res,
+    { user: await miscAdmin.updateAdminProfile(req.user.id, req.body, req.file) },
+    'Profile updated successfully.',
+  ),
 )
 
 // ── products ───────────────────────────────────────────────────────────────

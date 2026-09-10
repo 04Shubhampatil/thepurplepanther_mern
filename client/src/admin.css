@@ -77,6 +77,24 @@
  * specificity source order alone would still hand the reset the win. Wrapping both halves
  * makes every selector below (0,0,0), which no utility can lose to.
  */
+/*
+ * `admin.css` opens with `* { box-sizing: border-box; margin: 0; padding: 0 }`, and the
+ * margin half of that matters more than it looks: without it the browser's default 8px on
+ * `body` insets the whole panel, so the sidebar never reaches the left edge and the topbar
+ * never reaches the top.
+ *
+ * The reset below is scoped to `:where(.admin-root) *`, which cannot reach `body` — body is
+ * an ANCESTOR of the panel, not a descendant. The storefront's Bootstrap used to zero it,
+ * but `useAdminStylesheets()` disables those sheets while the admin is mounted, so the
+ * default came back. `.admin-body` is the class that hook sets, so it is the right place.
+ */
+.admin-body {
+  margin: 0;
+  background: var(--color-admin-bg);
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  color: #333;
+}
+
 :where(.admin-root) *,
 :where(.admin-root) *::before,
 :where(.admin-root) *::after {

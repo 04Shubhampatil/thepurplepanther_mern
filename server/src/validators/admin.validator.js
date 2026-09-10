@@ -287,6 +287,37 @@ export const adminUserUpdateSchema = adminUserCreateSchema.partial({ password: t
     .transform((v) => (v === '' ? null : v)),
 })
 
+/**
+ * Admin\ProfileController::update.
+ *
+ * `password` is `nullable|min:6|confirmed` — blank keeps the current one, and there is NO
+ * current-password field: an admin editing their OWN profile is already authenticated by the
+ * session, which is the same reasoning as the customer form requiring one (that form can be
+ * reached with a borrowed session on a shared machine, this one only after signing in here).
+ */
+export const adminProfileSchema = z
+  .object({
+    name: str(255, 'Please enter a name.'),
+    username: str(100, 'Please enter a username.'),
+    email: z
+      .string({ error: 'Please enter a valid email address.' })
+      .trim()
+      .max(255)
+      .email('Please enter a valid email address.'),
+    phone: optStr(20),
+    password: z
+      .string()
+      .nullish()
+      .transform((v) => (v === '' ? null : v))
+      .refine((v) => v == null || v.length >= 6, 'Password must be at least 6 characters.'),
+    password_confirmation: z.string().nullish(),
+  })
+  // Laravel's `confirmed` rule, which the form's Confirm Password field exists for.
+  .refine((d) => !d.password || d.password === d.password_confirmation, {
+    message: 'The password confirmation does not match.',
+    path: ['password_confirmation'],
+  })
+
 export const bulkUserSchema = z.object({
   action: z.enum(['enable', 'disable', 'delete'], { error: 'Please choose an action.' }),
   ids: idList,
@@ -496,6 +527,7 @@ export default {
   adminUserCreateSchema,
   adminUserUpdateSchema,
   bulkUserSchema,
+  adminProfileSchema,
   bannerSchema,
   homeSectionSchema,
   couponSchema,

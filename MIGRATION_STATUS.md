@@ -97,6 +97,7 @@ packed `#e3f2fd/#1565c0`, shipped `#fff3e0/#ef6c00`, delivered `#e8f5e9/#2e7d32`
 | Shipping Settings | unchanged | ✅ two fields + note | ✅ |
 | Brands | unchanged | ✅ inline form + table | ✅ |
 | Orders (print) | unchanged | ✅ standalone document | ✅ |
+| Profile | own updater, avatar + username | ✅ 7 rows + avatar | ✅ |
 | Banners (index) | `BANNER_SECTIONS` labels corrected | ✅ panel + section chips + card grid | ✅ |
 | Banners (create / edit) | per-slide metadata + video uploads restored | ✅ two form cards + media repeater | ✅ |
 | News Types | snake_case keys now reach Prisma | ✅ inline form + table, inline edit | ✅ |
@@ -495,6 +496,38 @@ every rule is applied inline from the Blade's own stylesheet rather than the pan
 `onload="window.print()"` is reproduced, but fires only once the order has arrived — Blade had
 its data before the document existed, and printing an empty page would be faithful to the
 letter and useless. A ref guards it so a re-render cannot reopen the dialog.
+
+### The profile screen, the missing logo, and an 8px inset
+
+**The admin profile endpoint was wired to the CUSTOMER updater.** `accountService.updateProfile`
+builds `name` from `first_name`/`last_name`, knows nothing of `username` or `avatar`, and
+demands the current password before changing it. Pointed at this form it would have blanked
+the admin's name and dropped every other field. `updateAdminProfile` is its own function now,
+with `username` unique alongside `email` and both ignoring the current row — an admin saving
+without changing either would otherwise clash with themselves. There is no current-password
+field, as in Laravel: an admin editing their own profile is already authenticated by this
+session.
+
+**The sidebar logo was never loading.** `/images/brand/logo-dark.png` had nothing serving it —
+Vite's SPA fallback answered with index.html, so the `<img>` fell back to its alt text, which
+is the "Purple Panther" wordmark visible in every earlier screenshot. Laravel serves it from
+`public/images/brand/`; the file is copied to `client/public/images/brand/` and now loads at
+its real 1600x686.
+
+**The whole panel was inset 8px.** `admin.css` opens with `* { margin: 0 }`, but the reset
+here is scoped to `:where(.admin-root) *`, which cannot reach `body` — body is an ANCESTOR of
+the panel, not a descendant. The storefront's Bootstrap used to zero it, and
+`useAdminStylesheets()` disables those sheets while the admin is mounted, so the browser
+default came back and the sidebar never reached the left edge. `.admin-body` — the class that
+hook already sets — now carries the margin, background and font.
+
+**`toFormData` threw on a null `files`.** The default parameter only covers `undefined`, and
+callers pass an explicit `null` when nothing was picked; `Object.entries(null)` surfaced as
+"Cannot convert undefined or null to object" in the toast. Fixed in the helper, since it is
+shared.
+
+Responsive check at 375px: ten admin screens, zero horizontal overflow on any of them, the
+sidebar correctly parked at -250px behind its hamburger.
 
 ## 4. Known issues / blockers
 

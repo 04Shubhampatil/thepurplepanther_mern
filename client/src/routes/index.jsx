@@ -42,6 +42,7 @@ const AdminOfferForm = lazy(() => import('../pages/Admin/OfferForm.jsx'))
 const AdminOrderDetail = lazy(() => import('../pages/Admin/OrderDetail.jsx'))
 const AdminOrderPrint = lazy(() => import('../pages/Admin/OrderPrint.jsx'))
 const AdminBrands = lazy(() => import('../pages/Admin/Brands.jsx'))
+const AdminProfile = lazy(() => import('../pages/Admin/Profile.jsx'))
 const AdminOrders = lazy(() => import('../pages/Admin/Orders.jsx'))
 const AdminResource = lazy(() => import('../pages/Admin/Resource.jsx'))
 const AdminContacts = lazy(() => import('../pages/Admin/Contacts.jsx'))
@@ -215,6 +216,7 @@ export default function AppRoutes() {
           <Route element={<AdminLayout />}>
             <Route index element={<Navigate to="/admin/dashboard" replace />} />
             <Route path="dashboard" element={<Dashboard />} />
+            <Route path="profile" element={<AdminProfile />} />
             {/* Rebuilt against the Blade views; declared before the generic :resource
                 route so they win over it. */}
             <Route path="categories" element={<AdminCategories />} />

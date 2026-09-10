@@ -119,7 +119,8 @@ const resource = (path) => ({
 export const admin = {
   dashboard: () => get('/admin/dashboard'),
   profile: () => get('/admin/profile'),
-  updateProfile: (body) => patch('/admin/profile', body),
+  // The profile form carries an avatar, so it goes out as multipart.
+  updateProfile: (body, files) => patch('/admin/profile', toFormData(body, files)),
 
   categories: resource('categories'),
   subCategories: resource('sub-categories'),

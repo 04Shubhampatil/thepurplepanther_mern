@@ -109,6 +109,56 @@ export async function findUser(id) {
  * Laravel reached the same columns through a leftJoin. Both order by the product's row, not
  * by the pivot's.
  */
+/**
+ * Admin\ProfileController::update — the signed-in admin editing their OWN row.
+ *
+ * Separate from `updateUser` because that one is the CUSTOMER screen: it pins the role,
+ * refuses a non-customer, and has no username field. This one edits an administrator and
+ * must not do any of that.
+ *
+ * `username` is UNIQUE alongside `email`, and both ignore the current row — an admin saving
+ * without changing either would otherwise clash with themselves.
+ */
+export async function updateAdminProfile(userId, data, file = null) {
+  const id = BigInt(userId)
+  const email = String(data.email).trim().toLowerCase()
+  const username = String(data.username).trim()
+
+  const [emailClash, usernameClash] = await Promise.all([
+    prisma.user.findFirst({ where: { email, NOT: { id } }, select: { id: true } }),
+    prisma.user.findFirst({ where: { username, NOT: { id } }, select: { id: true } }),
+  ])
+
+  if (usernameClash) {
+    throw new ValidationError(
+      { username: ['This username is already taken.'] },
+      'This username is already taken.',
+    )
+  }
+  if (emailClash) {
+    throw new ValidationError({ email: ['This email is already taken.'] }, 'This email is already taken.')
+  }
+
+  const existing = await prisma.user.findUnique({ where: { id }, select: { avatar: true } })
+
+  const update = {
+    name: data.name,
+    username,
+    email,
+    phone: data.phone || null,
+  }
+
+  // Blank keeps the current password; the form says so under the field.
+  if (data.password) update.password = await hashPassword(data.password)
+
+  if (file) {
+    update.avatar = persist(file, UPLOAD_DIRS.users)
+    if (existing?.avatar) remove(existing.avatar)
+  }
+
+  return prisma.user.update({ where: { id }, data: update, select: USER_SELECT })
+}
+
 export async function findUserDetail(id, { tab = 'wishlist', q = '', page = 1, perPage = 10, sort = 'created_at', dir = 'desc' } = {}) {
   const user = await findUser(id)
 
@@ -984,6 +1034,7 @@ export default {
   listUsers,
   findUser,
   findUserDetail,
+  updateAdminProfile,
   createUser,
   updateUser,
   deleteUser,
