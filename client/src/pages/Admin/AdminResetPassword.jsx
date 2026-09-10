@@ -82,7 +82,7 @@ export default function AdminResetPassword() {
 
     setBusy(true)
     try {
-      await api.auth.resetPassword({
+      await api.adminAuth.resetPassword({
         token,
         email: values.email.trim(),
         password: values.password,

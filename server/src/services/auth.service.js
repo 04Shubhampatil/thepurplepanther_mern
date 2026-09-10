@@ -140,6 +140,104 @@ export async function loginAdmin({ username, password }) {
 
 // ─────────────────────────────────────────────── password reset
 
+/*
+ * ADMIN password reset — Admin\AuthController::sendResetLink / resetPassword.
+ *
+ * The source calls Password::sendResetLink on the DEFAULT broker, so unlike the customer
+ * flow it is not scoped to a role and carries none of the 2-per-day cap; its only limit is
+ * the broker's `throttle` of 60 seconds between requests for the same address
+ * (config/auth.php). Its messages are the broker's own status strings, verbatim.
+ *
+ * IT IS SCOPED TO role='admin' HERE, and that is a deliberate divergence. The unscoped
+ * broker would happily mail an admin reset link to a CUSTOMER address, and the admin reset
+ * form would then set that customer's password — a privilege boundary the source only
+ * avoids because its admin form is unreachable in practice (see below).
+ *
+ * NOTE ON THE SOURCE: this flow cannot currently work in Laravel. The default
+ * ResetPassword notification builds its URL from `route('password.reset')`, but the admin
+ * routes are declared inside `->name('admin.')`, so the only names that exist are
+ * `admin.password.reset` and `customer.password.reset`. Submitting the admin forgot form
+ * therefore raises RouteNotFoundException. What is implemented here is the evident intent
+ * of the controller, not an observed behaviour, and it is the one place in this migration
+ * where the source could not be used as the reference.
+ */
+const ADMIN_RESET_THROTTLE_SECONDS = 60 // config/auth.php passwords.users.throttle
+
+export async function createAdminPasswordResetToken({ email }) {
+  const normalized = normalizeEmail(email)
+
+  const user = await prisma.user.findFirst({
+    where: { email: normalized, role: ROLES.ADMIN, isActive: true },
+  })
+
+  // Password::INVALID_USER — the broker's own wording.
+  if (!user) {
+    const message = "We can't find a user with that email address."
+    throw new ValidationError({ email: [message] }, message)
+  }
+
+  const existing = await prisma.passwordResetToken.findUnique({ where: { email: normalized } })
+  if (existing?.createdAt) {
+    const age = (Date.now() - new Date(existing.createdAt).getTime()) / 1000
+    // Password::RESET_THROTTLED
+    if (age < ADMIN_RESET_THROTTLE_SECONDS) {
+      throw new TooManyRequestsError('Please wait before retrying.')
+    }
+  }
+
+  const token = generateResetToken()
+  const hashed = await hashResetToken(token)
+
+  await prisma.passwordResetToken.upsert({
+    where: { email: normalized },
+    create: { email: normalized, token: hashed, createdAt: new Date() },
+    update: { token: hashed, createdAt: new Date() },
+  })
+
+  return { user, token, expiresMinutes: RESET_TOKEN_EXPIRY_MINUTES }
+}
+
+/** Password::reset for an admin. Single-use: the row is deleted inside the transaction. */
+export async function resetAdminPassword({ email, token, password }) {
+  const normalized = normalizeEmail(email)
+  const invalid = 'This password reset token is invalid.' // Password::INVALID_TOKEN
+
+  const user = await prisma.user.findFirst({
+    where: { email: normalized, role: ROLES.ADMIN, isActive: true },
+  })
+  if (!user) {
+    const message = "We can't find a user with that email address."
+    throw new ValidationError({ email: [message] }, message)
+  }
+
+  const record = await prisma.passwordResetToken.findUnique({ where: { email: normalized } })
+  if (!record) throw new ValidationError({ email: [invalid] }, invalid)
+
+  if (isResetTokenExpired(record.createdAt)) {
+    await prisma.passwordResetToken.delete({ where: { email: normalized } }).catch(() => {})
+    throw new ValidationError({ email: [invalid] }, invalid)
+  }
+
+  if (!(await verifyResetToken(token, record.token))) {
+    throw new ValidationError({ email: [invalid] }, invalid)
+  }
+
+  const hashed = await hashPassword(password)
+
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: user.id },
+      // setRememberToken(Str::random(60)) — the source rotates it, dropping other sessions.
+      data: { password: hashed, rememberToken: generateResetToken(60) },
+    }),
+    prisma.passwordResetToken.delete({ where: { email: normalized } }),
+  ])
+
+  logger.info({ userId: String(user.id) }, 'Admin password reset completed')
+  return user
+}
+
+
 /**
  * CustomerPasswordController::sendResetLink.
  *
@@ -258,6 +356,8 @@ export default {
   registerCustomer,
   isEmailAvailable,
   loginAdmin,
+  createAdminPasswordResetToken,
+  resetAdminPassword,
   createPasswordResetToken,
   resetPassword,
   findActiveUserById,

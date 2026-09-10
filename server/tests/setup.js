@@ -15,6 +15,18 @@ process.env.RAZORPAY_KEY_ID ||= 'rzp_test_0000000000'
 process.env.RAZORPAY_KEY_SECRET = 'test-razorpay-secret-not-a-real-key'
 process.env.RAZORPAY_CURRENCY ||= 'INR'
 
+/*
+ * Rate limits are raised for the suite, not disabled in the app.
+ *
+ * The limiters count FAILED requests per IP across a 15-minute window, and every test here
+ * shares one app instance and one address — so a file that deliberately exercises wrong
+ * passwords and bad tokens exhausts the budget and later tests get 429 instead of the
+ * status they assert. Raising the ceiling keeps each test independent of how many ran
+ * before it.
+ */
+process.env.RATE_LIMIT_MAX ||= '100000'
+process.env.AUTH_RATE_LIMIT_MAX ||= '5000'
+
 process.env.JWT_SECRET ||= 'test-jwt-secret-at-least-32-characters-long'
 process.env.SESSION_SECRET ||= 'test-session-secret-at-least-32-characters'
 process.env.META_CATALOG_FEED_TOKEN ||= 'test-meta-catalog-feed-token-value'

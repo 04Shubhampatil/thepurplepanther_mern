@@ -22,6 +22,14 @@ export const adminAuth = {
   login: (body) => post('/admin/auth/login', body),
   logout: () => post('/admin/auth/logout'),
   me: () => get('/admin/auth/me'),
+  /*
+   * The admin reset endpoints are SEPARATE from the customer ones on purpose. `auth.*`
+   * scopes every lookup to role='customer', so sending an administrator's address there
+   * answers "This email is not registered with us." — which is what the admin forgot form
+   * did before these existed.
+   */
+  forgotPassword: (email) => post('/admin/auth/forgot-password', { email }),
+  resetPassword: (body) => post('/admin/auth/reset-password', body),
 }
 
 // ── catalog ────────────────────────────────────────────────────────────────

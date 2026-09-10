@@ -3,7 +3,11 @@ import rateLimit from 'express-rate-limit'
 import * as adminAuthController from '../../controllers/admin/auth.controller.js'
 import { validate } from '../../middleware/validate.middleware.js'
 import { attachUser, requireAuth, requireAdmin } from '../../middleware/auth.middleware.js'
-import { adminLoginSchema } from '../../validators/auth.validator.js'
+import {
+  adminLoginSchema,
+  adminForgotPasswordSchema,
+  adminResetPasswordSchema,
+} from '../../validators/auth.validator.js'
 import env from '../../config/env.js'
 
 const router = Router()
@@ -20,6 +24,24 @@ const adminLoginLimiter = rateLimit({
 
 router.post('/login', adminLoginLimiter, validate(adminLoginSchema), adminAuthController.login)
 router.post('/logout', adminAuthController.logout)
+
+/*
+ * Reset endpoints share the login limiter: they take an email and answer differently for a
+ * known and an unknown one, so unlimited calls would enumerate administrator addresses.
+ * The service's own 60-second throttle is per address; this one is per client.
+ */
+router.post(
+  '/forgot-password',
+  adminLoginLimiter,
+  validate(adminForgotPasswordSchema),
+  adminAuthController.forgotPassword,
+)
+router.post(
+  '/reset-password',
+  adminLoginLimiter,
+  validate(adminResetPasswordSchema),
+  adminAuthController.resetPassword,
+)
 router.get('/me', attachUser, requireAuth, requireAdmin, adminAuthController.me)
 
 export default router

@@ -42,7 +42,16 @@ const schema = z.object({
   DATABASE_URL_DEV: optional(''),
 
   JWT_SECRET: required('JWT_SECRET').min(32, 'JWT_SECRET must be at least 32 characters'),
+  /* Lifetime of a "Remember me" sign-in. */
   JWT_EXPIRES_IN: optional('7d'),
+  /*
+   * Lifetime of a sign-in WITHOUT "Remember me", in minutes — config/session.php's
+   * `lifetime`, whose default is 120. Laravel issued a session cookie that died with the
+   * browser session and expired after this many minutes; only a remembered login outlived
+   * it. Without this the two cases are indistinguishable and every visitor gets the long
+   * one.
+   */
+  SESSION_LIFETIME_MINUTES: z.coerce.number().int().positive().default(120),
   SESSION_SECRET: required('SESSION_SECRET').min(32, 'SESSION_SECRET must be at least 32 characters'),
 
   COOKIE_DOMAIN: optional(''),

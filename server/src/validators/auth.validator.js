@@ -29,17 +29,23 @@ export const loginSchema = z.object({
   remember: z.union([z.boolean(), z.string()]).optional(),
 })
 
+/*
+ * Laravel's `confirmed` rule requires `<field>_confirmation` to be PRESENT and equal. It
+ * was optional here, so a client that simply omitted it skipped the check entirely — the
+ * server has to be the authority (brief §22), and a caller that is not the project's own
+ * form is exactly the case that matters.
+ */
 export const registerSchema = z
   .object({
     name: z.string({ error: 'Name is required.' }).trim().min(1, 'Name is required.').max(255),
     email,
     password,
-    password_confirmation: z.string().optional(),
+    password_confirmation: z.string({ error: 'Passwords do not match.' }),
   })
-  .refine(
-    (data) => data.password_confirmation === undefined || data.password === data.password_confirmation,
-    { message: 'Passwords do not match.', path: ['password'] },
-  )
+  .refine((data) => data.password === data.password_confirmation, {
+    message: 'Passwords do not match.',
+    path: ['password'],
+  })
 
 export const checkEmailSchema = z.object({ email })
 
@@ -50,12 +56,12 @@ export const resetPasswordSchema = z
     token: z.string({ error: 'Token is required.' }).min(1, 'Token is required.'),
     email,
     password,
-    password_confirmation: z.string().optional(),
+    password_confirmation: z.string({ error: 'Passwords do not match.' }),
   })
-  .refine(
-    (data) => data.password_confirmation === undefined || data.password === data.password_confirmation,
-    { message: 'Passwords do not match.', path: ['password'] },
-  )
+  .refine((data) => data.password === data.password_confirmation, {
+    message: 'Passwords do not match.',
+    path: ['password'],
+  })
 
 /** Admin login takes ONE field that may hold a username or an email. */
 export const adminLoginSchema = z.object({
@@ -64,6 +70,28 @@ export const adminLoginSchema = z.object({
   remember: z.union([z.boolean(), z.string()]).optional(),
 })
 
+export const adminForgotPasswordSchema = z.object({ email })
+
+/**
+ * `Admin\AuthController::resetPassword` validates `min:8`, where the customer controller
+ * validates `min:6`. Both are reproduced rather than unified — an admin credential is the
+ * higher-value one and the source draws the distinction deliberately.
+ */
+export const adminResetPasswordSchema = z
+  .object({
+    token: z.string({ error: 'Token is required.' }).min(1, 'Token is required.'),
+    email,
+    password: z
+      .string({ error: 'Password is required.' })
+      .min(8, 'Password must be at least 8 characters.')
+      .max(255),
+    password_confirmation: z.string({ error: 'Passwords do not match.' }),
+  })
+  .refine((data) => data.password === data.password_confirmation, {
+    message: 'Passwords do not match.',
+    path: ['password'],
+  })
+
 export default {
   loginSchema,
   registerSchema,
@@ -71,4 +99,6 @@ export default {
   forgotPasswordSchema,
   resetPasswordSchema,
   adminLoginSchema,
+  adminForgotPasswordSchema,
+  adminResetPasswordSchema,
 }

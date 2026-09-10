@@ -21,12 +21,32 @@ export const GUEST_COOKIE = 'pp_guest'
  * database on each request, so deactivating a user or changing their role takes effect
  * immediately rather than at token expiry.
  */
-export function signAuthToken(user) {
+export function signAuthToken(user, { remember = false } = {}) {
   return jwt.sign(
     { sub: String(user.id), role: user.role },
     env.JWT_SECRET,
-    { expiresIn: env.JWT_EXPIRES_IN, issuer: 'purple-panther' },
+    { expiresIn: remember ? env.JWT_EXPIRES_IN : `${env.SESSION_LIFETIME_MINUTES}m`, issuer: 'purple-panther' },
   )
+}
+
+/**
+ * `Auth::login($user, $remember)` — the checkbox is not decoration.
+ *
+ * Laravel gave an un-remembered sign-in a SESSION cookie that expired with the browser and
+ * after config/session.php's 120 minutes; ticking the box added the long-lived remember
+ * cookie instead. Treating every login as remembered hands a shared or public browser a
+ * week-long token, which is a weaker position than the app being replaced.
+ *
+ * Laravel's remembered cookie lasts five years. This uses JWT_EXPIRES_IN (7 days) instead
+ * — deliberately shorter, because a JWT cannot be revoked the way a database-backed
+ * remember_token can. Access still stops immediately when an account is deactivated, since
+ * every request reloads the user.
+ */
+export function rememberFlag(value) {
+  // An HTML checkbox posts "1"/"on"; JSON clients send a real boolean.
+  if (typeof value === 'boolean') return value
+  const text = String(value ?? '').trim().toLowerCase()
+  return text === '1' || text === 'true' || text === 'on' || text === 'yes'
 }
 
 /** Returns the payload, or null for any invalid/expired/tampered token. Never throws. */
@@ -61,9 +81,15 @@ export function expiresInMs(value = env.JWT_EXPIRES_IN) {
   return amount * multiplier
 }
 
-export function setAuthCookie(res, user) {
-  const token = signAuthToken(user)
-  res.cookie(AUTH_COOKIE, token, cookieOptions(expiresInMs()))
+/**
+ * The cookie's own lifetime tracks the token's, so a stale cookie is not left behind to be
+ * sent and rejected. Without `remember` it is a SESSION cookie — no maxAge at all, so the
+ * browser drops it on close, which is what `expire_on_close: false` plus a 120-minute
+ * lifetime amounted to in practice.
+ */
+export function setAuthCookie(res, user, { remember = false } = {}) {
+  const token = signAuthToken(user, { remember })
+  res.cookie(AUTH_COOKIE, token, cookieOptions(remember ? expiresInMs() : undefined))
   return token
 }
 
@@ -133,6 +159,7 @@ export default {
   AUTH_COOKIE,
   GUEST_COOKIE,
   signAuthToken,
+  rememberFlag,
   verifyAuthToken,
   setAuthCookie,
   clearAuthCookie,

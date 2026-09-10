@@ -1,6 +1,6 @@
 import * as authService from '../services/auth.service.js'
 import * as cartService from '../services/cart.service.js'
-import { setAuthCookie, clearAuthCookie } from '../utils/auth-token.js'
+import { setAuthCookie, clearAuthCookie, rememberFlag } from '../utils/auth-token.js'
 import { clearGuestCartCookie, writeGuestCart } from '../middleware/guest-cart.middleware.js'
 import { ok, asyncHandler } from '../utils/api-response.js'
 import { send } from '../integrations/email/mailer.js'
@@ -53,7 +53,7 @@ async function mergeGuestCart(req, res, user) {
 
 export const login = asyncHandler(async (req, res) => {
   const user = await authService.loginCustomer(req.body)
-  setAuthCookie(res, user)
+  setAuthCookie(res, user, { remember: rememberFlag(req.body.remember) })
   await mergeGuestCart(req, res, user)
 
   return ok(
@@ -65,6 +65,7 @@ export const login = asyncHandler(async (req, res) => {
 
 export const register = asyncHandler(async (req, res) => {
   const user = await authService.registerCustomer(req.body)
+  // `Auth::login($user)` with no second argument — registration never remembers.
   setAuthCookie(res, user)
   await mergeGuestCart(req, res, user)
 

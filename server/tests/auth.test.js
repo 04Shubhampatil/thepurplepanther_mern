@@ -218,7 +218,7 @@ describe('POST /api/v1/auth/register', () => {
   it('stores a bcrypt hash, never the plaintext', async () => {
     await request(app)
       .post('/api/v1/auth/register')
-      .send({ name: 'New Person', email: 'new@example.com', password: 'abcdef' })
+      .send({ name: 'New Person', email: 'new@example.com', password: 'abcdef', password_confirmation: 'abcdef' })
 
     const created = prismaMock.__tables.user.find((u) => u.email === 'new@example.com')
     expect(created.password).not.toBe('abcdef')
@@ -229,7 +229,7 @@ describe('POST /api/v1/auth/register', () => {
   it('rejects a duplicate email with Laravel\'s message', async () => {
     const res = await request(app)
       .post('/api/v1/auth/register')
-      .send({ name: 'Copy', email: 'asha@example.com', password: 'abcdef' })
+      .send({ name: 'Copy', email: 'asha@example.com', password: 'abcdef', password_confirmation: 'abcdef' })
 
     expect(res.status).toBe(422)
     expect(res.body.message).toBe('This email is already registered.')
@@ -238,7 +238,7 @@ describe('POST /api/v1/auth/register', () => {
   it('rejects a duplicate that differs only in case', async () => {
     const res = await request(app)
       .post('/api/v1/auth/register')
-      .send({ name: 'Copy', email: 'ASHA@EXAMPLE.COM', password: 'abcdef' })
+      .send({ name: 'Copy', email: 'ASHA@EXAMPLE.COM', password: 'abcdef', password_confirmation: 'abcdef' })
     expect(res.status).toBe(422)
   })
 
@@ -254,7 +254,7 @@ describe('POST /api/v1/auth/register', () => {
   it('enforces the 6-character minimum', async () => {
     const res = await request(app)
       .post('/api/v1/auth/register')
-      .send({ name: 'X', email: 'x@example.com', password: '12345' })
+      .send({ name: 'X', email: 'x@example.com', password: '12345', password_confirmation: '12345' })
 
     expect(res.status).toBe(422)
     expect(JSON.stringify(res.body.errors)).toContain('Password must be at least 6 characters.')
@@ -451,7 +451,7 @@ describe('password reset', () => {
 
     const res = await request(app)
       .post('/api/v1/auth/reset-password')
-      .send({ token, email: 'asha@example.com', password: 'brandnew1' })
+      .send({ token, email: 'asha@example.com', password: 'brandnew1', password_confirmation: 'brandnew1' })
 
     expect(cookieFor(res)).toBe('')
   })
@@ -461,7 +461,7 @@ describe('password reset', () => {
 
     const res = await request(app)
       .post('/api/v1/auth/reset-password')
-      .send({ token: 'totally-wrong-token', email: 'asha@example.com', password: 'brandnew1' })
+      .send({ token: 'totally-wrong-token', email: 'asha@example.com', password: 'brandnew1', password_confirmation: 'brandnew1' })
 
     expect(res.status).toBe(422)
     expect(res.body.message).toBe('This reset link is invalid or has expired.')
@@ -475,7 +475,7 @@ describe('password reset', () => {
 
     const res = await request(app)
       .post('/api/v1/auth/reset-password')
-      .send({ token, email: 'asha@example.com', password: 'brandnew1' })
+      .send({ token, email: 'asha@example.com', password: 'brandnew1', password_confirmation: 'brandnew1' })
 
     expect(res.status).toBe(422)
     expect(res.body.message).toBe('This reset link is invalid or has expired.')
@@ -488,7 +488,7 @@ describe('password reset', () => {
 
     const res = await request(app)
       .post('/api/v1/auth/reset-password')
-      .send({ token, email: 'inactive@example.com', password: 'brandnew1' })
+      .send({ token, email: 'inactive@example.com', password: 'brandnew1', password_confirmation: 'brandnew1' })
 
     expect(res.status).toBe(422)
   })
@@ -575,6 +575,269 @@ describe('admin authorisation', () => {
 })
 
 // ─────────────────────────────────────────────────────── service unit
+
+describe('remember me', () => {
+  /*
+   * `Auth::login($user, $remember)`. Without the box ticked Laravel issued a session
+   * cookie bounded by config/session.php's 120-minute lifetime; only a remembered login
+   * outlived the browser. Treating every sign-in as remembered handed a shared machine a
+   * week-long token — a weaker position than the app being replaced.
+   */
+  it('issues a SESSION cookie (no Max-Age) when remember is absent', async () => {
+    const res = await request(app)
+      .post('/api/v1/auth/login')
+      .send({ email: 'asha@example.com', password: PASSWORD })
+
+    expect(res.status).toBe(200)
+    expect(cookieFor(res)).not.toMatch(/Max-Age/i)
+  })
+
+  it('issues a persistent cookie when remember is set', async () => {
+    const res = await request(app)
+      .post('/api/v1/auth/login')
+      .send({ email: 'asha@example.com', password: PASSWORD, remember: true })
+
+    expect(res.status).toBe(200)
+    expect(cookieFor(res)).toMatch(/Max-Age=\d+/i)
+  })
+
+  it('accepts the checkbox value a form posts, not just a JSON boolean', async () => {
+    const res = await request(app)
+      .post('/api/v1/auth/login')
+      .send({ email: 'asha@example.com', password: PASSWORD, remember: '1' })
+
+    expect(cookieFor(res)).toMatch(/Max-Age=\d+/i)
+  })
+
+  it('gives a remembered token a longer life than an un-remembered one', async () => {
+    const plain = await request(app)
+      .post('/api/v1/auth/login')
+      .send({ email: 'asha@example.com', password: PASSWORD })
+    const remembered = await request(app)
+      .post('/api/v1/auth/login')
+      .send({ email: 'asha@example.com', password: PASSWORD, remember: true })
+
+    const expOf = (res) => {
+      const value = cookieFor(res).split('=')[1].split(';')[0]
+      return verifyAuthToken(decodeURIComponent(value)).exp
+    }
+
+    expect(expOf(remembered)).toBeGreaterThan(expOf(plain))
+  })
+
+  it('never remembers a freshly registered account — Auth::login() takes no flag there', async () => {
+    const res = await request(app)
+      .post('/api/v1/auth/register')
+      .send({
+        name: 'New Person',
+        email: 'new@example.com',
+        password: PASSWORD,
+        password_confirmation: PASSWORD,
+      })
+
+    expect(res.status).toBe(200)
+    expect(cookieFor(res)).not.toMatch(/Max-Age/i)
+  })
+})
+
+describe('confirmed rule', () => {
+  /*
+   * Laravel's `confirmed` requires the confirmation field to be PRESENT. It was optional
+   * here, so any caller that simply omitted it skipped the check — and the server, not the
+   * form, is the authority.
+   */
+  it('rejects registration with no password_confirmation at all', async () => {
+    const res = await request(app)
+      .post('/api/v1/auth/register')
+      .send({ name: 'No Confirm', email: 'noconfirm@example.com', password: PASSWORD })
+
+    expect(res.status).toBe(422)
+    expect(prismaMock.__tables.user.find((u) => u.email === 'noconfirm@example.com')).toBeUndefined()
+  })
+
+  it('rejects a reset with no password_confirmation at all', async () => {
+    const res = await request(app)
+      .post('/api/v1/auth/reset-password')
+      .send({ token: 'whatever', email: 'asha@example.com', password: PASSWORD })
+
+    expect(res.status).toBe(422)
+  })
+})
+
+describe('admin password reset', () => {
+  /*
+   * The admin flow is SEPARATE from the customer one. The customer endpoints scope every
+   * lookup to role='customer', so an administrator's address came back as "This email is
+   * not registered with us." and the admin forgot form could never succeed.
+   *
+   * Wording here is the Password broker's own status strings, which is what
+   * Admin\AuthController surfaces through `__($status)`.
+   */
+  it('emails an admin a reset link', async () => {
+    const res = await request(app)
+      .post('/api/v1/admin/auth/forgot-password')
+      .send({ email: 'admin@example.com' })
+
+    expect(res.status).toBe(200)
+    expect(res.body.message).toBe('We have emailed your password reset link.')
+    expect(sentEmails).toHaveLength(1)
+    expect(sentEmails[0].to).toBe('admin@example.com')
+    expect(sentEmails[0].subject).toContain('admin password')
+  })
+
+  it('points the link at the ADMIN reset route, not the storefront one', async () => {
+    await request(app).post('/api/v1/admin/auth/forgot-password').send({ email: 'admin@example.com' })
+
+    expect(sentEmails[0].text).toContain('/admin/reset-password/')
+  })
+
+  it('stores only a bcrypt hash of the admin token', async () => {
+    await request(app).post('/api/v1/admin/auth/forgot-password').send({ email: 'admin@example.com' })
+
+    const row = prismaMock.__tables.passwordResetToken[0]
+    expect(row.token).toMatch(/^\$2b\$/)
+    const link = sentEmails[0].text.match(/reset-password\/([^?]+)\?/)[1]
+    await expect(bcrypt.compare(decodeURIComponent(link), row.token)).resolves.toBe(true)
+  })
+
+  it('refuses an unknown address with the broker wording', async () => {
+    const res = await request(app)
+      .post('/api/v1/admin/auth/forgot-password')
+      .send({ email: 'nobody@example.com' })
+
+    expect(res.status).toBe(422)
+    expect(res.body.message).toBe("We can't find a user with that email address.")
+    expect(sentEmails).toHaveLength(0)
+  })
+
+  /*
+   * The privilege boundary. Laravel's unscoped broker would mail an ADMIN reset link to a
+   * customer address, and the admin form would then set that customer's password.
+   */
+  it('refuses a CUSTOMER address', async () => {
+    const res = await request(app)
+      .post('/api/v1/admin/auth/forgot-password')
+      .send({ email: 'asha@example.com' })
+
+    expect(res.status).toBe(422)
+    expect(sentEmails).toHaveLength(0)
+  })
+
+  it('throttles a repeat request within 60 seconds', async () => {
+    await request(app).post('/api/v1/admin/auth/forgot-password').send({ email: 'admin@example.com' })
+    const second = await request(app)
+      .post('/api/v1/admin/auth/forgot-password')
+      .send({ email: 'admin@example.com' })
+
+    expect(second.status).toBe(429)
+    expect(second.body.message).toBe('Please wait before retrying.')
+    expect(sentEmails).toHaveLength(1)
+  })
+
+  it('does NOT apply the customer 2-per-day cap', async () => {
+    // Aged past the 60-second throttle, a third and fourth request still go out — the
+    // broker has no daily cap, only CustomerPasswordController does.
+    for (let i = 0; i < 3; i += 1) {
+      await request(app).post('/api/v1/admin/auth/forgot-password').send({ email: 'admin@example.com' })
+      const row = prismaMock.__tables.passwordResetToken[0]
+      if (row) row.createdAt = new Date(Date.now() - 120 * 1000)
+    }
+
+    expect(sentEmails).toHaveLength(3)
+  })
+
+  it('resets the password with a valid token and rotates remember_token', async () => {
+    const { token } = await authService.createAdminPasswordResetToken({ email: 'admin@example.com' })
+    const before = prismaMock.__tables.user.find((u) => u.id === 3n).password
+
+    const res = await request(app).post('/api/v1/admin/auth/reset-password').send({
+      token,
+      email: 'admin@example.com',
+      password: 'brand-new-pass',
+      password_confirmation: 'brand-new-pass',
+    })
+
+    expect(res.status).toBe(200)
+    expect(res.body.data.redirect).toBe('/admin/login')
+
+    const after = prismaMock.__tables.user.find((u) => u.id === 3n)
+    expect(after.password).not.toBe(before)
+    expect(after.rememberToken).toBeTruthy()
+    await expect(bcrypt.compare('brand-new-pass', after.password)).resolves.toBe(true)
+  })
+
+  it('enforces min:8 — stricter than the customer min:6', async () => {
+    const { token } = await authService.createAdminPasswordResetToken({ email: 'admin@example.com' })
+
+    const res = await request(app).post('/api/v1/admin/auth/reset-password').send({
+      token,
+      email: 'admin@example.com',
+      password: 'short1',
+      password_confirmation: 'short1',
+    })
+
+    expect(res.status).toBe(422)
+    expect(JSON.stringify(res.body)).toContain('at least 8')
+  })
+
+  it('rejects a wrong token', async () => {
+    await authService.createAdminPasswordResetToken({ email: 'admin@example.com' })
+
+    const res = await request(app).post('/api/v1/admin/auth/reset-password').send({
+      token: 'not-the-token',
+      email: 'admin@example.com',
+      password: 'brand-new-pass',
+      password_confirmation: 'brand-new-pass',
+    })
+
+    expect(res.status).toBe(422)
+    expect(res.body.message).toBe('This password reset token is invalid.')
+  })
+
+  it('rejects a token past the 60-minute expiry', async () => {
+    const { token } = await authService.createAdminPasswordResetToken({ email: 'admin@example.com' })
+    prismaMock.__tables.passwordResetToken[0].createdAt = new Date(Date.now() - 61 * 60 * 1000)
+
+    const res = await request(app).post('/api/v1/admin/auth/reset-password').send({
+      token,
+      email: 'admin@example.com',
+      password: 'brand-new-pass',
+      password_confirmation: 'brand-new-pass',
+    })
+
+    expect(res.status).toBe(422)
+  })
+
+  it('makes the token single-use', async () => {
+    const { token } = await authService.createAdminPasswordResetToken({ email: 'admin@example.com' })
+    const body = {
+      token,
+      email: 'admin@example.com',
+      password: 'brand-new-pass',
+      password_confirmation: 'brand-new-pass',
+    }
+
+    await request(app).post('/api/v1/admin/auth/reset-password').send(body)
+    const again = await request(app).post('/api/v1/admin/auth/reset-password').send(body)
+
+    expect(again.status).toBe(422)
+  })
+
+  it('will not reset a CUSTOMER through the admin endpoint', async () => {
+    // A token minted by the customer flow must not be redeemable here.
+    await authService.createPasswordResetToken({ email: 'asha@example.com', ip: null })
+    const stolen = prismaMock.__tables.passwordResetToken[0]
+
+    const res = await request(app).post('/api/v1/admin/auth/reset-password').send({
+      token: stolen.token,
+      email: 'asha@example.com',
+      password: 'brand-new-pass',
+      password_confirmation: 'brand-new-pass',
+    })
+
+    expect(res.status).toBe(422)
+  })
+})
 
 describe('toPublicUser', () => {
   it('splits the name and omits every sensitive field', () => {

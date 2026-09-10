@@ -19,9 +19,13 @@ const RULES = [
 /**
  * admin/auth/forgot-password.blade.php.
  *
- * Points at the SAME endpoint the storefront's reset uses. Laravel's admin controller calls
- * `Password::sendResetLink` on the default broker — one `users` table, one broker — so an
- * admin and a customer go through the identical flow, including the 2-per-day cap.
+ * Points at the ADMIN endpoint, not the storefront's. The two are not interchangeable: the
+ * customer flow scopes every lookup to role='customer', so an administrator's address came
+ * back as "This email is not registered with us." and this form could never succeed.
+ *
+ * The admin flow also follows the broker's rules rather than the customer controller's —
+ * a 60-second throttle between requests instead of the 2-per-day cap, and the broker's own
+ * status wording.
  */
 export default function AdminForgotPassword() {
   useEffect(() => {
@@ -43,10 +47,10 @@ export default function AdminForgotPassword() {
 
     setBusy(true)
     try {
-      const res = await api.auth.forgotPassword(email.trim())
-      // Deliberately not "we found your account" — the endpoint answers the same either
-      // way, so the page must not leak whether an address is registered.
-      setAlert({ tone: 'success', text: res.$message ?? 'If that email is registered, a reset link is on its way.' })
+      const res = await api.adminAuth.forgotPassword(email.trim())
+      // The server decides the wording: the broker's RESET_LINK_SENT string on success,
+      // and its INVALID_USER / RESET_THROTTLED strings as errors on the catch path.
+      setAlert({ tone: 'success', text: res.$message ?? 'We have emailed your password reset link.' })
     } catch (err) {
       setAlert({ tone: 'error', text: err.message })
     } finally {
