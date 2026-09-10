@@ -21,13 +21,23 @@ export const ICONS = {
   mail: 'M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z',
 }
 
-/** `.input-group` — a 48px icon cell against the field, sharing one border. */
-export function AuthField({ icon, invalid, ...props }) {
+/**
+ * `.field-wrap` > `.input-group` + `.field-error`.
+ *
+ * The error slot is ALWAYS rendered, empty or not. `form-validation.js` creates it on init
+ * (`prepareErrorSlots`) precisely so `min-height: 18px` reserves the space up front — without
+ * it the fields shift down the moment a message appears, and the untouched form sits tighter
+ * than the real one.
+ *
+ * Three classes move together when a field fails: `.field-wrap.has-error`,
+ * `.input-group.has-error` (the red border) and `input.is-invalid` (a #fff8f8 tint).
+ */
+export function AuthField({ icon, error, ...props }) {
   return (
     <div className="mb-3.5">
       <div
         className={`flex items-stretch overflow-hidden rounded border transition-colors ${
-          invalid ? 'border-[#e53935]' : 'border-[#ddd]'
+          error ? 'border-[#e53935]' : 'border-[#ddd]'
         }`}
       >
         <span className="flex w-12 shrink-0 items-center justify-center border-r border-[#ddd] bg-[#f3f3f3] text-[#777] max-[480px]:w-[42px]">
@@ -36,12 +46,53 @@ export function AuthField({ icon, invalid, ...props }) {
           </svg>
         </span>
         <input
-          className="w-full min-w-0 flex-1 border-none px-3.5 py-[13px] text-[14px] text-[#333] outline-none placeholder:text-[#aaa] max-[480px]:px-2.5 max-[480px]:py-3 max-[480px]:text-[16px]"
+          className={`w-full min-w-0 flex-1 border-none px-3.5 py-[13px] text-[14px] text-[#333] outline-none placeholder:text-[#aaa] max-[480px]:px-2.5 max-[480px]:py-3 max-[480px]:text-[16px] ${
+            error ? 'bg-[#fff8f8]' : ''
+          }`}
           {...props}
         />
       </div>
+      {/* `.field-error` — 12px #e53935, 6px above, and 18px tall even when empty */}
+      <div aria-live="polite" className="mt-1.5 min-h-[18px] text-[12px] leading-[18px] text-[#e53935]">
+        {error}
+      </div>
     </div>
   )
+}
+
+/**
+ * `FormValidator` — the rule kinds admin-auth.js actually uses, with its own messages
+ * supplied per field by the caller.
+ *
+ * Validation runs on BLUR and on INPUT, not only on submit, which is what makes a message
+ * clear itself as soon as the field is corrected.
+ */
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+export function validateField(value, rules, values = {}) {
+  const text = String(value ?? '').trim()
+
+  for (const rule of rules) {
+    if (rule.type === 'required' && text === '') return rule.message
+    if (text === '') continue
+    if (rule.type === 'min' && text.length < rule.value) return rule.message
+    if (rule.type === 'email' && !EMAIL_RE.test(text)) return rule.message
+    if (rule.type === 'match' && text !== String(values[rule.field] ?? '')) return rule.message
+  }
+
+  return ''
+}
+
+/** Validate every field at once; used on submit, where the first invalid one takes focus. */
+export function validateAll(values, schema) {
+  const errors = {}
+
+  for (const [name, rules] of Object.entries(schema)) {
+    const message = validateField(values[name], rules, values)
+    if (message) errors[name] = message
+  }
+
+  return errors
 }
 
 /** `.auth-btn` — full width, 1px tracking, uppercase in the markup rather than by CSS. */

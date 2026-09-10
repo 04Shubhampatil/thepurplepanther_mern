@@ -8,7 +8,29 @@ import AdminAuthShell, {
   AuthButton,
   AuthLink,
   AuthAlert,
+  validateField,
+  validateAll,
 } from '../../components/admin/AdminAuthShell.jsx'
+
+/**
+ * admin-auth.js's reset rules. Note the password minimum is EIGHT here, not the six the
+ * login form enforces — a password being set deserves a stricter floor than one being typed
+ * back, and that is the source's own choice.
+ */
+const SCHEMA = {
+  email: [
+    { type: 'required', message: 'Email is required.' },
+    { type: 'email', message: 'Please enter a valid email address.' },
+  ],
+  password: [
+    { type: 'required', message: 'Password is required.' },
+    { type: 'min', value: 8, message: 'Password must be at least 8 characters.' },
+  ],
+  password_confirmation: [
+    { type: 'required', message: 'Please confirm your password.' },
+    { type: 'match', field: 'password', message: 'Passwords do not match.' },
+  ],
+}
 
 /**
  * admin/auth/reset-password.blade.php.
@@ -29,32 +51,42 @@ export default function AdminResetPassword() {
 
   const token = tokenParam ?? params.get('token') ?? ''
 
-  const [email, setEmail] = useState(params.get('email') ?? '')
-  const [password, setPassword] = useState('')
-  const [confirmation, setConfirmation] = useState('')
+  const [values, setValues] = useState({
+    email: params.get('email') ?? '',
+    password: '',
+    password_confirmation: '',
+  })
+  const [errors, setErrors] = useState({})
   const [alert, setAlert] = useState(null)
   const [busy, setBusy] = useState(false)
+
+  const bind = (name) => ({
+    value: values[name],
+    error: errors[name],
+    onChange: (event) => {
+      const next = { ...values, [name]: event.target.value }
+      setValues(next)
+      setErrors((prev) => ({ ...prev, [name]: validateField(next[name], SCHEMA[name], next) }))
+    },
+    onBlur: () =>
+      setErrors((prev) => ({ ...prev, [name]: validateField(values[name], SCHEMA[name], values) })),
+  })
 
   async function onSubmit(event) {
     event.preventDefault()
     setAlert(null)
 
-    if (!email.trim() || !password) {
-      setAlert({ tone: 'error', text: 'Please fill in every field.' })
-      return
-    }
-    if (password !== confirmation) {
-      setAlert({ tone: 'error', text: 'The password confirmation does not match.' })
-      return
-    }
+    const found = validateAll(values, SCHEMA)
+    setErrors(found)
+    if (Object.keys(found).length) return
 
     setBusy(true)
     try {
       await api.auth.resetPassword({
         token,
-        email: email.trim(),
-        password,
-        password_confirmation: confirmation,
+        email: values.email.trim(),
+        password: values.password,
+        password_confirmation: values.password_confirmation,
       })
       // The reset does NOT sign you in — Laravel redirected to the login form, and so does
       // this, so the new password is used once before it is trusted.
@@ -76,30 +108,27 @@ export default function AdminResetPassword() {
           icon={ICONS.mail}
           type="email"
           name="email"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
           placeholder="Email"
           autoComplete="email"
+          {...bind('email')}
         />
 
         <AuthField
           icon={ICONS.key}
           type="password"
           name="password"
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
           placeholder="New Password"
           autoComplete="new-password"
+          {...bind('password')}
         />
 
         <AuthField
           icon={ICONS.key}
           type="password"
           name="password_confirmation"
-          value={confirmation}
-          onChange={(event) => setConfirmation(event.target.value)}
           placeholder="Confirm Password"
           autoComplete="new-password"
+          {...bind('password_confirmation')}
         />
 
         <AuthLink to="/admin/login">Click here to Login</AuthLink>

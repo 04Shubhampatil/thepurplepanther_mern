@@ -7,7 +7,14 @@ import AdminAuthShell, {
   AuthButton,
   AuthLink,
   AuthAlert,
+  validateField,
 } from '../../components/admin/AdminAuthShell.jsx'
+
+/** admin-auth.js's rules for this form, with its wording. */
+const RULES = [
+  { type: 'required', message: 'Email is required.' },
+  { type: 'email', message: 'Please enter a valid email address.' },
+]
 
 /**
  * admin/auth/forgot-password.blade.php.
@@ -22,6 +29,7 @@ export default function AdminForgotPassword() {
   }, [])
 
   const [email, setEmail] = useState('')
+  const [error, setError] = useState('')
   const [alert, setAlert] = useState(null)
   const [busy, setBusy] = useState(false)
 
@@ -29,10 +37,9 @@ export default function AdminForgotPassword() {
     event.preventDefault()
     setAlert(null)
 
-    if (!email.trim()) {
-      setAlert({ tone: 'error', text: 'Please enter your email address.' })
-      return
-    }
+    const found = validateField(email, RULES)
+    setError(found)
+    if (found) return
 
     setBusy(true)
     try {
@@ -59,7 +66,12 @@ export default function AdminForgotPassword() {
           type="email"
           name="email"
           value={email}
-          onChange={(event) => setEmail(event.target.value)}
+          error={error}
+          onChange={(event) => {
+            setEmail(event.target.value)
+            setError(validateField(event.target.value, RULES))
+          }}
+          onBlur={() => setError(validateField(email, RULES))}
           placeholder="Email"
           autoComplete="email"
           autoFocus

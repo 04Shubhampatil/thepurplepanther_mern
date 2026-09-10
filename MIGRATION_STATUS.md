@@ -533,6 +533,23 @@ sidebar correctly parked at -250px behind its hamburger.
 
 ### The admin auth screens
 
+Measured field by field against the LIVE page rather than from a screenshot: all 28 properties
+of the card, brand, divider, input group, icon cell, input, links and button match.
+
+The piece a screenshot could not show is `form-validation.js`. It creates a `.field-error`
+div for every ruled field ON INIT (`prepareErrorSlots`), so 18px is reserved under each input
+before anything is typed — without it the untouched form sits tighter than the real one. It
+validates on BLUR and on INPUT, not only on submit, which is what makes a message clear the
+moment a field is corrected, and on a failed submit it focuses the first invalid field.
+
+So the errors are PER FIELD, with `admin-auth.js`'s own wording ("Username is required.",
+"Username must be at least 3 characters."). The `.alert` box at the top is only ever the
+SERVER's — `session('error')` or the validation bag — never a client-side summary, which is
+what the first pass had used.
+
+The reset form's password minimum is EIGHT where the login form's is six. That asymmetry is
+the source's, not a slip.
+
 `layouts/auth.blade.php` is a standalone document with its OWN stylesheet, and its own
 palette: #391550 dark purple, not the #e91e63 pink the rest of the panel uses. Nothing else in
 the admin is that colour, so the tokens live in AdminAuthShell rather than admin.css. The
