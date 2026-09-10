@@ -98,6 +98,8 @@ packed `#e3f2fd/#1565c0`, shipped `#fff3e0/#ef6c00`, delivered `#e8f5e9/#2e7d32`
 | Brands | unchanged | ✅ inline form + table | ✅ |
 | Orders (print) | unchanged | ✅ standalone document | ✅ |
 | Profile | own updater, avatar + username | ✅ 7 rows + avatar | ✅ |
+| Admin login | unchanged | ✅ purple auth card | ✅ |
+| Admin forgot / reset password | reuses the shared broker | ✅ same auth card | ✅ |
 | Banners (index) | `BANNER_SECTIONS` labels corrected | ✅ panel + section chips + card grid | ✅ |
 | Banners (create / edit) | per-slide metadata + video uploads restored | ✅ two form cards + media repeater | ✅ |
 | News Types | snake_case keys now reach Prisma | ✅ inline form + table, inline edit | ✅ |
@@ -528,6 +530,29 @@ shared.
 
 Responsive check at 375px: ten admin screens, zero horizontal overflow on any of them, the
 sidebar correctly parked at -250px behind its hamburger.
+
+### The admin auth screens
+
+`layouts/auth.blade.php` is a standalone document with its OWN stylesheet, and its own
+palette: #391550 dark purple, not the #e91e63 pink the rest of the panel uses. Nothing else in
+the admin is that colour, so the tokens live in AdminAuthShell rather than admin.css. The
+three routes sit outside the guard AND outside AdminLayout for the same reason.
+
+The logo carries `mix-blend-mode: multiply` so the PNG's white ground disappears against the
+card — the same dark file the sidebar inverts to white, used here as-is. The divider's three
+squares are turned 45°, which IS the diamond shape; the rotation is set inline because a
+dropped transform leaves three plain squares and nothing else says it is wrong.
+
+Forgot and reset point at the STOREFRONT's password endpoints. Laravel's admin controller
+calls `Password::sendResetLink` on the default broker — one `users` table, one broker — so an
+admin and a customer already went through the identical flow, including the 2-per-day cap. A
+reset does not sign you in; it returns to the login form, as Laravel's redirect did.
+
+The header avatar was reading `user.avatarUrl` while the payload provides `user.avatar`
+(already resolved by utils/media.js), so the branch was never taken and every admin got a
+letter tile. `avatarUrl()`'s own fallback for a user with no file is a ui-avatars.com URL —
+also a letter — so that case now uses the bundled `admin_png.webp` instead of a remote
+round-trip for an initial we already have.
 
 ## 4. Known issues / blockers
 

@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronDown, Menu } from 'lucide-react'
 
+/** The bundled admin portrait — used when the account has no uploaded avatar of its own. */
+const ADMIN_AVATAR = '/images/brand/admin_png.webp'
+
 /**
  * The admin topbar — `.topbar` in admin.css: #2a3140, 58px minimum height, sticky, with the
  * hamburger and the wordmark on the left and the user menu on the right.
@@ -28,6 +31,19 @@ export default function AdminHeader({ user, onToggleSidebar, onLogout }) {
 
   const initial = String(user?.name ?? 'A').charAt(0).toUpperCase()
 
+  /*
+   * The Blade shows `avatar_url` when the admin HAS an avatar and the initial otherwise.
+   * The payload calls the field `avatar` (already resolved to a URL by utils/media.js) —
+   * reading `avatarUrl` here meant the branch never taken and every admin got a letter.
+   *
+   * `ui-avatars.com` is `avatarUrl()`'s own fallback for a user with no file, and it is a
+   * generated letter tile rather than a picture. Swapped for the bundled admin portrait, so
+   * the header shows a face rather than a remote round-trip for an initial we already have.
+   */
+  const remoteFallback = 'https://ui-avatars.com/api/'
+  const stored = user?.avatar
+  const avatar = !stored || stored.startsWith(remoteFallback) ? ADMIN_AVATAR : stored
+
   return (
     <header className="sticky top-0 z-[15] flex min-h-[58px] items-center justify-between gap-2.5 bg-admin-topbar px-5 pl-[18px] text-white">
       <div className="flex items-center gap-3">
@@ -50,7 +66,11 @@ export default function AdminHeader({ user, onToggleSidebar, onLogout }) {
         >
           {/* .avatar — 32px circle on --primary */}
           <span className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-admin-primary text-[13px] font-bold">
-            {user?.avatarUrl ? <img src={user.avatarUrl} alt={user.name} className="size-full object-cover" /> : initial}
+            {avatar ? (
+              <img src={avatar} alt={user?.name ?? 'Admin'} className="size-full object-cover" />
+            ) : (
+              initial
+            )}
           </span>
           <span className="truncate text-[14px]">{user?.name}</span>
           <ChevronDown size={14} className={`transition-transform ${open ? 'rotate-180' : ''}`} />

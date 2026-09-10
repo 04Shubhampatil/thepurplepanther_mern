@@ -34,6 +34,8 @@ const ResetPassword = lazy(() => import('../pages/Auth/ResetPassword.jsx'))
 const Account = lazy(() => import('../pages/Account/Account.jsx'))
 
 const AdminLogin = lazy(() => import('../pages/Admin/AdminLogin.jsx'))
+const AdminForgotPassword = lazy(() => import('../pages/Admin/AdminForgotPassword.jsx'))
+const AdminResetPassword = lazy(() => import('../pages/Admin/AdminResetPassword.jsx'))
 const Dashboard = lazy(() => import('../pages/Admin/Dashboard.jsx'))
 const AdminProducts = lazy(() => import('../pages/Admin/Products.jsx'))
 const AdminProductForm = lazy(() => import('../pages/Admin/ProductForm.jsx'))
@@ -208,6 +210,11 @@ export default function AppRoutes() {
 
         {/* Admin. The login page is outside the guard so an admin can reach it. */}
         <Route path="admin/login" element={<AdminLogin />} />
+        {/* The auth screens are their own standalone document in Blade, with their own
+            stylesheet and palette — outside the guard AND outside the shell. */}
+        <Route path="admin/forgot-password" element={<AdminForgotPassword />} />
+        <Route path="admin/reset-password" element={<AdminResetPassword />} />
+        <Route path="admin/reset-password/:token" element={<AdminResetPassword />} />
         <Route path="admin" element={<RequireAdmin />}>
           {/* print.blade.php is its own `<html>` with no admin chrome, so this one route
               sits inside the guard but OUTSIDE the shell. */}
