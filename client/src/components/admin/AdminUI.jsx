@@ -388,16 +388,15 @@ export function Pagination({ page, lastPage, total, perPage, onChange }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// TEMPORARY COMPATIBILITY SHIM — delete with the last un-rebuilt page.
+// Aliases for Resource.jsx — the ONLY page still importing them.
 //
-// The pages carried over from the earlier generic-Tailwind admin (Products, Orders,
-// Contacts, Settings, Resource) import the primitives that panel used. They are aliased
-// onto the new ones so the build stays green while each page is rebuilt against the Blade
-// source one at a time, which is the migration loop the brief asks for — rather than
-// breaking every admin page at once and fixing them under a red build.
+// Every screen with a Blade counterpart has been rebuilt against it; Resource.jsx is not
+// one of those. It is the generic `/admin/:resource` fallback, and what it actually serves
+// is the Brands module, which layouts/app.blade.php hides behind `$showBrands = false`.
+// Rebuilding a hidden screen against a Blade view nobody can reach would be work for its
+// own sake, so the page and these four aliases stay together.
 //
-// Nothing new should import from this block. When Resource.jsx is the last one left, this
-// goes with it.
+// Nothing new should import from this block.
 // ─────────────────────────────────────────────────────────────────────────
 
 export const AdminButton = Button

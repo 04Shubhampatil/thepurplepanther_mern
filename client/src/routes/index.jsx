@@ -42,8 +42,9 @@ const AdminOfferForm = lazy(() => import('../pages/Admin/OfferForm.jsx'))
 const AdminOrderDetail = lazy(() => import('../pages/Admin/OrderDetail.jsx'))
 const AdminOrders = lazy(() => import('../pages/Admin/Orders.jsx'))
 const AdminResource = lazy(() => import('../pages/Admin/Resource.jsx'))
-const AdminSettings = lazy(() => import('../pages/Admin/Settings.jsx'))
 const AdminContacts = lazy(() => import('../pages/Admin/Contacts.jsx'))
+const AdminPageSettings = lazy(() => import('../pages/Admin/PageSettings.jsx'))
+const AdminShippingSettings = lazy(() => import('../pages/Admin/ShippingSettings.jsx'))
 const AdminCategories = lazy(() => import('../pages/Admin/Categories.jsx'))
 const AdminCategoryForm = lazy(() => import('../pages/Admin/CategoryForm.jsx'))
 const AdminSubCategories = lazy(() => import('../pages/Admin/SubCategories.jsx'))
@@ -246,11 +247,12 @@ export default function AppRoutes() {
             <Route path="orders" element={<AdminOrders />} />
             <Route path="orders/:id" element={<AdminOrderDetail />} />
             <Route path="contacts" element={<AdminContacts />} />
-            <Route path="settings" element={<AdminSettings />} />
-            {/* The sidebar links straight to a Settings tab; both land on the same
-                page, which is how layouts/app.blade.php linked them too. */}
-            <Route path="settings/pages" element={<AdminSettings />} />
-            <Route path="settings/shipping" element={<AdminSettings />} />
+            {/* Two separate screens in Laravel, and the sidebar links to each. Bare
+                /admin/settings lands on the pages one, which is what the panel's own
+                Settings menu opens first. */}
+            <Route path="settings" element={<Navigate to="/admin/settings/pages" replace />} />
+            <Route path="settings/pages" element={<AdminPageSettings />} />
+            <Route path="settings/shipping" element={<AdminShippingSettings />} />
             <Route path=":resource" element={<AdminResource />} />
           </Route>
         </Route>

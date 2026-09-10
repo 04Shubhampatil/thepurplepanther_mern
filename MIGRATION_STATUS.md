@@ -93,6 +93,8 @@ packed `#e3f2fd/#1565c0`, shipped `#fff3e0/#ef6c00`, delivered `#e8f5e9/#2e7d32`
 | Products (reviews) | unchanged | ✅ inline form + table | ✅ |
 | Offers (create / edit) | unchanged | ✅ 4 rows, suffix on the right | ✅ |
 | Orders (detail) | `statusLabel` / `statusBadgeClass` on findOrder | ✅ summary + items + totals | ✅ |
+| Page Settings | unchanged | ✅ tabbed CMS editor | ✅ |
+| Shipping Settings | unchanged | ✅ two fields + note | ✅ |
 | Banners (index) | `BANNER_SECTIONS` labels corrected | ✅ panel + section chips + card grid | ✅ |
 | Banners (create / edit) | per-slide metadata + video uploads restored | ✅ two form cards + media repeater | ✅ |
 | News Types | snake_case keys now reach Prisma | ✅ inline form + table, inline edit | ✅ |
@@ -451,6 +453,29 @@ follows the order and is not editable per line, which is why both controls open 
 
 The offer form's discount box is the coupon form's mirror image — `.discount-suffix` puts the
 % on the RIGHT over a left border, where `.discount-prefix` puts the symbol on the left.
+
+### Settings, and what is deliberately NOT rebuilt
+
+Page Settings and Shipping Settings are two separate screens in Laravel and the sidebar links
+to each; the port had merged them into one page with no route of its own. They are split
+again, and bare `/admin/settings` redirects to the pages one.
+
+`.page-settings-tab.active` marks the active tab with a TOP border and a white ground — not
+the bottom underline the Contact List and User Detail tabs use. Three tab strips in this
+panel, three different treatments, all reproduced as they are.
+
+The page URL field is read-only and greyed because it is where the page ALREADY lives; the
+value is `getPublicUrlAttribute` (`url('/page/'.$slug)`), an accessor, so it is built on the
+client. The two shipping numbers drive live pricing: the threshold is compared against the
+product subtotal at checkout, so a stray 0 ships every order free.
+
+**Resource.jsx stays, and so do its four aliases in AdminUI.jsx.** Every screen with a Blade
+counterpart has now been rebuilt against it. Resource.jsx is not one of those — it is the
+generic `/admin/:resource` fallback, and what it actually serves is the Brands module, which
+`layouts/app.blade.php` hides behind `$showBrands = false`. Rebuilding a hidden screen
+against a view nobody can reach would be work for its own sake.
+
+Every admin route was walked afterwards: 18 list screens render with zero failed requests.
 
 ## 4. Known issues / blockers
 
