@@ -10,18 +10,30 @@ import { useEffect } from 'react'
  */
 const DEFAULT_BODY_CLASS = 'home21-type'
 
+/*
+ * Called with NO classes, this still drops `home21-type` — a page can want a bare <body>.
+ *
+ * That is not a corner case invented here: `about.blade.php` and `blog.blade.php` open with
+ * a plain `<body>`, and the difference is load-bearing. style.css:576 carries
+ * `body.home21-type p, … h1, … h6 { color: var(--dark-color5); font-family: var(--dmsans-font);
+ * font-weight: var(--font-weight-500) }` at specificity (0,2,1), which outranks page rules
+ * like `.about-editorial__intro h1` (0,1,1) and overrides exactly those three properties —
+ * so leaving the homepage's class on a bare-body page repaints its whole typography in DM
+ * Sans 500 #3B3738 while the sizes and spacing, set by the losing rule, still look right.
+ */
 export function useBodyClass(...classes) {
   const key = classes.filter(Boolean).join(' ')
 
   useEffect(() => {
     const applied = key.split(' ').filter(Boolean)
-    if (applied.length === 0) return undefined
 
     document.body.classList.remove(DEFAULT_BODY_CLASS)
     document.body.classList.add(...applied)
 
+    if (applied.length > 0) document.body.classList.add(...applied)
+
     return () => {
-      document.body.classList.remove(...applied)
+      if (applied.length > 0) document.body.classList.remove(...applied)
       document.body.classList.add(DEFAULT_BODY_CLASS)
     }
   }, [key])

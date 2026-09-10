@@ -1,16 +1,39 @@
+import { useEffect } from 'react'
+import { createPortal } from 'react-dom'
+
 /**
  * The size-guide drawer from frontend/pages/shop-single.blade.php.
  *
- * script.js moves `.cloth-sidebar-overlay` and `.cloth-size-sidebar` to <body> and toggles
- * `.active` on them plus `product-size-closed` / `header-active` on <body>. That is a
- * fixed-position drawer over the whole page, so it is driven here from React state and the
- * same classes are written directly — moving React-owned nodes to <body> is what to avoid.
+ * IT MUST BE A DIRECT CHILD OF <body>, and that is not a stylistic preference — every rule
+ * that gives this drawer its appearance is written as `body.product-detail-page > .cloth-…`
+ * (custom.css:1912). The Blade renders the markup inside the product section and
+ * `script.js` then calls `.appendTo('body')` precisely to satisfy that child combinator.
+ * Rendered in place, the selectors miss and the panel gets no width, no white ground and no
+ * slide — which is exactly what it did before this portal existed.
  *
- * The default chart is the theme's own static table, shown when a product has no
- * `size_guide_content` of its own.
+ * `createPortal` is the React-sanctioned form of that move: the node lives under <body> in
+ * the DOM while staying inside this component's tree for state and events, so nothing is
+ * detached behind React's back.
+ *
+ * `open` also drives two classes on <body> itself, from the ProductDetail side:
+ * `product-size-closed` is REMOVED while open (it forces `visibility: hidden !important` on
+ * both nodes) and `header-active` is added, mirroring script.js:3349.
  */
 export default function SizeGuideDrawer({ product, open, onClose }) {
-  return (
+  /*
+   * Escape closes it. The jQuery original has no key handler at all — this is the one
+   * deliberate addition, because a full-screen overlay that traps the eye should be
+   * dismissable from the keyboard, and it changes nothing visually.
+   */
+  useEffect(() => {
+    if (!open) return undefined
+
+    const onKey = (event) => { if (event.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [open, onClose])
+
+  return createPortal(
     <>
       <div
         className={`cloth-sidebar-overlay position-fixed top-0 start-0 w-100 h-100${open ? ' active' : ''}`}
@@ -108,6 +131,7 @@ export default function SizeGuideDrawer({ product, open, onClose }) {
           )}
         </div>
       </aside>
-    </>
+    </>,
+    document.body,
   )
 }

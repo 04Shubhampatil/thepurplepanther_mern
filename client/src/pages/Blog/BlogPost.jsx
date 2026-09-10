@@ -2,7 +2,7 @@ import { Link, useParams } from 'react-router-dom'
 import { useApi } from '../../hooks/useApi.js'
 import Loading from '../../components/common/Loading.jsx'
 import NotFound from '../NotFound.jsx'
-import { usePageTitle } from '../../theme/page.js'
+import { useBodyClass, usePageTitle } from '../../theme/page.js'
 import * as api from '../../services/endpoints.js'
 
 /**
@@ -22,6 +22,9 @@ import * as api from '../../services/endpoints.js'
 const INSTAGRAM = [1, 2, 3, 4, 5, 6, 7]
 
 export default function BlogPost() {
+  // blog.blade.php / blog-single.blade.php open with a bare `<body>`, like about. Keeping
+  // `home21-type` would repaint the journal's headings in DM Sans — see useBodyClass.
+  useBodyClass()
   const { slug } = useParams()
   const { data, error, loading } = useApi(() => api.cms.post(slug), [slug])
 

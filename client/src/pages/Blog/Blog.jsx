@@ -2,7 +2,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { useApi } from '../../hooks/useApi.js'
 import Loading from '../../components/common/Loading.jsx'
 import CollectionPagination from '../../components/common/CollectionPagination.jsx'
-import { usePageTitle } from '../../theme/page.js'
+import { useBodyClass, usePageTitle } from '../../theme/page.js'
 import * as api from '../../services/endpoints.js'
 
 /**
@@ -37,6 +37,9 @@ function byline(post) {
 }
 
 export default function Blog() {
+  // blog.blade.php / blog-single.blade.php open with a bare `<body>`, like about. Keeping
+  // `home21-type` would repaint the journal's headings in DM Sans — see useBodyClass.
+  useBodyClass()
   const [searchParams] = useSearchParams()
   const type = searchParams.get('type') ?? ''
   const page = Number.parseInt(searchParams.get('page') ?? '1', 10) || 1

@@ -10,6 +10,7 @@ import NotFound from '../NotFound.jsx'
 import { useApi } from '../../hooks/useApi.js'
 import { useCartStore, useRecentStore } from '../../store/index.js'
 import { useBodyClass, usePageTitle } from '../../theme/page.js'
+import { useBodyClasses } from '../../theme/chrome.js'
 import { slugify } from '../../utils/slug.js'
 import * as api from '../../services/endpoints.js'
 
@@ -84,9 +85,18 @@ export default function ProductDetail() {
 
   useBodyClass(
     'product-detail-page',
-    'product-size-closed',
     product?.category ? `category-${slugify(product.category.title)}` : '',
   )
+
+  /*
+   * script.js:3321 puts `product-size-closed` on <body> at load and takes it off the moment
+   * the size guide opens, swapping in `header-active`; closing reverses both. That is not
+   * bookkeeping — `body.product-size-closed .cloth-size-sidebar` forces
+   * `visibility: hidden !important` (style.css:44307), so leaving the class on permanently
+   * meant the drawer could never be seen however many `active` classes it collected.
+   */
+  useBodyClasses(['product-size-closed'], !sizeGuideOpen)
+  useBodyClasses(['header-active'], sizeGuideOpen)
   usePageTitle(
     product ? `${product.title} - The Purple Panther` : 'Product - The Purple Panther',
     product?.seo?.description,

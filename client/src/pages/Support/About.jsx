@@ -1,4 +1,4 @@
-import { usePageTitle } from '../../theme/page.js'
+import { useBodyClass, usePageTitle } from '../../theme/page.js'
 
 /**
  * frontend/pages/about.blade.php — Our Story.
@@ -8,6 +8,10 @@ import { usePageTitle } from '../../theme/page.js'
  * returning the section on its own rather than adding a container the theme has no rule for.
  */
 export default function About() {
+  // `about.blade.php` opens with a bare `<body>` — no `home21-type`. That class carries the
+  // homepage's DM Sans / #3B3738 typography at a specificity that beats every
+  // `.about-editorial__*` rule, so the editorial serif only survives without it.
+  useBodyClass()
   usePageTitle('Our Story - The Purple Panther')
 
   return (
