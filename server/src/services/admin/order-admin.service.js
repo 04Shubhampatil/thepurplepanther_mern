@@ -134,7 +134,17 @@ export async function listOrders({
 export async function findOrder(id) {
   const order = await prisma.order.findUnique({ where: { id: BigInt(id) }, include: ORDER_INCLUDE })
   if (!order) throw new NotFoundError('Order not found.')
-  return order
+
+  /*
+   * `status_label` and `status_badge_class` are ACCESSORS, and the detail screen prints both.
+   * Attached here rather than recomputed on the client so the summary card and the list read
+   * the same value — neither normalises `pending`, so a fresh order says "Pending" on both.
+   */
+  return {
+    ...order,
+    statusLabel: statusLabel(order.status),
+    statusBadgeClass: statusBadgeClass(order.status),
+  }
 }
 
 /** Admin\OrderController::statusPayload — drives the status dropdown. */

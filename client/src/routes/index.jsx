@@ -37,9 +37,13 @@ const AdminLogin = lazy(() => import('../pages/Admin/AdminLogin.jsx'))
 const Dashboard = lazy(() => import('../pages/Admin/Dashboard.jsx'))
 const AdminProducts = lazy(() => import('../pages/Admin/Products.jsx'))
 const AdminProductForm = lazy(() => import('../pages/Admin/ProductForm.jsx'))
+const AdminProductReviews = lazy(() => import('../pages/Admin/ProductReviews.jsx'))
+const AdminOfferForm = lazy(() => import('../pages/Admin/OfferForm.jsx'))
+const AdminOrderDetail = lazy(() => import('../pages/Admin/OrderDetail.jsx'))
 const AdminOrders = lazy(() => import('../pages/Admin/Orders.jsx'))
 const AdminResource = lazy(() => import('../pages/Admin/Resource.jsx'))
 const AdminSettings = lazy(() => import('../pages/Admin/Settings.jsx'))
+const AdminContacts = lazy(() => import('../pages/Admin/Contacts.jsx'))
 const AdminCategories = lazy(() => import('../pages/Admin/Categories.jsx'))
 const AdminCategoryForm = lazy(() => import('../pages/Admin/CategoryForm.jsx'))
 const AdminSubCategories = lazy(() => import('../pages/Admin/SubCategories.jsx'))
@@ -213,6 +217,8 @@ export default function AppRoutes() {
             <Route path="colors" element={<AdminColors />} />
             <Route path="sizes" element={<AdminSizes />} />
             <Route path="offers" element={<AdminOffers />} />
+            <Route path="offers/create" element={<AdminOfferForm />} />
+            <Route path="offers/:id/edit" element={<AdminOfferForm />} />
             <Route path="banners" element={<AdminBanners />} />
             <Route path="banners/create" element={<AdminBannerForm />} />
             <Route path="banners/:id/edit" element={<AdminBannerForm />} />
@@ -236,8 +242,15 @@ export default function AppRoutes() {
             <Route path="products" element={<AdminProducts />} />
             <Route path="products/create" element={<AdminProductForm />} />
             <Route path="products/:id/edit" element={<AdminProductForm />} />
+            <Route path="products/:id/reviews" element={<AdminProductReviews />} />
             <Route path="orders" element={<AdminOrders />} />
+            <Route path="orders/:id" element={<AdminOrderDetail />} />
+            <Route path="contacts" element={<AdminContacts />} />
             <Route path="settings" element={<AdminSettings />} />
+            {/* The sidebar links straight to a Settings tab; both land on the same
+                page, which is how layouts/app.blade.php linked them too. */}
+            <Route path="settings/pages" element={<AdminSettings />} />
+            <Route path="settings/shipping" element={<AdminSettings />} />
             <Route path=":resource" element={<AdminResource />} />
           </Route>
         </Route>

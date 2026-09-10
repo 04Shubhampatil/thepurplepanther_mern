@@ -90,6 +90,9 @@ packed `#e3f2fd/#1565c0`, shipped `#fff3e0/#ef6c00`, delivered `#e8f5e9/#2e7d32`
 | Offers | unchanged | ✅ card grid (shares Categories') | pending |
 | Products (index) | unchanged | ✅ panel + filters + bulk + card grid | ✅ |
 | Products (create / edit) | colour galleries, highlight icons, upload.any() | ✅ 10 panels + 4 repeaters | ✅ |
+| Products (reviews) | unchanged | ✅ inline form + table | ✅ |
+| Offers (create / edit) | unchanged | ✅ 4 rows, suffix on the right | ✅ |
+| Orders (detail) | `statusLabel` / `statusBadgeClass` on findOrder | ✅ summary + items + totals | ✅ |
 | Banners (index) | `BANNER_SECTIONS` labels corrected | ✅ panel + section chips + card grid | ✅ |
 | Banners (create / edit) | per-slide metadata + video uploads restored | ✅ two form cards + media repeater | ✅ |
 | News Types | snake_case keys now reach Prisma | ✅ inline form + table, inline edit | ✅ |
@@ -426,6 +429,28 @@ six gallery images, featured image, prices and all four display flags unchanged,
 highlight rows kept their titles and subtitles. The JSON columns come back as STRINGS from the
 admin API, so the form parses both shapes — a product's highlights would otherwise reset to one
 empty row the first time it was edited.
+
+### The product form was unreachable, and three links went nowhere
+
+**The Products index carried its own inline editor.** Add New, View and Edit all opened a
+form built into index.jsx, so the full ProductForm page existed but nothing in the UI ever
+navigated to it — which is exactly what "still doesn't show the updated UI" meant. The index
+now links to create/edit as index.blade.php does, and the 260-line inline form is gone.
+
+**Three routes were missing** while the sidebar and list pages linked to them:
+`/admin/contacts` (the Contact List fell through to the generic resource page),
+`/admin/settings/pages` and `/admin/settings/shipping`. Both settings paths land on the same
+page, which is how layouts/app.blade.php linked them.
+
+`.status-text` on the order detail is NOT the `.status-badge` pill the list uses. It shares
+the `badge-*` class names but renders as bold coloured TEXT with no background, and `placed`
+is #ef6c00 there where the pill is grey — same classes, different component.
+
+The per-item Update control on the order detail updates the ORDER: `order_items.status`
+follows the order and is not editable per line, which is why both controls open the same modal.
+
+The offer form's discount box is the coupon form's mirror image — `.discount-suffix` puts the
+% on the RIGHT over a left border, where `.discount-prefix` puts the symbol on the left.
 
 ## 4. Known issues / blockers
 
