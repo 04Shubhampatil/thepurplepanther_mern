@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Pencil } from 'lucide-react'
 import { Button } from './AdminUI.jsx'
@@ -37,8 +37,42 @@ export default function OrderStatusModal({ orderId, onClose, onSaved }) {
   const [status, setStatus] = useState('')
   const [description, setDescription] = useState('')
   const [saving, setSaving] = useState(false)
+  const pickerRef = useRef(null)
 
   const open = orderId !== null && orderId !== undefined
+
+  /*
+   * order-admin.js's bindDatePicker: the visible field stays a plain text box in
+   * DD-MM-YYYY, and a hidden native <input type="date"> beside it supplies the calendar.
+   * Focusing or clicking the text box opens the browser's own picker; a date chosen there
+   * is written back into the text box in the display format. The text box stays editable
+   * by hand, exactly as before — the picker is a convenience layered on top, not a
+   * replacement.
+   */
+  const toIso = (dmy) => {
+    const m = /^(\d{2})-(\d{2})-(\d{4})$/.exec(String(dmy ?? '').trim())
+    return m ? `${m[3]}-${m[2]}-${m[1]}` : ''
+  }
+
+  function openPicker() {
+    const picker = pickerRef.current
+    if (!picker) return
+    // Keep the calendar on the date already in the field, as the source prefilled it.
+    picker.value = toIso(deliveryDate)
+    try {
+      if (typeof picker.showPicker === 'function') picker.showPicker()
+      else picker.click()
+    } catch {
+      picker.click()
+    }
+  }
+
+  function onPickerChange(event) {
+    const value = event.target.value // YYYY-MM-DD
+    if (!value) return
+    const [y, m, d] = value.split('-')
+    setDeliveryDate(`${d}-${m}-${y}`)
+  }
 
   useEffect(() => {
     if (!open) {
@@ -187,9 +221,21 @@ export default function OrderStatusModal({ orderId, onClose, onSaved }) {
                 type="text"
                 value={deliveryDate}
                 onChange={(event) => setDeliveryDate(event.target.value)}
+                onFocus={openPicker}
+                onClick={openPicker}
                 placeholder="DD-MM-YYYY"
                 autoComplete="off"
                 className="h-[38px] min-w-[140px] rounded-md border border-[#ddd] px-3 text-[14px] outline-none"
+              />
+              {/* `.date-picker-native` — present for its calendar, invisible and out of the
+                  tab order. showPicker() needs a real element in the document. */}
+              <input
+                ref={pickerRef}
+                type="date"
+                aria-hidden="true"
+                tabIndex={-1}
+                onChange={onPickerChange}
+                className="pointer-events-none absolute h-0 w-0 opacity-0"
               />
               {/* `.btn-delivery-update` — green, and the only green control in the panel */}
               <button
