@@ -14,10 +14,17 @@ import * as api from '../../services/endpoints.js'
  * rule, its own body padding and its own shadow, and the delivery-date row sits above the
  * timeline rather than inside the form.
  *
- * The two halves save SEPARATELY. Update writes the expected delivery date and emails the
- * customer; Save writes the status change and its note. Laravel wired them to different
- * endpoints for that reason, so a typo in the description cannot roll back a delivery date
- * the customer has already been told about.
+ * ONE ACTION SAVES EVERYTHING THAT WAS FILLED IN. Laravel wired the two halves to separate
+ * buttons — a green "Update" under the delivery date, a "Save" under the status — and the
+ * live logs show exactly what that produced: an admin chose a status, pressed the green
+ * "Update" in a dialog titled "Update Order Status", and only the date was written. Three
+ * times in a row, with no status change ever submitted. Either button now applies the
+ * delivery date if it was entered and the status if one was chosen, so the dialog does what
+ * its title says whichever button is pressed.
+ *
+ * The two writes stay separate ENDPOINTS, in a fixed order: date first, then status. Each
+ * emails the customer, and each reports its own outcome, so a rejected status never hides a
+ * date that was already saved and announced.
  *
  * The status dropdown is filled from the SERVER's `options`, not from a fixed list: the
  * state machine decides what a given order can move to, and `delivered` and `cancelled`
@@ -26,9 +33,9 @@ import * as api from '../../services/endpoints.js'
 export default function OrderStatusModal({ orderId, onClose, onSaved }) {
   const [data, setData] = useState(null)
   const [deliveryDate, setDeliveryDate] = useState('')
+  const [loadedDate, setLoadedDate] = useState('')
   const [status, setStatus] = useState('')
   const [description, setDescription] = useState('')
-  const [savingDate, setSavingDate] = useState(false)
   const [saving, setSaving] = useState(false)
 
   const open = orderId !== null && orderId !== undefined
@@ -39,6 +46,11 @@ export default function OrderStatusModal({ orderId, onClose, onSaved }) {
       setStatus('')
       setDescription('')
       setDeliveryDate('')
+      setLoadedDate('')
+      // The component stays mounted between opens, so this must be cleared here too —
+      // otherwise a successful save leaves `saving` true and the NEXT open has both buttons
+      // disabled with nothing to explain why.
+      setSaving(false)
       return
     }
 
@@ -48,7 +60,9 @@ export default function OrderStatusModal({ orderId, onClose, onSaved }) {
       .then((payload) => {
         if (cancelled) return
         setData(payload)
-        setDeliveryDate(formatDateDMY(payload.expectedDeliveryDate))
+        const current = formatDateDMY(payload.expectedDeliveryDate)
+        setDeliveryDate(current)
+        setLoadedDate(current)
       })
       .catch((err) => {
         if (!cancelled) toast.error(err.message)
@@ -69,38 +83,53 @@ export default function OrderStatusModal({ orderId, onClose, onSaved }) {
     return () => document.removeEventListener('keydown', onKey)
   }, [open, onClose])
 
-  async function saveDeliveryDate() {
-    setSavingDate(true)
-    try {
-      // The field is DD-MM-YYYY; the endpoint takes an ISO date.
-      const match = /^(\d{2})-(\d{2})-(\d{4})$/.exec(deliveryDate.trim())
-      const iso = match ? `${match[3]}-${match[2]}-${match[1]}` : deliveryDate.trim()
+  /*
+   * Everything the admin filled in, in one go. The date is only written when it actually
+   * changed — re-saving the same date would re-send the "delivery date updated" email.
+   */
+  async function saveAll(event) {
+    event?.preventDefault?.()
 
-      const res = await api.admin.orders.updateDeliveryDate(orderId, iso)
-      toast.success(res.$message)
-      onSaved?.()
-    } catch (err) {
-      toast.error(err.message)
-    } finally {
-      setSavingDate(false)
-    }
-  }
+    const dateText = deliveryDate.trim()
+    const dateChanged = dateText !== '' && dateText !== loadedDate
+    const hasStatus = Boolean(status)
 
-  async function onSubmit(event) {
-    event.preventDefault()
-    if (!status) {
-      toast.error('Please choose a status.')
+    if (!dateChanged && !hasStatus) {
+      toast.error('Choose a status or enter a delivery date.')
       return
     }
 
+    // The field is DD-MM-YYYY; the endpoint takes an ISO date. Reject a malformed date
+    // BEFORE anything is written, so a typo here cannot leave a half-applied change.
+    let iso = null
+    if (dateChanged) {
+      const match = /^(\d{2})-(\d{2})-(\d{4})$/.exec(dateText)
+      if (!match) {
+        toast.error('Enter the delivery date as DD-MM-YYYY.')
+        return
+      }
+      iso = `${match[3]}-${match[2]}-${match[1]}`
+    }
+
     setSaving(true)
+    let wroteSomething = false
     try {
-      const res = await api.admin.orders.updateStatus(orderId, { status, description })
-      toast.success(res.$message)
+      if (dateChanged) {
+        const res = await api.admin.orders.updateDeliveryDate(orderId, iso)
+        toast.success(res.$message)
+        wroteSomething = true
+      }
+      if (hasStatus) {
+        const res = await api.admin.orders.updateStatus(orderId, { status, description })
+        toast.success(res.$message)
+        wroteSomething = true
+      }
       onSaved?.()
       onClose()
     } catch (err) {
       toast.error(err.message)
+      // A date may already be saved when the status is refused — show the list as it is.
+      if (wroteSomething) onSaved?.()
       setSaving(false)
     }
   }
@@ -165,8 +194,8 @@ export default function OrderStatusModal({ orderId, onClose, onSaved }) {
               {/* `.btn-delivery-update` — green, and the only green control in the panel */}
               <button
                 type="button"
-                onClick={saveDeliveryDate}
-                disabled={savingDate}
+                onClick={saveAll}
+                disabled={saving}
                 className="inline-flex h-[38px] items-center justify-center gap-2 rounded-md border-none bg-[#43a047] px-3.5 font-semibold text-white transition-colors hover:bg-[#2e7d32] disabled:cursor-wait disabled:opacity-85"
               >
                 <Pencil size={14} />
@@ -202,7 +231,7 @@ export default function OrderStatusModal({ orderId, onClose, onSaved }) {
             ))}
           </div>
 
-          <form onSubmit={onSubmit} noValidate>
+          <form onSubmit={saveAll} noValidate>
             {/* `.offer-form-row` — the same 220px label grid the offer and coupon forms use */}
             <div className="grid grid-cols-1 gap-2 border-b border-[#f0f0f0] py-3.5 min-[576px]:grid-cols-[160px_1fr] min-[576px]:items-center min-[576px]:gap-4">
               <label htmlFor="order-status-select" className="text-[14px] font-semibold text-[#555]">
