@@ -1,0 +1,665 @@
+.beyond-ordinary-page {
+  --beyond-ordinary-ink: #1d1d1d;
+  --beyond-ordinary-plum: #3a1651;
+  --beyond-ordinary-paper: #f5f1eb;
+  --beyond-ordinary-line: rgba(29, 29, 29, .22);
+  margin: 0;
+  color: var(--beyond-ordinary-ink);
+  background: #fff;
+}
+
+.beyond-ordinary-page * {
+  box-sizing: border-box;
+}
+
+.beyond-ordinary-page .beyond-ordinary-shell {
+  width: min(100% - 64px, 1640px);
+  margin-inline: auto;
+}
+
+.beyond-ordinary-page .beyond-ordinary-hero {
+  --beyond-ordinary-scroll-y: 0px;
+  position: relative;
+  min-height: min(78vh, 820px);
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  background: #f2eee8;
+}
+
+.beyond-ordinary-page .beyond-ordinary-hero__image {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 0%;
+  transform: translate3d(0, var(--beyond-ordinary-scroll-y), 0) scale(1.025);
+  animation: beyondOrdinaryHero 1.6s cubic-bezier(.2, .7, .2, 1) both;
+  will-change: transform;
+}
+
+.beyond-ordinary-page .beyond-ordinary-hero__shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, #f6f2ec 0%, #f6f2ec 31%, rgba(246, 242, 236, .94) 38%, rgba(246, 242, 236, .18) 61%, transparent 76%);
+}
+
+.beyond-ordinary-page .beyond-ordinary-hero__content {
+  position: relative;
+  z-index: 1;
+  padding-block: clamp(100px, 12vw, 180px);
+  color: var(--beyond-ordinary-plum);
+}
+
+.beyond-ordinary-page .beyond-ordinary-hero h1 {
+    max-width: 600px;
+    margin: 0;
+    color: inherit;
+    font-family: "Times New Roman", Georgia, serif;
+    font-size: clamp(58px, 5.6vw, 108px);
+    font-weight: 400;
+    line-height: .98;
+    /* letter-spacing: -.045em; */
+}
+
+.beyond-ordinary-page .beyond-ordinary-hero__tagline {
+  max-width: 530px;
+  margin: clamp(28px, 3vw, 46px) 0 0;
+  color: var(--beyond-ordinary-plum);
+  font-family: "Times New Roman", Georgia, serif;
+  font-size: clamp(22px, 2vw, 34px);
+  line-height: 1.25;
+}
+
+.beyond-ordinary-page .beyond-ordinary-intro {
+  display: block;
+  padding: clamp(64px, 6vw, 92px) 0 clamp(58px, 5vw, 80px);
+}
+
+.beyond-ordinary-page .beyond-ordinary-intro__layout {
+  display: grid;
+  grid-template-columns: minmax(280px, .85fr) minmax(420px, 1.15fr);
+  max-width: 1140px;
+  margin-inline: auto;
+  padding-block: clamp(22px, 3vw, 44px);
+  border-block: 1px solid var(--beyond-ordinary-line);
+}
+
+.beyond-ordinary-page .beyond-ordinary-intro__heading {
+  padding: 4px clamp(40px, 5vw, 78px) 4px 0;
+}
+
+.beyond-ordinary-page .beyond-ordinary-intro__heading p {
+  margin: 0 0 18px;
+  color: #806f85;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .22em;
+}
+
+.beyond-ordinary-page .beyond-ordinary-intro__heading h2 {
+  max-width: 430px;
+  margin: 0;
+  color: var(--beyond-ordinary-plum);
+  font-family: "Times New Roman", Georgia, serif;
+  font-size: clamp(44px, 4.2vw, 68px);
+  font-weight: 400;
+  line-height: .98;
+  letter-spacing: -.035em;
+}
+
+.beyond-ordinary-page .beyond-ordinary-intro__copy {
+  padding: 2px 0 2px clamp(40px, 5vw, 78px);
+  border-left: 1px solid var(--beyond-ordinary-line);
+  color: #767676;
+  font-family: "Plus Jakarta Sans", sans-serif;
+  font-size: 14px;
+  line-height: 1.71;
+}
+
+.beyond-ordinary-page .beyond-ordinary-intro__copy p {
+  max-width: 620px;
+  margin: 0 0 16px;
+}
+
+.beyond-ordinary-page .beyond-ordinary-intro__copy p:last-child {
+  margin-bottom: 0;
+}
+
+.beyond-ordinary-page .beyond-ordinary-intro__copy .beyond-ordinary-intro__lead {
+  color: var(--beyond-ordinary-ink);
+  font-family: "Times New Roman", Georgia, serif;
+  font-size: clamp(22px, 2vw, 30px);
+  line-height: 1.3;
+}
+
+.beyond-ordinary-page .beyond-ordinary-intro__copy .beyond-ordinary-intro__statement {
+  margin-block: 24px;
+  color: var(--beyond-ordinary-plum);
+  font-family: "Times New Roman", Georgia, serif;
+  font-size: 19px;
+  line-height: 1.5;
+}
+
+.beyond-ordinary-page .beyond-ordinary-fabrics {
+  max-width: 1140px;
+  margin: clamp(44px, 5vw, 72px) auto 0;
+}
+
+.beyond-ordinary-page .beyond-ordinary-fabrics h2 {
+  margin: 0;
+  padding: 0 0 22px;
+  color: var(--beyond-ordinary-plum);
+  font-family: "Times New Roman", Georgia, serif;
+  font-size: 22px;
+  font-weight: 400;
+  letter-spacing: .14em;
+  text-align: left;
+}
+
+.beyond-ordinary-page .beyond-ordinary-fabrics ol {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  margin: 0;
+  padding: 0;
+  border-block: 1px solid var(--beyond-ordinary-line);
+  list-style: none;
+  counter-reset: fabric;
+}
+
+.beyond-ordinary-page .beyond-ordinary-fabrics li {
+  counter-increment: fabric;
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  align-items: center;
+  min-height: 86px;
+  padding: 16px 20px;
+  border-right: 1px solid var(--beyond-ordinary-line);
+  font-size: 13px;
+  letter-spacing: .1em;
+}
+
+.beyond-ordinary-page .beyond-ordinary-fabrics li:last-child {
+  border-right: 0;
+}
+
+.beyond-ordinary-page .beyond-ordinary-fabrics li::before {
+  content: "0" counter(fabric);
+  color: #806f85;
+  font-size: 11px;
+}
+
+.beyond-ordinary-page .beyond-ordinary-craft {
+  position: relative;
+  padding-block: clamp(90px, 90px, 170px);
+  background: var(--beyond-ordinary-plum);
+  color: #fff;
+  overflow: hidden;
+}
+
+.beyond-ordinary-page .beyond-ordinary-section-heading {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: end;
+  gap: 40px;
+  margin-bottom: clamp(55px, 7vw, 110px);
+}
+
+.beyond-ordinary-page .beyond-ordinary-section-heading h2 {
+  margin: 0;
+  color: inherit;
+  font-family: "Times New Roman", Georgia, serif;
+  font-size: clamp(44px, 4.4vw, 70px);
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: -.03em;
+}
+
+.beyond-ordinary-page .beyond-ordinary-section-heading p {
+  margin: 0;
+  color: rgba(255, 255, 255, .78);
+  font-family: "Times New Roman", Georgia, serif;
+  font-size: clamp(22px, 2.2vw, 38px);
+  line-height: 1.27;
+}
+
+.beyond-ordinary-page .beyond-ordinary-section-heading p em {
+  color: inherit;
+}
+
+.beyond-ordinary-page .beyond-ordinary-craft__grid {
+  display: grid;
+  grid-template-columns: 1.05fr .95fr;
+  gap: clamp(40px, 7vw, 110px);
+  align-items: start;
+}
+
+.beyond-ordinary-page .beyond-ordinary-craft__image {
+  margin: 0;
+  overflow: hidden;
+  aspect-ratio: 3 / 2;
+}
+
+.beyond-ordinary-page .beyond-ordinary-craft__image img,
+.beyond-ordinary-page .beyond-ordinary-craft__detail img,
+.beyond-ordinary-page .beyond-ordinary-material__visual img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform .9s cubic-bezier(.2, .7, .2, 1);
+}
+
+.beyond-ordinary-page .beyond-ordinary-craft__image:hover img,
+.beyond-ordinary-page .beyond-ordinary-craft__detail:hover img,
+.beyond-ordinary-page .beyond-ordinary-material__visual:hover img {
+  transform: scale(1.025);
+}
+
+.beyond-ordinary-page .beyond-ordinary-craft__points article {
+  position: relative;
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  padding: 0 0 30px;
+  margin-bottom: 30px;
+  border-bottom: 1px solid rgba(255, 255, 255, .25);
+}
+
+.beyond-ordinary-page .beyond-ordinary-craft__points span {
+  grid-row: 1 / 3;
+  padding-top: 4px;
+  font-size: 11px;
+  letter-spacing: .12em;
+  opacity: .62;
+}
+
+.beyond-ordinary-page .beyond-ordinary-craft__points h3 {
+  margin: 0 0 12px;
+  color: inherit;
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: .1em;
+}
+
+.beyond-ordinary-page .beyond-ordinary-craft__points p {
+  margin: 0;
+  max-width: 680px;
+  color: rgba(255, 255, 255, .78);
+  font-family: "Plus Jakarta Sans", sans-serif;
+  font-size: 14px;
+  line-height: 1.71;
+}
+
+.beyond-ordinary-page .beyond-ordinary-craft__detail {
+  width: min(32vw, 470px);
+  aspect-ratio: 1;
+  margin: clamp(70px, 10vw, 150px) 4% -23% auto;
+  overflow: hidden;
+  box-shadow: 0 28px 70px rgba(14, 4, 19, .26);
+}
+
+.beyond-ordinary-page .beyond-ordinary-material {
+  padding-block: clamp(110px, 110px, 210px);
+  background: #fff;
+}
+
+.beyond-ordinary-page .beyond-ordinary-material:nth-child(even) {
+  background: var(--beyond-ordinary-paper);
+}
+
+.beyond-ordinary-page .beyond-ordinary-material__grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(300px, .88fr) minmax(420px, 1.12fr);
+  gap: clamp(55px, 9vw, 150px);
+  align-items: start;
+}
+
+.beyond-ordinary-page .beyond-ordinary-material--reverse .beyond-ordinary-material__visual {
+  order: 2;
+}
+
+.beyond-ordinary-page .beyond-ordinary-material--reverse .beyond-ordinary-material__content {
+  order: 1;
+}
+
+.beyond-ordinary-page .beyond-ordinary-material__number {
+  position: absolute;
+  top: 0;
+  left: -2px;
+  z-index: 2;
+  transform: translateY(-52%);
+  color: var(--beyond-ordinary-plum);
+  font-family: "Times New Roman", Georgia, serif;
+  font-size: clamp(88px, 11vw, 180px);
+  line-height: 1;
+  opacity: .12;
+}
+
+.beyond-ordinary-page .beyond-ordinary-material--reverse .beyond-ordinary-material__number {
+  left: calc(50% + clamp(0px, 2vw, 32px));
+}
+
+.beyond-ordinary-page .beyond-ordinary-material__visual {
+  position: sticky;
+  top: 120px;
+  aspect-ratio: 2 / 3;
+  margin: 0;
+  overflow: hidden;
+  background: #e9e4de;
+}
+
+.beyond-ordinary-page .beyond-ordinary-material__content {
+  padding-top: clamp(20px, 5vw, 74px);
+}
+
+.beyond-ordinary-page .beyond-ordinary-material__content h2 {
+  margin: 0 0 42px;
+  color: var(--beyond-ordinary-ink);
+  font-family: "Times New Roman", Georgia, serif;
+  font-size: clamp(38px, 3.5vw, 56px);
+  font-weight: 400;
+  line-height: 1.08;
+  letter-spacing: -.03em;
+}
+
+.beyond-ordinary-page .beyond-ordinary-material__content>p {
+  max-width: 850px;
+  color: #767676;
+  font-size: 14px;
+  line-height: 1.71;
+}
+
+.beyond-ordinary-page .beyond-ordinary-material__lead {
+  margin-bottom: 5px;
+}
+
+.beyond-ordinary-page .beyond-ordinary-specs {
+  margin: 48px 0 58px;
+  padding: 30px 0;
+  border-block: 1px solid var(--beyond-ordinary-line);
+}
+
+.beyond-ordinary-page .beyond-ordinary-specs div {
+  display: grid;
+  grid-template-columns: 145px 1fr;
+  gap: 12px;
+  margin: 7px 0;
+  font-size: 14px;
+  line-height: 1.71;
+}
+
+.beyond-ordinary-page .beyond-ordinary-specs dt {
+  font-weight: 600;
+}
+
+.beyond-ordinary-page .beyond-ordinary-specs dd {
+  margin: 0;
+}
+
+.beyond-ordinary-page .beyond-ordinary-quality-title {
+  margin: 0 0 25px;
+  color: var(--beyond-ordinary-ink);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .16em;
+}
+
+.beyond-ordinary-page .beyond-ordinary-qualities {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.beyond-ordinary-page .beyond-ordinary-qualities li {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 16px;
+  padding: 17px 0;
+  border-bottom: 1px solid var(--beyond-ordinary-line);
+}
+
+.beyond-ordinary-page .beyond-ordinary-quality-mark {
+  width: 13px;
+  height: 13px;
+  margin-top: 7px;
+  border: 1px solid var(--beyond-ordinary-plum);
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 3px #fff, inset 0 0 0 7px var(--beyond-ordinary-plum);
+}
+
+.beyond-ordinary-page .beyond-ordinary-qualities p {
+  margin: 0;
+  color: #767676;
+  font-size: 14px;
+  line-height: 1.71;
+}
+
+.beyond-ordinary-page .beyond-ordinary-reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity .75s ease, transform .75s cubic-bezier(.2, .7, .2, 1);
+}
+
+.beyond-ordinary-page .beyond-ordinary-reveal--visible {
+  opacity: 1;
+  transform: none;
+}
+
+.beyond-ordinary-page .site-footer {
+  margin-top: 0;
+}
+
+body.beyond-ordinary-page.mm-wrapper.header-active footer.footer_one.su-footer-four.su-footer-five.home43-style.bgc-thm15.pt60.site-footer {
+  margin-top: 0px;
+}
+
+@keyframes beyondOrdinaryHero {
+  from {
+    opacity: .35;
+    filter: saturate(.7);
+  }
+
+  to {
+    opacity: 1;
+    filter: saturate(1);
+  }
+}
+
+@media (max-width: 1024px) {
+  .beyond-ordinary-page .beyond-ordinary-section-heading {
+    grid-template-columns: 1fr;
+  }
+
+  .beyond-ordinary-page .beyond-ordinary-fabrics ol {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .beyond-ordinary-page .beyond-ordinary-fabrics li:nth-child(2) {
+    border-right: 0;
+  }
+
+  .beyond-ordinary-page .beyond-ordinary-fabrics li:nth-child(-n+2) {
+    border-bottom: 1px solid var(--beyond-ordinary-line);
+  }
+
+  .beyond-ordinary-page .beyond-ordinary-craft__grid,
+  .beyond-ordinary-page .beyond-ordinary-material__grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 42px;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .beyond-ordinary-page .beyond-ordinary-shell {
+    width: min(100% - 36px, 1640px);
+  }
+
+  .beyond-ordinary-page .beyond-ordinary-hero {
+    min-height: 76svh;
+    align-items: flex-end;
+  }
+
+.beyond-ordinary-page .beyond-ordinary-hero__image {
+        inset: 10% 0 24% 0%;
+        width: 100%;
+        height: 110%;
+        object-position: 61% center;
+    }
+
+  .beyond-ordinary-page .beyond-ordinary-hero__shade {
+    background: linear-gradient(0deg, #f6f2ec 0%, #f6f2ec 28%, rgba(246, 242, 236, .84) 42%, transparent 68%);
+  }
+
+  .beyond-ordinary-page .beyond-ordinary-hero__content {
+    padding-block: 48px;
+  }
+
+  .beyond-ordinary-page .beyond-ordinary-hero h1 {
+    max-width: 90%;
+    font-size: clamp(52px, 15vw, 76px);
+  }
+
+  .beyond-ordinary-page .beyond-ordinary-hero__tagline {
+    max-width: 88%;
+    margin-top: 20px;
+    font-size: 22px;
+  }
+
+  .beyond-ordinary-page .beyond-ordinary-intro {
+    padding: 56px 0 52px;
+  }
+
+  .beyond-ordinary-page .beyond-ordinary-intro__layout {
+    grid-template-columns: 1fr;
+    padding-block: 0;
+  }
+
+  .beyond-ordinary-page .beyond-ordinary-intro__heading {
+    padding: 30px 0 34px;
+  }
+
+  .beyond-ordinary-page .beyond-ordinary-intro__heading h2 {
+    max-width: 330px;
+  }
+
+  .beyond-ordinary-page .beyond-ordinary-intro__copy {
+    padding: 34px 0 30px;
+    border-top: 1px solid var(--beyond-ordinary-line);
+    border-left: 0;
+  }
+
+  .beyond-ordinary-page .beyond-ordinary-fabrics {
+    margin-top: 38px;
+  }
+
+  .beyond-ordinary-page .beyond-ordinary-fabrics h2 {
+    margin: 0;
+    padding-bottom: 20px;
+  }
+
+  .beyond-ordinary-page .beyond-ordinary-fabrics ol {
+    grid-template-columns: 1fr;
+  }
+
+  .beyond-ordinary-page .beyond-ordinary-fabrics li {
+    min-height: 72px;
+    border-right: 0;
+    border-bottom: 1px solid var(--beyond-ordinary-line);
+  }
+
+  .beyond-ordinary-page .beyond-ordinary-fabrics li:last-child {
+    border-bottom: 0;
+  }
+
+  .beyond-ordinary-page .beyond-ordinary-craft__grid,
+  .beyond-ordinary-page .beyond-ordinary-material__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .beyond-ordinary-page .beyond-ordinary-craft__points {
+    margin-top: 14px;
+  }
+
+  .beyond-ordinary-page .beyond-ordinary-craft__detail {
+    width: 58vw;
+    margin-bottom: -35%;
+  }
+
+  .beyond-ordinary-page .beyond-ordinary-material {
+    padding-block: 100px;
+  }
+
+  .beyond-ordinary-page .beyond-ordinary-material__visual,
+  .beyond-ordinary-page .beyond-ordinary-material--reverse .beyond-ordinary-material__visual {
+    position: relative;
+    top: auto;
+    order: 1;
+    aspect-ratio: 4 / 5;
+  }
+
+  .beyond-ordinary-page .beyond-ordinary-material__content,
+  .beyond-ordinary-page .beyond-ordinary-material--reverse .beyond-ordinary-material__content {
+    order: 2;
+    padding-top: 15px;
+  }
+
+  .beyond-ordinary-page .beyond-ordinary-material__number {
+    top: -24px;
+  }
+
+  .beyond-ordinary-page .beyond-ordinary-material--reverse .beyond-ordinary-material__number {
+    left: -2px;
+  }
+}
+
+@media (max-width: 390px) {
+  .beyond-ordinary-page .beyond-ordinary-shell {
+    width: calc(100% - 28px);
+  }
+
+  .beyond-ordinary-page .beyond-ordinary-hero__content {
+    padding-bottom: 38px;
+  }
+
+  .beyond-ordinary-page .beyond-ordinary-intro__copy {
+    font-size: 14px;
+  }
+
+  .beyond-ordinary-page .beyond-ordinary-craft__points article {
+    grid-template-columns: 32px 1fr;
+  }
+
+  .beyond-ordinary-page .beyond-ordinary-craft__detail {
+    width: 68vw;
+  }
+
+  .beyond-ordinary-page .beyond-ordinary-material__content h2 {
+    font-size: 38px;
+  }
+
+  .beyond-ordinary-page .beyond-ordinary-specs div {
+    grid-template-columns: 1fr;
+    gap: 1px;
+    margin: 13px 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .beyond-ordinary-page .beyond-ordinary-hero__image {
+    animation: none;
+    transform: none;
+    will-change: auto;
+  }
+
+  .beyond-ordinary-page .beyond-ordinary-reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .beyond-ordinary-page .beyond-ordinary-craft__image img,
+  .beyond-ordinary-page .beyond-ordinary-craft__detail img,
+  .beyond-ordinary-page .beyond-ordinary-material__visual img {
+    transition: none;
+  }
+}
