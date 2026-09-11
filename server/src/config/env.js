@@ -23,11 +23,26 @@ const int = (fallback) =>
     .transform((v) => (v === undefined || v === '' ? fallback : Number(v)))
     .pipe(z.number().int())
 
+/*
+ * Every string value is TRIMMED. A value pasted into a hosting dashboard routinely arrives
+ * with a trailing newline, and it does not fail loudly: MEDIA_BASE_URL with "
+" on the
+ * end produced image URLs of the form ".../storage
+/banners/x.jpg" — syntactically a URL,
+ * so nothing threw, and every image on the live site simply failed to load. No variable
+ * here can legitimately begin or end with whitespace, so trimming loses nothing.
+ */
 const required = (name) =>
-  z.string({ error: `${name} is required` }).min(1, `${name} must not be empty`)
+  z
+    .string({ error: `${name} is required` })
+    .trim()
+    .min(1, `${name} must not be empty`)
 
 const optional = (fallback = '') =>
-  z.string().optional().transform((v) => (v === undefined ? fallback : v))
+  z
+    .string()
+    .optional()
+    .transform((v) => (v === undefined ? fallback : v.trim()))
 
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
