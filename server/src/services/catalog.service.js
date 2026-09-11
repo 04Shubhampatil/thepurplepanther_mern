@@ -77,16 +77,15 @@ export async function listProducts({ categorySlug = null, search = '', page = 1,
   const currentPage = Math.max(1, page)
 
   // One round trip for the page and its total, rather than two sequential queries.
-  const [total, rows] = await prisma.$transaction([
-    prisma.product.count({ where }),
-    prisma.product.findMany({
-      where,
-      include: CARD_INCLUDE,
-      orderBy: PRODUCT_ORDER,
-      skip: (currentPage - 1) * take,
-      take,
-    }),
-  ])
+const total = await prisma.product.count({ where })
+
+const rows = await prisma.product.findMany({
+  where,
+  include: CARD_INCLUDE,
+  orderBy: PRODUCT_ORDER,
+  skip: (currentPage - 1) * take,
+  take,
+})
 
   // The collection page renders a "New Arrivals" strip under the grid, and Laravel loaded
   // it in the same controller action (FrontendController::collection). Keeping it here
