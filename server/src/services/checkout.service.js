@@ -274,6 +274,20 @@ export async function verifyAndComplete({ orderId, payload, user, guestPassword 
 
   const paymentId = String(payload.razorpay_payment_id)
 
+  /*
+   * A successful payment moves a fresh order from `pending` to `placed` — the same write
+   * CheckoutService::confirmPayment makes in Laravel, and the only status change in this
+   * codebase that is not an admin's. It must NOT move any other status. The source assigns
+   * PLACED unconditionally, so an order an admin had already advanced while its payment
+   * was still outstanding would be dragged back to `placed` the moment the payment landed,
+   * erasing the admin's decision. Here the admin's status is kept; the payment is still
+   * recorded as paid and logged.
+   */
+  const fulfilmentStatus =
+    order.status === 'pending' || order.status === ORDER_STATUSES.PLACED
+      ? ORDER_STATUSES.PLACED
+      : order.status
+
   const completed = await prisma.$transaction(async (tx) => {
     const updated = await tx.order.update({
       where: { id: order.id },
@@ -282,7 +296,7 @@ export async function verifyAndComplete({ orderId, payload, user, guestPassword 
         razorpayOrderId: razorpayOrderId || order.razorpayOrderId,
         paymentMode: 'razorpay',
         paymentStatus: PAYMENT_STATUSES.PAID,
-        status: ORDER_STATUSES.PLACED,
+        status: fulfilmentStatus,
         orderedAt: order.orderedAt ?? new Date(),
       },
       include: { items: true, user: true },
@@ -291,7 +305,7 @@ export async function verifyAndComplete({ orderId, payload, user, guestPassword 
     await tx.orderStatusLog.create({
       data: {
         orderId: order.id,
-        status: ORDER_STATUSES.PLACED,
+        status: fulfilmentStatus,
         title: 'Payment received',
         description: `Payment successful via Razorpay. Payment ID: ${paymentId}`,
         loggedAt: new Date(),

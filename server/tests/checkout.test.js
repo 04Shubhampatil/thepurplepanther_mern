@@ -637,6 +637,33 @@ describe('verifyAndComplete', () => {
     expect(data.description).toContain(paymentId)
   })
 
+  /*
+   * The only status write outside the admin panel is this one, and it must move exactly
+   * one thing: a fresh `pending` order to `placed`. An order the admin had already
+   * advanced while its payment was outstanding keeps the admin's status — the payment is
+   * still recorded, but it does not drag fulfilment back to the start.
+   */
+  it('moves a PENDING order to placed on payment', async () => {
+    prismaMock.order.findUnique.mockResolvedValue(pendingOrder({ status: 'pending' }))
+    await checkout.verifyAndComplete({ orderId: 500n, payload: validPayload(), user: null })
+
+    expect(prismaMock.order.update.mock.calls[0][0].data.status).toBe('placed')
+    expect(prismaMock.orderStatusLog.create.mock.calls[0][0].data.status).toBe('placed')
+  })
+
+  it.each(['packed', 'shipped', 'delivered'])(
+    'does NOT drag an order the admin already moved to %s back to placed',
+    async (adminStatus) => {
+      prismaMock.order.findUnique.mockResolvedValue(pendingOrder({ status: adminStatus }))
+      await checkout.verifyAndComplete({ orderId: 500n, payload: validPayload(), user: null })
+
+      const { data } = prismaMock.order.update.mock.calls[0][0]
+      expect(data.paymentStatus).toBe('paid') // the payment is still recorded
+      expect(data.status).toBe(adminStatus) // the admin's decision stands
+      expect(prismaMock.orderStatusLog.create.mock.calls[0][0].data.status).toBe(adminStatus)
+    },
+  )
+
   it('sends the customer and admin emails', async () => {
     await checkout.verifyAndComplete({ orderId: 500n, payload: validPayload(), user: null })
 
