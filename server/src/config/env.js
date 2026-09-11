@@ -54,6 +54,12 @@ const schema = z.object({
   LOG_LEVEL: optional('info'),
 
   DATABASE_URL: required('DATABASE_URL'),
+  /*
+   * Pool ceiling and idle lifetime. See config/database.js — the host counts NEW connections
+   * per hour, so a small pool that keeps its connections open beats a large one that churns.
+   */
+  DB_POOL_MAX: int(5),
+  DB_POOL_IDLE_SECONDS: int(6 * 60 * 60),
   DATABASE_URL_DEV: optional(''),
 
   JWT_SECRET: required('JWT_SECRET').min(32, 'JWT_SECRET must be at least 32 characters'),
