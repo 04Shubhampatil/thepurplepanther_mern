@@ -106,7 +106,18 @@ export default function OrderPrint() {
           <h2 style={{ fontSize: '16px', margin: '18px 0 8px' }}>Billing &amp; Shipping</h2>
           <p><strong>Name:</strong> {order.shippingName || order.userName || '—'}</p>
           <p><strong>Phone:</strong> {order.shippingPhone || order.userPhone || '—'}</p>
+          {/*
+            The live admin print (thepurplepanther.in/admin/orders/{id}/print) shows the full
+            checkout address — the columns added by the 2026_08_11 checkout-fields migration —
+            with the same labels and fallbacks as the order detail screen (OrderDetail.jsx).
+            The zipped print.blade.php predates that and stops at Address.
+          */}
+          <p><strong>Email:</strong> {order.shippingEmail || order.userEmail || '—'}</p>
           <p><strong>Address:</strong> {order.shippingAddress || '—'}</p>
+          <p><strong>Town / City:</strong> {order.shippingCity || '—'}</p>
+          <p><strong>State:</strong> {order.shippingState || '—'}</p>
+          <p><strong>Zip / PIN Code:</strong> {order.shippingPincode || '—'}</p>
+          <p><strong>Country / Region:</strong> {order.shippingCountry || '—'}</p>
         </div>
       </div>
 

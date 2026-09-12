@@ -6,10 +6,14 @@ import * as api from '../../services/endpoints.js'
 import { useAuthStore, useCartStore } from '../../store/index.js'
 import { loadRazorpay } from '../../utils/razorpay.js'
 import Loading from '../../components/common/Loading.jsx'
-import { usePageTitle } from '../../theme/page.js'
+import { useBodyClass, usePageTitle } from '../../theme/page.js'
 
 /**
  * frontend/pages/checkout.blade.php, with the flow from checkout.js.
+ *
+ * checkout.blade.php opens with a bare `<body>`; useBodyClass() with no classes matches it.
+ * Without this the homepage's body class stays on and style.css hides the header's
+ * announcement bar (see pages/Cart/Cart.jsx).
  *
  * The payment sequence is unchanged and the order of its steps is the security property:
  *
@@ -31,6 +35,7 @@ export default function Checkout() {
   const removeCoupon = useCartStore((s) => s.removeCoupon)
   const user = useAuthStore((s) => s.user)
 
+  useBodyClass()
   usePageTitle('Checkout - The Purple Panther')
 
   const { data, error, loading } = useApi(() => api.checkout.context(), [])

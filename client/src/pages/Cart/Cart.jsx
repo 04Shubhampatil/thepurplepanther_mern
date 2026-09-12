@@ -2,11 +2,16 @@ import { Link } from 'react-router-dom'
 import CartContents from '../../components/cart/CartContents.jsx'
 import ProductRecommendations from '../../components/product/ProductRecommendations.jsx'
 import { useApi } from '../../hooks/useApi.js'
-import { usePageTitle } from '../../theme/page.js'
+import { useBodyClass, usePageTitle } from '../../theme/page.js'
 import * as api from '../../services/endpoints.js'
 
 /**
  * frontend/pages/cart.blade.php.
+ *
+ * cart.blade.php opens with a bare `<body>`, and useBodyClass() with no classes reproduces
+ * that. It is not optional: style.css hides `header` under `body.home21-type.mm-wrapper`,
+ * so leaving the homepage's class in place removes the announcement bar (the public
+ * coupon ticker — "Sign Up & Receive 10% Off…") from the top of this page.
  *
  * The breadcrumb across the top is the theme's three-step checkout progress — cart,
  * checkout, order complete — with the last step disabled. It is duplicated for small
@@ -17,6 +22,7 @@ import * as api from '../../services/endpoints.js'
  * so the ordering and the top-up-to-four fallback stay on the server where they were.
  */
 export default function Cart() {
+  useBodyClass()
   usePageTitle('Shopping Cart - The Purple Panther')
 
   const { data } = useApi(() => api.cart.recommendations(), [])

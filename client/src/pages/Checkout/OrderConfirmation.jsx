@@ -2,11 +2,14 @@ import { Link, useParams } from 'react-router-dom'
 import { useApi } from '../../hooks/useApi.js'
 import Loading from '../../components/common/Loading.jsx'
 import NotFound from '../NotFound.jsx'
-import { usePageTitle } from '../../theme/page.js'
+import { useBodyClass, usePageTitle } from '../../theme/page.js'
 import * as api from '../../services/endpoints.js'
 
 /**
  * frontend/pages/order.blade.php — the order-complete step.
+ *
+ * order.blade.php opens with a bare `<body>`; useBodyClass() with no classes matches it and
+ * keeps the header's announcement bar visible (see pages/Cart/Cart.jsx).
  *
  * The breadcrumb's third step is the active one here and carries no link, which is what
  * marks the flow as finished; cart and checkout above it stay clickable exactly as Blade
@@ -17,6 +20,7 @@ import * as api from '../../services/endpoints.js'
  */
 export default function OrderConfirmation() {
   const { orderNumber } = useParams()
+  useBodyClass()
 
   const { data, error, loading } = useApi(() => api.checkout.order(orderNumber), [orderNumber])
   const order = data?.order ?? data ?? null

@@ -12,16 +12,24 @@
  *
  * The server sends both the formatted strings and the percent (utils/product-presenter.js),
  * so no price arithmetic happens in the browser — the same rule the cart follows.
+ *
+ * The struck MRP is shown only when the MRP is actually higher than the price. The Blade
+ * partial derived its percent from that comparison alone, but the card payload's
+ * `discountPercent` can come from an attached offer, so a product whose MRP equals its
+ * selling price could otherwise render the same figure twice, one of them crossed out.
  */
 export default function PpPrice({ product }) {
   const hasSelling = product.hasSellingPrice
   const discount = Number(product.discountPercent ?? 0)
+  const mrp = Number(product.mrp)
+  const price = Number(product.price)
+  const hasSaving = discount > 0 && !(Number.isFinite(mrp) && Number.isFinite(price) && mrp <= price)
 
   return (
     <span className={`pp-price ${hasSelling ? 'pp-price--has-selling-price' : 'pp-price--mrp-only'}`}>
       {!hasSelling ? (
         <span className="pp-price__mrp">{product.mrpFormatted}</span>
-      ) : discount ? (
+      ) : hasSaving ? (
         <>
           <span className="pp-price__mrp"><s>{product.mrpFormatted}</s></span>
           <span className="pp-price__discount">-{discount}%</span>

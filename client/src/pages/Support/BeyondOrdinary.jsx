@@ -1,5 +1,74 @@
+import { useEffect } from 'react'
 import { MATERIALS } from './beyondOrdinaryMaterials.js'
 import { useBodyClass, usePageStylesheet, usePageTitle } from '../../theme/page.js'
+
+const REVEAL = '.beyond-ordinary-reveal'
+const VISIBLE = 'beyond-ordinary-reveal--visible'
+
+/**
+ * The two inline scripts at the foot of beyond-ordinary.blade.php.
+ *
+ * Neither is decorative. beyond-ordinary.css holds every `.beyond-ordinary-reveal` block
+ * at opacity 0 until `--visible` is added, so without the observer the intro, craft and
+ * all four fabric sections never appear — only the hero renders. The site-wide useReveal
+ * in theme/reveal.js handles `.wow` elements only, so this page runs its own, with the
+ * same threshold and the same reduced-motion short-circuit the Blade script had.
+ *
+ * The second script scrolls the hero image at a fraction of the page's scroll, via the
+ * `--beyond-ordinary-scroll-y` custom property the stylesheet reads.
+ *
+ * The page renders synchronously from static data, so by the time this effect runs every
+ * reveal block is already in the DOM; a one-shot querySelectorAll is enough here.
+ */
+function useBeyondOrdinaryScripts() {
+  useEffect(() => {
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const items = document.querySelectorAll(REVEAL)
+    let observer
+
+    if (!items.length || reducedMotion || typeof IntersectionObserver === 'undefined') {
+      items.forEach((item) => item.classList.add(VISIBLE))
+    } else {
+      observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add(VISIBLE)
+              observer.unobserve(entry.target)
+            }
+          })
+        },
+        { threshold: 0.12 },
+      )
+      items.forEach((item) => observer.observe(item))
+    }
+
+    let onScroll
+    const hero = document.querySelector('.beyond-ordinary-hero')
+    if (!reducedMotion && hero) {
+      let ticking = false
+      const update = () => {
+        const rect = hero.getBoundingClientRect()
+        const progress = Math.max(0, Math.min(1, -rect.top / Math.max(rect.height, 1)))
+        hero.style.setProperty('--beyond-ordinary-scroll-y', `${progress * 56}px`)
+        ticking = false
+      }
+      onScroll = () => {
+        if (!ticking) {
+          window.requestAnimationFrame(update)
+          ticking = true
+        }
+      }
+      window.addEventListener('scroll', onScroll, { passive: true })
+      update()
+    }
+
+    return () => {
+      observer?.disconnect()
+      if (onScroll) window.removeEventListener('scroll', onScroll)
+    }
+  }, [])
+}
 
 /**
  * frontend/pages/beyond-ordinary.blade.php.
@@ -16,6 +85,7 @@ export default function BeyondOrdinary() {
   useBodyClass('beyond-ordinary-page')
   usePageStylesheet('/frontend/css/beyond-ordinary.css?v=intro-editorial-5')
   usePageTitle('Beyond Ordinary - The Purple Panther')
+  useBeyondOrdinaryScripts()
 
   return (
     <main>

@@ -3,7 +3,7 @@ import SearchPanel from './SearchPanel.jsx'
 import MobileMenu from './MobileMenu.jsx'
 import AccountHeaderIcon from './AccountHeaderIcon.jsx'
 import ThemeSwiper, { SwiperSlide } from '../ui/ThemeSwiper.jsx'
-import { useOffersStore } from '../../store/index.js'
+import { useAuthStore, useCartStore, useOffersStore } from '../../store/index.js'
 import { useUiStore } from '../../store/ui.js'
 import { useStickyHeader } from '../../theme/chrome.js'
 
@@ -19,11 +19,40 @@ import { useStickyHeader } from '../../theme/chrome.js'
  * delegated handlers in script.js that toggled classes on nodes elsewhere in the document;
  * they are click handlers on shared state (store/ui.js) now. The classes stay because the
  * stylesheet still needs them, but nothing selects on them any more.
+ *
+ * The bag icon is cart.js's, not a page link. Its delegated handler on `.cart-filter-btn`
+ * called preventDefault, reloaded the cart and then opened the bag drawer — so clicking the
+ * icon never left the page. The href stays `/cart` for the same reason it did there: with
+ * no JavaScript it still goes somewhere useful. cart.js's ensureBadges() also appended a
+ * `.site-cart-count` badge to the icon and hid it below one item; that is the count span.
  */
 export default function SiteHeader() {
   const offers = useOffersStore((s) => s.offers)
-  const { openMenu, openSearch } = useUiStore()
+  const cartCount = useCartStore((s) => s.cart.count ?? 0)
+  const refreshCart = useCartStore((s) => s.refresh)
+  const openBag = useCartStore((s) => s.openDrawer)
+  const { openMenu, openSearch, openAccount } = useUiStore()
+  const user = useAuthStore((s) => s.user)
+  const customer = Boolean(user) && user.role !== 'admin'
   const fixed = useStickyHeader()
+
+  /*
+   * site-drawers.js addHeaderButtons(): a wishlist heart inserted between the account icon
+   * and the bag on every page. A signed-in customer goes to /account/wishlist; a guest gets
+   * the account panel with the wishlist recorded as where to land after signing in — the
+   * `pp_account_return` the ui store carries as `accountReturn`.
+   */
+  function openWishlist(event) {
+    if (customer) return
+    event.preventDefault()
+    openAccount('/account/wishlist')
+  }
+
+  function openBagDrawer(event) {
+    event.preventDefault()
+    // cart.js: loadCart().finally(openBagDrawer) — open even if the reload fails.
+    refreshCart().finally(openBag)
+  }
 
   const ticker = offers.length > 0
     ? offers
@@ -113,13 +142,25 @@ export default function SiteHeader() {
                     <li className="ms-0">
                       <AccountHeaderIcon />
                     </li>
+                    <li className="position-relative ms-2 site-wishlist-entry">
+                      <Link to="/account/wishlist" className="wishlist-panel-btn" aria-label="Open wishlist" onClick={openWishlist}>
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78Z" /></svg>
+                      </Link>
+                    </li>
                     <li className="position-relative ms-2">
-                      <Link to="/cart" className="cart-filter-btn" aria-label="Shopping bag">
+                      <a
+                        href="/cart"
+                        className="cart-filter-btn site-cart-link"
+                        style={{ position: 'relative' }}
+                        aria-label="Shopping bag"
+                        onClick={openBagDrawer}
+                      >
                         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                           <path d="M11.9 15H4.09998C2.44998 15 1.09998 13.65 1.09998 12V11.9L1.39998 3.9C1.44998 2.25 2.79998 1 4.39998 1H11.6C13.2 1 14.55 2.25 14.6 3.9L14.9 11.9C14.95 12.7 14.65 13.45 14.1 14.05C13.55 14.65 12.8 15 12 15C12 15 11.95 15 11.9 15ZM4.39998 2C3.29998 2 2.44998 2.85 2.39998 3.9L2.09998 12C2.09998 13.1 2.99998 14 4.09998 14H12C12.55 14 13.05 13.75 13.4 13.35C13.75 12.95 13.95 12.45 13.95 11.9L13.65 3.9C13.6 2.8 12.75 2 11.65 2H4.39998Z" fill="currentColor" />
                           <path d="M8 7C6.05 7 4.5 5.45 4.5 3.5C4.5 3.2 4.7 3 5 3C5.3 3 5.5 3.2 5.5 3.5C5.5 4.9 6.6 6 8 6C9.4 6 10.5 4.9 10.5 3.5C10.5 3.2 10.7 3 11 3C11.3 3 11.5 3.2 11.5 3.5C11.5 5.45 9.95 7 8 7Z" fill="currentColor" />
                         </svg>
-                      </Link>
+                        <span className="site-cart-count" data-cart-count="" hidden={cartCount < 1}>{cartCount}</span>
+                      </a>
                     </li>
                   </ul>
                 </nav>

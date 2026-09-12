@@ -334,11 +334,12 @@ export default function Account() {
                           <p>
                             {product.price > 0 ? (
                               <span className="pp-price pp-price--has-selling-price">
-                                <span className="pp-price__mrp">
-                                  {product.discountPercent ? <s>{product.mrpFormatted}</s> : product.mrpFormatted}
-                                </span>
-                                {product.discountPercent ? (
-                                  <span className="pp-price__discount">-{product.discountPercent}%</span>
+                                {/* MRP only when it beats the price — otherwise the stylesheet strikes an equal figure. */}
+                                {product.discountPercent > 0 && product.mrp > product.price ? (
+                                  <>
+                                    <span className="pp-price__mrp"><s>{product.mrpFormatted}</s></span>
+                                    <span className="pp-price__discount">-{product.discountPercent}%</span>
+                                  </>
                                 ) : null}
                                 <span className="pp-price__selling">{product.priceFormatted}</span>
                               </span>

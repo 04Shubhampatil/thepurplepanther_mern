@@ -296,14 +296,26 @@ export default function Home() {
               1200: { slidesPerView: 2, spaceBetween: 30 },
             }}
           >
+            {/*
+              Blade put `home-fabric-card` on the slide itself. Here the card is an <article>
+              INSIDE the slide, and that is load-bearing: style.css gives the card a fixed
+              height per breakpoint (528 / 460 / 390px) and Swiper's own stylesheet gives
+              `.swiper-slide` `height: 100%`. In Laravel, Swiper 6's CSS sat inside style.css
+              ahead of the card rule, so the card rule won; in this build Swiper's CSS is
+              bundled after the theme, so on the slide the same two rules resolve the other
+              way and the card collapses to the image's natural aspect. On a nested article
+              there is no conflict — the slide's 100% resolves to the article's height.
+            */}
             {fabricCards.map((fabric, index) => (
-              <SwiperSlide className="home-fabric-card" tag="article" tabIndex="0" key={fabric.id ?? index}>
-                <img src={fabric.image} alt={fabric.alt ?? fabric.title} />
-                <div className="home-fabric-card__overlay"></div>
-                <div className="home-fabric-card__content">
-                  <h3>{fabric.title}</h3>
-                  {fabric.subtitle && <p>{fabric.subtitle}</p>}
-                </div>
+              <SwiperSlide key={fabric.id ?? index}>
+                <article className="home-fabric-card" tabIndex="0">
+                  <img src={fabric.image} alt={fabric.alt ?? fabric.title} />
+                  <div className="home-fabric-card__overlay"></div>
+                  <div className="home-fabric-card__content">
+                    <h3>{fabric.title}</h3>
+                    {fabric.subtitle && <p>{fabric.subtitle}</p>}
+                  </div>
+                </article>
               </SwiperSlide>
             ))}
           </ThemeSwiper>

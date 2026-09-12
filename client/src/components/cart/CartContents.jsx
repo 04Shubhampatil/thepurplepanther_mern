@@ -71,12 +71,17 @@ export default function CartContents() {
     return parts.join('')
   }
 
+  // product-price.blade.php: the MRP appears only when it is higher than the unit price.
+  // custom.css strikes every `.pp-price__mrp` inside `--has-selling-price`, so rendering it
+  // when the two are equal shows the same figure twice, one crossed out.
   const unitPrice = (item) => (
     <span className="pp-price pp-price--has-selling-price">
-      <span className="pp-price__mrp">
-        {item.discountPercent ? <s>{item.mrpFormatted}</s> : item.mrpFormatted}
-      </span>
-      {item.discountPercent ? <span className="pp-price__discount">-{item.discountPercent}%</span> : null}
+      {item.discountPercent > 0 && item.mrp > item.unitPrice ? (
+        <>
+          <span className="pp-price__mrp"><s>{item.mrpFormatted}</s></span>
+          <span className="pp-price__discount">-{item.discountPercent}%</span>
+        </>
+      ) : null}
       <span className="pp-price__selling">{item.unitPriceFormatted}</span>
     </span>
   )

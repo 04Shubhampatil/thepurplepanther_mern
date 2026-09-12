@@ -229,14 +229,18 @@ export default function ProductDetail() {
                 <p className="product-design__price" data-product-price>
                   {selectedPackage ? (
                     <span className="pp-price pp-price--has-selling-price">
-                      <span className="pp-price__mrp">
-                        {packageDiscount ? (
-                          <s>₹ {selectedPackage.mrp.toFixed(2)}</s>
-                        ) : (
-                          <>₹ {selectedPackage.mrp.toFixed(2)}</>
-                        )}
-                      </span>
-                      {packageDiscount > 0 && <span className="pp-price__discount">-{packageDiscount}%</span>}
+                      {/*
+                        Same three-state rule as PpPrice / product-price.blade.php: the MRP is
+                        rendered only when the pack is cheaper than it. custom.css strikes every
+                        `.pp-price__mrp` in this wrapper, so an equal MRP showed as "₹519 ₹519"
+                        with the first crossed out.
+                      */}
+                      {packageDiscount > 0 && (
+                        <>
+                          <span className="pp-price__mrp"><s>₹ {selectedPackage.mrp.toFixed(2)}</s></span>
+                          <span className="pp-price__discount">-{packageDiscount}%</span>
+                        </>
+                      )}
                       <span className="pp-price__selling">₹ {selectedPackage.price.toFixed(2)}</span>
                     </span>
                   ) : (
