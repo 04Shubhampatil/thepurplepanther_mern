@@ -99,6 +99,7 @@ export default function SiteFooter() {
                       <ul className="list-unstyled">
                         <li><Link to="/">Home</Link></li>
                         <li><Link to="/about">Our Story</Link></li>
+                        <li><Link to="/beyond-ordinary">Beyond Ordinary</Link></li>
                         <li><Link to="/support/faqs">Contact</Link></li>
                         {/* <li><Link to="/about">Sustainability</Link></li> */}
                         {/* <li><Link to="/about">Stores</Link></li> */}

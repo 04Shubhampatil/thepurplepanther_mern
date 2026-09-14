@@ -36,6 +36,7 @@ const MENU_LINKS = (accessoriesUrl) => [
   ['/collection', 'COLLECTION'],
   [accessoriesUrl, 'ACCESSORIES'],
   ['/about', 'OUR STORY'],
+  ['/beyond-ordinary', 'BEYOND ORDINARY'],
   ['/support', 'CUSTOMER SUPPORT'],
 ]
 

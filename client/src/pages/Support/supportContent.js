@@ -29,6 +29,12 @@ export const SUPPORT_CONTENT = {
       {
         type: 'accordion',
         items: [
+          ['Shipping', [
+            'Your order will be dispatched within 3–5 business days.',
+          ]],
+          ['Delivery', [
+            'Once dispatched, delivery will take approximately 5–7 business days to reach you.',
+          ]],
           ['Order processing', [
             'Orders are prepared Monday through Friday. Please allow 1–2 business days for processing before dispatch.',
             'During launches and seasonal promotions, processing may require an additional business day.',
