@@ -5,6 +5,7 @@ import HomeNewArrivals from '../../components/home/HomeNewArrivals.jsx'
 import ShopTheLook from '../../components/home/ShopTheLook.jsx'
 import Loading from '../../components/common/Loading.jsx'
 import { useApi } from '../../hooks/useApi.js'
+import { useBodyClass } from '../../theme/page.js'
 import HomeHero from '../../components/home/HomeHero.jsx'
 import ThemeSwiper, { SwiperSlide } from '../../components/ui/ThemeSwiper.jsx'
 import { variantLabel } from '../../utils/variant-label.js'
@@ -57,6 +58,18 @@ const DEFAULT_FABRICS = [
 ]
 
 export default function Home() {
+  // Home never called useBodyClass, so it kept the default 'home21-type' — which is also
+  // exactly what style.css's `body.home21-type.mm-wrapper header { display: none }` keys
+  // off, hiding the header's announcement ticker ("Sign Up & Receive 10%…") ONLY here and
+  // on the one other page with the same untouched default (see Search.jsx, also unset — a
+  // page Laravel never had, so its header was never a design decision either way). The
+  // client wants the offer visible on the homepage too. Passing 'home21-type' straight
+  // back in keeps every rule that already depends on it (see theme/page.js's note on
+  // body.home21-type's typography overrides), and the added 'home-page' class is a marker
+  // the CSS override below can key off without touching Search or any other page that
+  // still relies on the plain default.
+  useBodyClass('home21-type', 'home-page')
+
   const { data, loading } = useApi(() => api.catalog.home(), [])
 
   const banners = data?.banners ?? {}

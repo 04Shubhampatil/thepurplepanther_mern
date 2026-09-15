@@ -33,7 +33,12 @@ export default function Collection({ categorySlug = null }) {
   const newArrivals = data?.newArrivals ?? []
   const pagination = data?.pagination ?? { page: 1, lastPage: 1, total: 0, perPage: 50 }
 
-  useBodyClass('collection-template')
+  // `category-<slug>` mirrors what ProductDetail.jsx already puts on <body>, so a category
+  // page can be styled on its own — the Accessories grid crops its card images differently
+  // from Collection's (style.css, the `.collection-page__media img` object-position rules)
+  // and there was no other hook to tell the two apart, since both render this component.
+  // /shop and /collection carry only `collection-template`, as before.
+  useBodyClass('collection-template', activeCategory ? `category-${activeCategory.slug}` : '')
   usePageTitle(
     activeCategory ? `${activeCategory.title} - The Purple Panther` : 'Collection - The Purple Panther',
   )

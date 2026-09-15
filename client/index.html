@@ -14,9 +14,15 @@
     SAME /frontend path by the Express app (app.js -> express.static(THEME_ROOT)). One copy,
     one path, so every relative url() inside the CSS still resolves and the rendered result
     is byte-for-byte the design that shipped.
+
+    style.css carries a `?v=` like custom.css does, and for the same reason: the Express
+    static mount serves /frontend with a 30-day Cache-Control, and the URL is not
+    fingerprinted, so without a version bump every browser that has ever loaded the file
+    keeps its stale copy for a month — a hard refresh on one machine does nothing for a
+    phone. Bump this value whenever style.css changes.
   -->
   <link rel="stylesheet" href="/frontend/css/bootstrap.min.css">
-  <link rel="stylesheet" href="/frontend/css/style.css">
+  <link rel="stylesheet" href="/frontend/css/style.css?v=accessories-crop-1">
   <link rel="stylesheet" href="/frontend/css/custom.css?v=pricing-1">
   <link rel="stylesheet" href="/frontend/css/site-drawers.css">
   <link rel="stylesheet" href="/frontend/css/journal.css">

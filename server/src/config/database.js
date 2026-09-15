@@ -32,6 +32,22 @@ const adapter = new PrismaMariaDb(env.DATABASE_URL, {
   connectionLimit: env.DB_POOL_MAX,
   minimumIdle: 1,
   idleTimeout: env.DB_POOL_IDLE_SECONDS,
+  /*
+   * TEXT PROTOCOL, NOT PREPARED STATEMENTS — this is what makes search work.
+   *
+   * Every `contains` filter (storefront search, /shop?q=, admin product/category/order
+   * search) compiles to `LIKE CONCAT('%', ?, '%')`. Over the driver's binary protocol
+   * (`execute`) the bound parameter reaches MySQL/MariaDB with a binary collation, and
+   * CONCAT of that with the '%' literals yields `utf8mb4_bin,NONE` — which cannot be
+   * compared against a `utf8mb4_unicode_ci` column: error 1267 "Illegal mix of
+   * collations", surfaced to the browser as "A database error occurred." It reproduces
+   * on both the production MySQL and the local MariaDB 11 dev server. With the text
+   * protocol the connector escapes the value and inlines it as a plain string literal,
+   * so it simply takes the column's collation. Result decoding (typeCast, jsonStrings,
+   * bitOneIsBoolean) is shared by both paths in the adapter, so nothing else changes.
+   * Setting a `collation` on the connection does NOT fix it — that was tried.
+   */
+  useTextProtocol: true,
 })
 
 const globalForPrisma = globalThis
