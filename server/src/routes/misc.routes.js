@@ -28,5 +28,7 @@ router.post('/contact', writeLimiter, newsletterController.contact)
 // The feed keeps its ORIGINAL path as well, because Meta Commerce Manager is configured
 // against it. Both are mounted; see docs/route-mapping.md §6.
 router.get('/catalog/meta/products.csv', catalogFeedController.feed)
+// Token-free copy of the same CSV, for opening directly in a browser or Excel.
+router.get('/catalog/meta/products-public.csv', catalogFeedController.publicFeed)
 
 export default router

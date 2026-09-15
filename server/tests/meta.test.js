@@ -413,6 +413,61 @@ describe('catalog feed access control (audit R1)', () => {
   })
 })
 
+// ══════════════════════════════════════════════ public CSV copy
+
+describe('catalog feed — public copy (no token)', () => {
+  it('serves the CSV at /catalog/meta/products-public.csv without a token', async () => {
+    prismaMock.product.findMany.mockResolvedValueOnce([feedProduct()]).mockResolvedValue([])
+
+    const res = await request(app).get('/catalog/meta/products-public.csv')
+
+    expect(res.status).toBe(200)
+    expect(res.headers['content-type']).toContain('text/csv')
+    expect(res.headers['content-disposition']).toContain('inline')
+    expect(res.headers['content-disposition']).toContain('.csv')
+    expect(res.headers['x-content-type-options']).toBe('nosniff')
+    expect(res.text.startsWith(`${feedService.FEED_COLUMNS.join(',')}
+`)).toBe(true)
+    expect(res.text).toContain('Indigo Kurti')
+  })
+
+  it('is also mounted under /api/v1, like the guarded feed', async () => {
+    prismaMock.product.findMany.mockResolvedValue([])
+    const res = await request(app).get('/api/v1/catalog/meta/products-public.csv')
+    expect(res.status).toBe(200)
+    expect(res.headers['content-type']).toContain('text/csv')
+  })
+
+  it('produces byte-identical data to the token-guarded feed', async () => {
+    const rows = [feedProduct(), feedProduct({ id: 2n, title: 'Kurti, "Indigo"', sellingPrice: null })]
+
+    // One short page ends the stream, so queue exactly one page per request.
+    prismaMock.product.findMany.mockResolvedValueOnce(rows)
+    const guarded = await request(app).get(
+      `/catalog/meta/products.csv?token=${env.META_CATALOG_FEED_TOKEN}`,
+    )
+
+    prismaMock.product.findMany.mockResolvedValueOnce(rows)
+    const open = await request(app).get('/catalog/meta/products-public.csv')
+
+    expect(guarded.status).toBe(200)
+    expect(open.status).toBe(200)
+    expect(open.text).toBe(guarded.text)
+  })
+
+  it('does NOT relax the guarded feed: /products.csv still needs the token', async () => {
+    expect((await request(app).get('/catalog/meta/products.csv')).status).toBe(403)
+    expect((await request(app).get('/api/v1/catalog/meta/products.csv?token=wrong')).status).toBe(403)
+  })
+
+  it('only reads active products and never writes', async () => {
+    prismaMock.product.findMany.mockResolvedValue([])
+    await request(app).get('/catalog/meta/products-public.csv')
+    expect(prismaMock.product.findMany.mock.calls[0][0].where.isActive).toBe(true)
+    expect(prismaMock.product.create).not.toHaveBeenCalled()
+  })
+})
+
 // ══════════════════════════════════════════════ newsletter & contact
 
 describe('newsletter', () => {

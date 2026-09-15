@@ -32,15 +32,14 @@ function tokenMatches(provided) {
   return crypto.timingSafeEqual(expected, supplied)
 }
 
-export const feed = asyncHandler(async (req, res) => {
-  if (!tokenMatches(req.query.token)) {
-    logger.warn({ ip: req.ip }, 'Meta catalog feed access denied')
-    throw new ForbiddenError('Invalid feed token.')
-  }
-
+/**
+ * Streams the catalogue as CSV to `res`. Shared by the token-guarded Meta feed and the
+ * public copy below, so both serve byte-identical output from `streamFeedRows()`.
+ */
+async function writeFeed(res, filename) {
   res.status(200)
   res.setHeader('Content-Type', 'text/csv; charset=UTF-8')
-  res.setHeader('Content-Disposition', 'inline; filename="meta-products.csv"')
+  res.setHeader('Content-Disposition', `inline; filename="${filename}"`)
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
   res.setHeader('Pragma', 'no-cache')
   res.setHeader('X-Content-Type-Options', 'nosniff')
@@ -60,6 +59,25 @@ export const feed = asyncHandler(async (req, res) => {
     logger.error({ err: error }, 'Meta catalog feed stream failed')
     res.end()
   }
+}
+
+export const feed = asyncHandler(async (req, res) => {
+  if (!tokenMatches(req.query.token)) {
+    logger.warn({ ip: req.ip }, 'Meta catalog feed access denied')
+    throw new ForbiddenError('Invalid feed token.')
+  }
+
+  await writeFeed(res, 'meta-products.csv')
 })
 
-export default { feed }
+/**
+ * PUBLIC copy of the same feed — no token, added at the client's request so the product
+ * CSV can be opened directly in a browser or Excel. It is the same read-only stream as
+ * `feed` above (same columns, prices, availability, links and images) and only ever
+ * includes ACTIVE products. The guarded Meta endpoint is untouched.
+ */
+export const publicFeed = asyncHandler(async (_req, res) => {
+  await writeFeed(res, 'products.csv')
+})
+
+export default { feed, publicFeed }

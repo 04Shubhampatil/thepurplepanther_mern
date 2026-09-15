@@ -8,7 +8,10 @@ import rateLimit from 'express-rate-limit'
 import env from './config/env.js'
 import logger from './config/logger.js'
 import apiV1 from './routes/index.js'
-import { feed as metaCatalogFeed } from './controllers/catalog-feed.controller.js'
+import {
+  feed as metaCatalogFeed,
+  publicFeed as publicCatalogFeed,
+} from './controllers/catalog-feed.controller.js'
 import { errorHandler, notFoundHandler } from './middleware/error.middleware.js'
 import { serveClient, shouldServeClient } from './middleware/spa.middleware.js'
 import { installBigIntSerializer } from './utils/json.js'
@@ -120,6 +123,8 @@ app.use('/api/v1', apiV1)
 // Manager is configured against that URL. Serving both means the feed keeps working
 // through cutover without a change on Meta's side. See docs/route-mapping.md §6.
 app.get('/catalog/meta/products.csv', metaCatalogFeed)
+// Token-free copy of the same CSV, for opening directly in a browser or Excel.
+app.get('/catalog/meta/products-public.csv', publicCatalogFeed)
 
 // ---------------------------------------------------------------- client app
 // Mounted AFTER every API route so nothing here can shadow one, and BEFORE the 404 handler
