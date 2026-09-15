@@ -194,7 +194,7 @@ export const SUPPORT_CONTENT = {
             'We accept the payment methods displayed at checkout. Payments are securely processed and charged when the order is confirmed.',
           ]],
           ['Shipping and delivery', [
-            'Domestic delivery generally takes 3–7 business days after dispatch. Tracking is provided by email.',
+            'Your order will be dispatched within 3–5 business days. Once dispatched, delivery will take approximately 5–7 business days to reach you.',
           ]],
           ['Return Eligibility', [
             'We do not offer refunds. If you are not satisfied with your purchase, the product may be exchanged within 7 days of delivery, provided it is unworn, unwashed, unused, and has its original tags attached. Items must be free from fragrance, makeup, marks, or alterations.',

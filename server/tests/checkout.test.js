@@ -458,16 +458,57 @@ describe('createPendingOrder', () => {
     expect(data.role).toBe('customer')
   })
 
-  it('REFUSES guest checkout when the email already has an account', async () => {
-    // Otherwise anyone could place orders against someone else's account by typing
-    // their address.
-    prismaMock.user.findUnique.mockResolvedValue({ id: 42n })
+  it('ALLOWS guest checkout when the email already has an account — the order is filed under it, guest checkout is never blocked', async () => {
+    // The client requirement: a returning customer who does not remember their password
+    // must still be able to complete a purchase without logging in.
+    prismaMock.user.findUnique.mockResolvedValue({ id: 42n, name: 'Asha Menon', email: 'asha@example.com' })
 
-    await expect(
-      checkout.createPendingOrder({ user: null, guestCart, data: VALID_BODY }),
-    ).rejects.toThrow('This email is already registered. Please log in to continue checkout.')
+    const { guestPassword, user: resolvedUser } = await checkout.createPendingOrder({
+      user: null,
+      guestCart,
+      data: VALID_BODY,
+    })
 
-    expect(prismaMock.order.create).not.toHaveBeenCalled()
+    expect(prismaMock.order.create).toHaveBeenCalled()
+    // orders.user_id is NOT NULL — the order is filed under the matching account.
+    expect(prismaMock.order.create.mock.calls[0][0].data.userId).toBe(42n)
+    expect(resolvedUser.id).toBe(42n)
+    // No account was created, and nothing was done that would sign the browser into it
+    // (checkout.controller.js only calls setAuthCookie when guestPassword is set).
+    expect(prismaMock.user.create).not.toHaveBeenCalled()
+    expect(guestPassword).toBeNull()
+  })
+
+  it('does NOT overwrite the existing account\'s saved address when an unauthenticated guest reuses its email', async () => {
+    // Typing someone else's email at checkout must place an order, never mutate their
+    // account — including their saved default address.
+    prismaMock.user.findUnique.mockResolvedValue({ id: 42n, name: 'Asha Menon', email: 'asha@example.com' })
+
+    await checkout.createPendingOrder({ user: null, guestCart, data: VALID_BODY })
+
+    expect(prismaMock.userAddress.create).not.toHaveBeenCalled()
+    expect(prismaMock.userAddress.update).not.toHaveBeenCalled()
+    expect(prismaMock.userAddress.updateMany).not.toHaveBeenCalled()
+
+    // Nothing in the account is touched: no phone backfill either.
+    expect(prismaMock.user.update).not.toHaveBeenCalled()
+
+    // The guest's cookie cart is priced on its own — it must never be folded into the
+    // matching account's persisted cart (mergeGuestCartIntoUser is skipped because
+    // guestPassword stays null for this path).
+    expect(prismaMock.cartItem.create).not.toHaveBeenCalled()
+    expect(prismaMock.cartItem.update).not.toHaveBeenCalled()
+  })
+
+  it('still creates a fresh guest account (and saves its address) for a genuinely new email', async () => {
+    // Unchanged Laravel behaviour: only a brand-new email creates an account.
+    prismaMock.user.findUnique.mockResolvedValue(null)
+    prismaMock.userAddress.findFirst.mockResolvedValue(null)
+
+    await checkout.createPendingOrder({ user: null, guestCart, data: VALID_BODY })
+
+    expect(prismaMock.user.create).toHaveBeenCalled()
+    expect(prismaMock.userAddress.create).toHaveBeenCalled()
   })
 
   it('stores the Razorpay order id after the transaction commits', async () => {

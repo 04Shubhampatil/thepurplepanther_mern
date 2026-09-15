@@ -77,12 +77,31 @@ async function upsertAddress(tx, userId, data) {
 }
 
 /**
- * Guest checkout creates a real customer account.
+ * A brand-new email creates a real customer account, exactly as Laravel's
+ * `CheckoutService::createPendingOrder` does.
  *
- * If the email already belongs to an account it REFUSES rather than silently attaching the
- * order — otherwise anyone could place orders against someone else's account by typing
- * their address. The generated password reaches the customer only in the confirmation
- * email.
+ * GUEST CHECKOUT: Laravel — and this file, until now — REFUSED checkout when the entered
+ * email already belonged to an account ("This email is already registered. Please log in
+ * to continue checkout."). The client has asked for that block removed: a returning
+ * customer who does not remember their password must still be able to buy something.
+ *
+ * `orders.user_id` is `NOT NULL` with a foreign key to `users` (see the guest-cart note in
+ * `config/database.js` and `docs/database-mapping.md`), so an order cannot exist without
+ * SOME user row — there is no schema-free way to make this a true anonymous order, and
+ * redesigning that column is out of scope for this fix. Reusing the matching account is the
+ * smallest change that satisfies the constraint.
+ *
+ * That reuse touches NOTHING about the account: no password check, no phone backfill, no
+ * saved-address overwrite (see the `isNewGuestAccount` guard around `upsertAddress` below),
+ * and the browser is never signed into it (`guestPassword` stays `null`, so
+ * `checkout.controller.js`'s `place` never calls `setAuthCookie`). Typing someone else's
+ * email at checkout must place an order against that email, never grant access to the
+ * account behind it — that property must not regress.
+ *
+ * The order itself still records the name/phone/address exactly as typed at checkout
+ * (`createPendingOrder` builds the order row from `data`, not from the resolved user), so
+ * the shipping details are always the guest's own, whichever account the order is filed
+ * under.
  */
 async function resolveCustomer(user, data) {
   if (user) {
@@ -90,13 +109,13 @@ async function resolveCustomer(user, data) {
     if (!user.phone && data.phone) {
       await prisma.user.update({ where: { id: BigInt(user.id) }, data: { phone: data.phone } })
     }
-    return { user, guestPassword: null }
+    return { user, guestPassword: null, isNewGuestAccount: false }
   }
 
   const email = String(data.email).trim().toLowerCase()
-  const existing = await prisma.user.findUnique({ where: { email }, select: { id: true } })
+  const existing = await prisma.user.findUnique({ where: { email } })
   if (existing) {
-    throw new BusinessError('This email is already registered. Please log in to continue checkout.')
+    return { user: existing, guestPassword: null, isNewGuestAccount: false }
   }
 
   // 10 characters, matching Str::random(10).
@@ -115,7 +134,7 @@ async function resolveCustomer(user, data) {
     },
   })
 
-  return { user: created, guestPassword }
+  return { user: created, guestPassword, isNewGuestAccount: true }
 }
 
 /**
@@ -127,7 +146,7 @@ export async function createPendingOrder({ user, guestCart, data }) {
   let summary = await cart.getSummary(user, guestCart)
   if (summary.count < 1) throw new BusinessError('Your cart is empty.')
 
-  const { user: customer, guestPassword } = await resolveCustomer(user, data)
+  const { user: customer, guestPassword, isNewGuestAccount } = await resolveCustomer(user, data)
 
   // A guest's cart lives in the cookie; fold it into the new account and re-price, so the
   // order is built from the same rows the customer will see afterwards.
@@ -216,7 +235,13 @@ export async function createPendingOrder({ user, guestCart, data }) {
       },
     })
 
-    await upsertAddress(tx, customer.id, data)
+    // Only touch the address book for an account the caller actually controls — a
+    // signed-in customer's own account, or the fresh one just created for them. An
+    // unauthenticated guest who happens to type an existing customer's email must never
+    // overwrite that customer's saved default address.
+    if (user || isNewGuestAccount) {
+      await upsertAddress(tx, customer.id, data)
+    }
 
     return created
   })

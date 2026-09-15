@@ -21,6 +21,27 @@
     display: none !important;
 }
 
+html,
+body,
+* {
+  scrollbar-width: none !important; /* Firefox */
+  -ms-overflow-style: none !important; /* IE/Edge legacy */
+  scrollbar-color: transparent transparent !important;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+*::-webkit-scrollbar {
+  width: 0 !important;
+  height: 0 !important;
+  display: none !important;
+  background: transparent !important;
+}
+
+html, body {
+  overflow-y: auto;
+}
+
 .site-header,
 .header-main {
   position: sticky;
@@ -1194,6 +1215,19 @@ body {
   /* Prevents browser from creating bold/italic versions */
   text-rendering: optimizeLegibility;
   /* For better readability */
+}
+
+/* The page scrolls at the body level (see the mmenu-provided .mm-wrapper rule below),
+   so the browser's scrollbar track is what shows on the right edge of every page. Hidden
+   here, site-wide, purely visually — scrolling itself is untouched (wheel, touch, drag,
+   keyboard, and any in-page scrollIntoView all keep working exactly as before). */
+body {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* legacy Edge */
+}
+
+body::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, current Edge */
 }
 
 p,
@@ -33775,7 +33809,23 @@ only screen and (min-width: 576px) and (max-width: 767px),
 @media (max-width: 575.98px) {
   .shoplook-home43 {
     height: 360px;
-    background-position: 40% 0;
+    /* Mobile hero: the "Shop the Look" model photo (1873x840) is cropped through a
+       360px-tall window at background-size:cover, so only a ~44% horizontal slice is
+       ever visible. At 40% the model sat crowded against the right edge with her
+       extended arm cut off, and a disproportionate slab of the plain backdrop showed on
+       the left. 60% centers her fully in frame with balanced margins on both sides,
+       verified against the real uploaded photo at 375/390/430px. */
+    background-position: 60% 0;
+    /* Containment, not a fix in itself: .hotspot-right's popup is repositioned below to
+       fit inside the viewport with room to spare, so this should never actually clip
+       anything for the current photo. It exists so this section can never push the PAGE
+       into horizontal scroll — e.g. if a future "look" image needs different hotspot
+       tuning and someone misses it. `.shoplook-home43` is the section's own full-bleed
+       box (its background already fills exactly this box), so clipping here can only
+       ever cut into this section's own absolutely-positioned children, never the section
+       itself or anything below it. Scoped to mobile only — desktop's wider popups already
+       fit and are left untouched. */
+    overflow: hidden;
   }
 }
 
@@ -33901,7 +33951,8 @@ only screen and (min-width: 576px) and (max-width: 767px),
 @media (max-width: 575.98px) {
  .hotspot-wrapper .hotspot-right {
         bottom: 33%;
-        left: 60%;
+        /* Cap the left edge so the right-opening card remains on-screen. */
+        left: min(calc(60% - 40px), calc(100% - 196px));
     }
 }
 

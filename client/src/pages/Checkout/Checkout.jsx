@@ -191,9 +191,12 @@ export default function Checkout() {
                 {isLoggedIn ? (
                   <p className="text-muted mb-3">Signed in — your details are filled in below.</p>
                 ) : (
+                  // Guest checkout must never require an account. An email that is already
+                  // registered no longer blocks the order — the "log in" path stays available
+                  // only as a shortcut for someone who wants their saved address filled in.
                   <p className="text-muted mb-3">
-                    Guest checkout — we’ll create your account if this email is new. If it’s already
-                    registered, please <Link to="/login">log in</Link>.
+                    Checking out as a guest — no account required. Already have an account?{' '}
+                    <Link to="/login">Log in</Link> for faster checkout.
                   </p>
                 )}
 
