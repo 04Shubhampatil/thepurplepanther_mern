@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Wrench, Printer, Trash2 } from 'lucide-react'
 import { useApi } from '../../hooks/useApi.js'
 import { ConfirmDialog, Pagination } from '../../components/admin/AdminUI.jsx'
@@ -47,8 +47,33 @@ const BADGE_CLASSES = {
   'badge-cancelled': 'bg-[#ffebee] text-[#c62828]',
 }
 
+/**
+ * Filter by Payment reads the EXISTING `payment_status` column, whose only two values are
+ * these. It is independent of Filter by Status: payment landing and the order shipping are
+ * separate facts, so the two selects narrow the list together rather than overriding.
+ */
+const PAYMENT_OPTIONS = [
+  { value: 'paid', label: 'Successful Orders' },
+  { value: 'pending', label: 'Pending Orders' },
+]
+
+/** `₹ ` + number_format($value, 2) — the same format as the dashboard's Transactions card. */
+const money = (value) =>
+  `₹ ${Number(value ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
 export default function Orders() {
   usePageTitle('Order List - Purple Panther')
+
+  /*
+   * The payment filter is mirrored in the URL so the dashboard's Transactions card can
+   * link straight to the successful orders (/admin/orders?payment=paid) and land with the
+   * select already showing it. Only this one filter is in the URL — the others stay local
+   * state, exactly as before.
+   */
+  const [params, setParams] = useSearchParams()
+  const payment = PAYMENT_OPTIONS.some((o) => o.value === params.get('payment'))
+    ? params.get('payment')
+    : ''
 
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
@@ -66,18 +91,21 @@ export default function Orders() {
       api.admin.orders.list({
         search,
         status: status || undefined,
+        payment: payment || undefined,
         date: date || undefined,
         page,
         per_page: perPage,
         sort: sort.key,
         dir: sort.dir,
       }),
-    [search, status, date, page, perPage, sort],
+    [search, status, payment, date, page, perPage, sort],
   )
   const { data: statusList } = useApi(() => api.admin.orders.statuses(), [])
 
   const items = data?.items ?? []
   const pagination = data?.pagination ?? { page: 1, lastPage: 1, total: 0, perPage }
+  // Server-side sum over the PAID orders of the whole filtered set, not just this page.
+  const successfulTotal = data?.successfulTotal ?? 0
   const statuses = statusList?.statuses ?? []
 
   const ids = useMemo(() => items.map((order) => String(order.id)), [items])
@@ -164,6 +192,29 @@ export default function Orders() {
             </div>
 
             <div className="flex flex-col gap-1">
+              <label htmlFor="order-payment" className="text-[12px] font-semibold text-[#777]">
+                Filter by Payment
+              </label>
+              <select
+                id="order-payment"
+                value={payment}
+                onChange={(event) => {
+                  const next = new URLSearchParams(params)
+                  if (event.target.value) next.set('payment', event.target.value)
+                  else next.delete('payment')
+                  setParams(next, { replace: true })
+                  setPage(1)
+                }}
+                className="h-[38px] min-w-[160px] rounded border border-[#ddd] bg-white px-3 text-[13px] text-[#555] outline-none"
+              >
+                <option value="">---All---</option>
+                {PAYMENT_OPTIONS.map((entry) => (
+                  <option key={entry.value} value={entry.value}>{entry.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-1">
               <label htmlFor="order-date" className="text-[12px] font-semibold text-[#777]">
                 Filter by Date
               </label>
@@ -202,6 +253,9 @@ export default function Orders() {
               <SortTh column="user_name" label="User Name" sort={sort.key} dir={sort.dir} onSort={onSort} />
               <SortTh column="user_phone" label="User Phone" sort={sort.key} dir={sort.dir} onSort={onSort} />
               <SortTh column="ordered_at" label="Ordered On" sort={sort.key} dir={sort.dir} onSort={onSort} />
+              {/* Not sortable: ORDER_SORTS on the server has no payable_amount column, and
+                  a header that sorted nothing would be worse than a plain one. */}
+              <DataTh>Amount</DataTh>
               <SortTh column="status" label="Status" sort={sort.key} dir={sort.dir} onSort={onSort} />
               <DataTh>Action</DataTh>
             </tr>
@@ -209,11 +263,11 @@ export default function Orders() {
           <tbody>
             {loading ? (
               <tr>
-                <DataTd colSpan={7} className="py-6 text-center text-admin-muted">Loading…</DataTd>
+                <DataTd colSpan={8} className="py-6 text-center text-admin-muted">Loading…</DataTd>
               </tr>
             ) : items.length === 0 ? (
               <tr>
-                <td colSpan={7} className="p-6 text-center text-[#888]">No orders found.</td>
+                <td colSpan={8} className="p-6 text-center text-[#888]">No orders found.</td>
               </tr>
             ) : (
               items.map((order) => {
@@ -246,6 +300,13 @@ export default function Orders() {
                         <small className="text-[#888]">{formatTime12(order.orderedAt)}</small>
                       </div>
                     </DataTd>
+                    {/*
+                      This order's own payable_amount — the same figure its detail screen
+                      and printed copy show. Every row carries one regardless of payment
+                      state, so these do NOT add up to the Total Amount below, which counts
+                      the successful ones only.
+                    */}
+                    <DataTd className="whitespace-nowrap">{money(order.payableAmount)}</DataTd>
                     <DataTd>
                       {/* `.status-badge` — 11px/700 pill, uppercased in the Blade */}
                       <span
@@ -288,6 +349,28 @@ export default function Orders() {
               })
             )}
           </tbody>
+
+          {/*
+            Total Amount — the last row of the table, spanning the leading columns so the
+            label sits against the figure on the right. It reports the PAID orders of the
+            whole filtered set, so it is unaffected by which page is on screen, and it
+            reads 0 when the list is filtered to Pending Orders.
+          */}
+          <tfoot>
+            <tr>
+              <td
+                colSpan={5}
+                className="px-3 py-3 text-right text-[13px] font-bold text-[#444]"
+              >
+                Total Amount
+              </td>
+              {/* In the Amount column, so the total sits directly under the row figures. */}
+              <td className="whitespace-nowrap px-3 py-3 text-[13px] font-bold text-[#444]">
+                {loading ? '—' : money(successfulTotal)}
+              </td>
+              <td colSpan={2} />
+            </tr>
+          </tfoot>
         </DataTable>
       </div>
 

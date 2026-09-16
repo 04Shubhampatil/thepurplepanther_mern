@@ -61,9 +61,25 @@ function dayRange(value) {
   return { gte: start, lt: end }
 }
 
+/**
+ * The Payment filter's two choices map onto the EXISTING `payment_status` column, whose
+ * only values are the two in PAYMENT_STATUSES: "Successful Orders" is `paid`, "Pending
+ * Orders" is `pending`. No new column, and nothing derived from `status` — an order's
+ * delivery state and whether its money landed are separate facts, which is why the list
+ * can show a SHIPPED pill on a row whose payment is still pending.
+ *
+ * Anything else is ignored rather than passed through to Prisma, so a hand-typed
+ * `?payment=` cannot filter on a value the column never holds.
+ */
+function paymentFilter(value) {
+  const wanted = String(value ?? '').trim().toLowerCase()
+  return Object.values(PAYMENT_STATUSES).includes(wanted) ? wanted : null
+}
+
 export async function listOrders({
   search = '',
   status = null,
+  payment = null,
   date = null,
   page = 1,
   perPage = 10,
@@ -72,9 +88,11 @@ export async function listOrders({
 } = {}) {
   const term = String(search ?? '').trim()
   const orderedAt = dayRange(date)
+  const paymentStatus = paymentFilter(payment)
 
   const where = {
     ...(status ? { status } : {}),
+    ...(paymentStatus ? { paymentStatus } : {}),
     ...(orderedAt ? { orderedAt } : {}),
     ...(term
       ? {
@@ -94,7 +112,16 @@ export async function listOrders({
   const column = ORDER_SORTS[sort] ?? 'orderedAt'
   const direction = String(dir).toLowerCase() === 'asc' ? 'asc' : 'desc'
 
-  const [total, rows] = await prisma.$transaction([
+  /*
+   * The footer's Total Amount sums payable_amount over the PAID orders of the WHOLE
+   * filtered set, not the page on screen — a total that changed when you paged would be
+   * reporting the page, not the filter. Aggregated in SQL for the same reason the counts
+   * are: the rows it sums are not the rows fetched, and there may be far more of them.
+   *
+   * It is the same figure the dashboard's Transactions card shows (dashboardStats below
+   * aggregates identically), so with no filters applied the two agree by construction.
+   */
+  const [total, rows, successful] = await prisma.$transaction([
     prisma.order.count({ where }),
     prisma.order.findMany({
       where,
@@ -102,6 +129,16 @@ export async function listOrders({
       orderBy: [{ [column]: direction }, { id: 'desc' }],
       skip: (currentPage - 1) * take,
       take,
+    }),
+    prisma.order.aggregate({
+      /*
+       * AND, not a spread: spreading would let this `paymentStatus` overwrite the one the
+       * Payment filter put in `where`, and the footer would report the paid total of the
+       * WHOLE table while the list showed Pending Orders. Anded, the two conditions are
+       * both applied, so filtering to Pending correctly totals 0.
+       */
+      where: { AND: [where, { paymentStatus: PAYMENT_STATUSES.PAID }] },
+      _sum: { payableAmount: true },
     }),
   ])
 
@@ -122,6 +159,7 @@ export async function listOrders({
       orderedAt: order.orderedAt,
       expectedDeliveryDate: order.expectedDeliveryDate,
     })),
+    successfulTotal: toNumber(successful._sum.payableAmount ?? 0),
     pagination: {
       page: currentPage,
       perPage: take,

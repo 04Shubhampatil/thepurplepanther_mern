@@ -26,7 +26,12 @@ const STAT_CARDS = [
   { key: 'products', label: 'Products', to: '/admin/products', tone: 'admin-stat-purple', Icon: Package },
   { key: 'users', label: 'Users', to: '/admin/users', tone: 'admin-stat-green', Icon: Users },
   { key: 'orders', label: 'Orders', to: '/admin/orders', tone: 'admin-stat-cyan', Icon: ShoppingCart },
-  { key: 'transactions', label: 'Transactions', to: '/admin/orders', tone: 'admin-stat-pink', Icon: Receipt, money: true },
+  /*
+   * Transactions is the SUM over PAID orders, so it links to the order list already
+   * filtered to those — `?payment=paid` is what the list's Filter by Payment select reads,
+   * so the page opens showing Successful Orders and the admin can change it from there.
+   */
+  { key: 'transactions', label: 'Transactions', to: '/admin/orders?payment=paid', tone: 'admin-stat-pink', Icon: Receipt, money: true },
 ]
 
 const SHOW_BRANDS = false

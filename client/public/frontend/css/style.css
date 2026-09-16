@@ -38,7 +38,10 @@ body::-webkit-scrollbar,
   background: transparent !important;
 }
 
-html, body {
+/* body only, never html. With overflow set on html too, body becomes its own scroll
+   container and position:sticky (product-detail panel) anchors to body instead of the
+   viewport, so the panel scrolls away. The PHP theme leaves html at overflow:visible. */
+body {
   overflow-y: auto;
 }
 
@@ -43773,10 +43776,9 @@ section.product-design__information article:first-child h3 {
 }
 
 .product-design__details-inner {
-  max-height: calc(100vh - 0px);
-  overflow-y: auto;
-  /* overscroll-behavior: contain; */
-  scrollbar-width: none;
+  height: auto;
+  max-height: none;
+  overflow-y: visible;
   padding-right: 4px
 }
 

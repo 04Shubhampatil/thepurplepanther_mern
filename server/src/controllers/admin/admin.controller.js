@@ -169,6 +169,8 @@ export const orderIndex = asyncHandler(async (req, res) =>
     await orderAdmin.listOrders({
       search: req.query.search ?? '',
       status: req.query.status ?? null,
+      // Filter by Payment: "paid" (Successful) or "pending", the two payment_status values.
+      payment: req.query.payment ?? null,
       // "DD-MM-YYYY" from the Filter by Date field, matching its placeholder.
       date: req.query.date ?? null,
       page: intParam(req.query.page, 1),
