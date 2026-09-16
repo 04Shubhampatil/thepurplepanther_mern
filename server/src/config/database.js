@@ -33,6 +33,14 @@ const adapter = new PrismaMariaDb(env.DATABASE_URL, {
   minimumIdle: 1,
   idleTimeout: env.DB_POOL_IDLE_SECONDS,
   /*
+   * MySQL 8.4 (the CloudPanel VPS) authenticates with caching_sha2_password. The first
+   * login of a user after a server restart needs the server's RSA public key to encrypt
+   * the password on a non-TLS connection; without this flag the driver refuses with
+   * "RSA public key is not available client side" and the pool times out. Every
+   * connection is loopback (same host or an SSH tunnel), so key retrieval is safe here.
+   */
+  allowPublicKeyRetrieval: true,
+  /*
    * TEXT PROTOCOL, NOT PREPARED STATEMENTS — this is what makes search work.
    *
    * Every `contains` filter (storefront search, /shop?q=, admin product/category/order
