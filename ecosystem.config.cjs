@@ -2,15 +2,17 @@ module.exports = {
   apps: [{
     name: "thepurplepanther",
     script: "src/index.js",
-    // dotenv reads server/.env from the process cwd, so the app must start here.
-    cwd: "/home/thepurplepanther-new/htdocs/new.thepurplepanther.in/server",
+
+    // Server directory: server/.env is loaded from this cwd
+    cwd: "/home/purplepanthernew/htdocs/thepurplepanther.in/thepurplepanther_mern/server",
+
     env: {
       NODE_ENV: "production",
-      PORT: 3000,
+      PORT: 5000,
       SERVE_CLIENT: "true"
     },
-    // The MySQL user has a max_connections_per_hour quota, so a crash loop must stay
-    // slow: a few attempts, then stop, rather than burning the hour on restarts.
+
+    // Prevent rapid restart loops
     max_restarts: 3,
     min_uptime: "30s",
     restart_delay: 60000,
