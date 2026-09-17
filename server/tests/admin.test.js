@@ -681,8 +681,9 @@ describe('admin routing', () => {
   it('does not read /orders/statuses as an order id', async () => {
     const res = await request(app).get('/api/v1/admin/orders/statuses').set('Cookie', cookieFor(ADMIN))
     expect(res.status).toBe(200)
-    // placed, successful, packed, shipped, delivered, cancelled
-    expect(res.body.data.statuses).toHaveLength(6)
+    // pending, placed, successful, packed, shipped, delivered, cancelled
+    expect(res.body.data.statuses).toHaveLength(7)
+    expect(res.body.data.statuses[0]).toEqual({ value: 'pending', label: 'Pending' })
     expect(res.body.data.statuses.map((s) => s.value)).toContain('successful')
   })
 

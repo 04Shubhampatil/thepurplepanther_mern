@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { Wrench, Printer, Trash2 } from 'lucide-react'
 import { useApi } from '../../hooks/useApi.js'
 import { ConfirmDialog, Pagination } from '../../components/admin/AdminUI.jsx'
@@ -48,33 +48,12 @@ const BADGE_CLASSES = {
   'badge-cancelled': 'bg-[#ffebee] text-[#c62828]',
 }
 
-/**
- * Filter by Payment reads the EXISTING `payment_status` column, whose only two values are
- * these. It is independent of Filter by Status: payment landing and the order shipping are
- * separate facts, so the two selects narrow the list together rather than overriding.
- */
-const PAYMENT_OPTIONS = [
-  { value: 'paid', label: 'Successful Orders' },
-  { value: 'pending', label: 'Pending Orders' },
-]
-
 /** `₹ ` + number_format($value, 2) — the same format as the dashboard's Transactions card. */
 const money = (value) =>
   `₹ ${Number(value ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 export default function Orders() {
   usePageTitle('Order List - Purple Panther')
-
-  /*
-   * The payment filter is mirrored in the URL so the dashboard's Transactions card can
-   * link straight to the successful orders (/admin/orders?payment=paid) and land with the
-   * select already showing it. Only this one filter is in the URL — the others stay local
-   * state, exactly as before.
-   */
-  const [params, setParams] = useSearchParams()
-  const payment = PAYMENT_OPTIONS.some((o) => o.value === params.get('payment'))
-    ? params.get('payment')
-    : ''
 
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
@@ -92,14 +71,13 @@ export default function Orders() {
       api.admin.orders.list({
         search,
         status: status || undefined,
-        payment: payment || undefined,
         date: date || undefined,
         page,
         per_page: perPage,
         sort: sort.key,
         dir: sort.dir,
       }),
-    [search, status, payment, date, page, perPage, sort],
+    [search, status, date, page, perPage, sort],
   )
   const { data: statusList } = useApi(() => api.admin.orders.statuses(), [])
 
@@ -187,29 +165,6 @@ export default function Orders() {
               >
                 <option value="">---All---</option>
                 {statuses.map((entry) => (
-                  <option key={entry.value} value={entry.value}>{entry.label}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label htmlFor="order-payment" className="text-[12px] font-semibold text-[#777]">
-                Filter by Payment
-              </label>
-              <select
-                id="order-payment"
-                value={payment}
-                onChange={(event) => {
-                  const next = new URLSearchParams(params)
-                  if (event.target.value) next.set('payment', event.target.value)
-                  else next.delete('payment')
-                  setParams(next, { replace: true })
-                  setPage(1)
-                }}
-                className="h-[38px] min-w-[160px] rounded border border-[#ddd] bg-white px-3 text-[13px] text-[#555] outline-none"
-              >
-                <option value="">---All---</option>
-                {PAYMENT_OPTIONS.map((entry) => (
                   <option key={entry.value} value={entry.value}>{entry.label}</option>
                 ))}
               </select>

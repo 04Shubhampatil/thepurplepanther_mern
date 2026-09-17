@@ -169,8 +169,6 @@ export const orderIndex = asyncHandler(async (req, res) =>
     await orderAdmin.listOrders({
       search: req.query.search ?? '',
       status: req.query.status ?? null,
-      // Filter by Payment: "paid" (Successful) or "pending", the two payment_status values.
-      payment: req.query.payment ?? null,
       // "DD-MM-YYYY" from the Filter by Date field, matching its placeholder.
       date: req.query.date ?? null,
       page: intParam(req.query.page, 1),
@@ -228,7 +226,18 @@ export const orderBulk = asyncHandler(async (req, res) =>
 export const orderStatuses = asyncHandler(async (req, res) =>
   ok(
     res,
-    { statuses: Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label })) },
+    {
+      /*
+       * The Filter by Status list. `pending` leads it: it is a real value of `orders.status`
+       * (every order starts there, before payment lands) and admins need to find those, but
+       * it is NOT in STATUS_LABELS because that list also drives the Update Status validator,
+       * and no order may ever be moved back to pending.
+       */
+      statuses: [
+        { value: 'pending', label: 'Pending' },
+        ...Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label })),
+      ],
+    },
     'Order statuses',
   ),
 )
