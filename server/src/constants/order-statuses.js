@@ -7,6 +7,16 @@
 
 export const ORDER_STATUSES = Object.freeze({
   PLACED: 'placed',
+  /*
+   * NOT in the Laravel source. Added 2026-09-17 at the client's request: the step between
+   * "placed" and "packed" at which payment has been confirmed and the order accepted. It
+   * exists because the Razorpay callback does not always land (see checkout.service.js),
+   * leaving paid orders stuck at pending — the admin marks those Successful by hand.
+   *
+   * Reaching it also records the payment as paid (order-admin.service.js updateStatus),
+   * since that is what the status means; the two must never disagree.
+   */
+  SUCCESSFUL: 'successful',
   PACKED: 'packed',
   SHIPPED: 'shipped',
   DELIVERED: 'delivered',
@@ -15,6 +25,7 @@ export const ORDER_STATUSES = Object.freeze({
 
 export const STATUS_LABELS = Object.freeze({
   placed: 'Placed',
+  successful: 'Successful',
   packed: 'Packed',
   shipped: 'Shipped',
   delivered: 'Delivered',
@@ -62,6 +73,7 @@ const BADGE_CLASSES = Object.freeze({
   delivered: 'badge-delivered',
   shipped: 'badge-shipped',
   packed: 'badge-packed',
+  successful: 'badge-successful',
 })
 
 export function statusBadgeClass(status) {
@@ -79,6 +91,14 @@ export function nextOptions(current) {
   switch (normaliseStatus(current)) {
     case ORDER_STATUSES.PLACED:
       return {
+        successful: 'Successful',
+        packed: 'Packed',
+        shipped: 'Shipped',
+        delivered: 'Delivered',
+        cancelled: 'Cancelled',
+      }
+    case ORDER_STATUSES.SUCCESSFUL:
+      return {
         packed: 'Packed',
         shipped: 'Shipped',
         delivered: 'Delivered',
@@ -93,6 +113,7 @@ export function nextOptions(current) {
       return {}
     default:
       return {
+        successful: 'Successful',
         packed: 'Packed',
         shipped: 'Shipped',
         delivered: 'Delivered',
@@ -109,6 +130,8 @@ export function defaultMessage(status) {
   switch (normaliseStatus(status)) {
     case ORDER_STATUSES.PLACED:
       return 'Your Order has been placed.'
+    case ORDER_STATUSES.SUCCESSFUL:
+      return 'Your payment was successful and your order has been confirmed.'
     case ORDER_STATUSES.PACKED:
       return 'Your Order has been packed.'
     case ORDER_STATUSES.SHIPPED:

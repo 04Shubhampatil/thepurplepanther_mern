@@ -145,6 +145,7 @@ export function TableLoading({ colSpan }) {
 const BADGE_STATUS = {
   placed: 'bg-[#eceff1] text-[#546e7a]',
   pending: 'bg-[#eceff1] text-[#546e7a]',
+  successful: 'bg-[#e0f2f1] text-[#00796b]',
   packed: 'bg-[#e3f2fd] text-[#1565c0]',
   shipped: 'bg-[#fff3e0] text-[#ef6c00]',
   delivered: 'bg-[#e8f5e9] text-[#2e7d32]',

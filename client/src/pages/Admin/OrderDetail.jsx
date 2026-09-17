@@ -35,6 +35,7 @@ import * as api from '../../services/endpoints.js'
  */
 const STATUS_TEXT = {
   'badge-placed': 'text-[#ef6c00]',
+  'badge-successful': 'text-[#00796b]',
   'badge-packed': 'text-[#1565c0]',
   'badge-shipped': 'text-[#ef6c00]',
   'badge-delivered': 'text-[#2e7d32]',
@@ -269,10 +270,12 @@ const ITEM_BADGES = {
   delivered: 'badge-delivered',
   shipped: 'badge-shipped',
   packed: 'badge-packed',
+  successful: 'badge-successful',
 }
 
 const ITEM_LABELS = {
   placed: 'Placed',
+  successful: 'Successful',
   packed: 'Packed',
   shipped: 'Shipped',
   delivered: 'Delivered',

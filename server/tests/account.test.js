@@ -577,8 +577,11 @@ describe('order history', () => {
 
 describe('order status machine', () => {
   it('moves forward only, with cancel available until terminal', () => {
-    expect(Object.keys(nextOptions('placed'))).toEqual(['packed', 'shipped', 'delivered', 'cancelled'])
+    expect(Object.keys(nextOptions('placed'))).toEqual(['successful', 'packed', 'shipped', 'delivered', 'cancelled'])
+    expect(Object.keys(nextOptions('successful'))).toEqual(['packed', 'shipped', 'delivered', 'cancelled'])
     expect(Object.keys(nextOptions('packed'))).toEqual(['shipped', 'delivered', 'cancelled'])
+    // Successful sits between placed and packed, so it is never reachable once packing starts.
+    expect(canTransition('packed', 'successful')).toBe(false)
     expect(Object.keys(nextOptions('shipped'))).toEqual(['delivered', 'cancelled'])
   })
 

@@ -222,10 +222,23 @@ export async function updateStatus(id, { status, title = null, description = nul
     throw new ValidationError({ status: [message] }, message)
   }
 
+  /*
+   * "Successful" means the payment has been confirmed, so reaching it records the payment
+   * as paid in the same write — the status and payment_status columns must not disagree,
+   * or the order would show as Successful in the list yet sit under Pending Orders and be
+   * left out of Total Amount. Only a pending payment is touched; a paid one stays as is,
+   * and no other status change ever alters payment_status.
+   */
+  const confirmsPayment =
+    target === ORDER_STATUSES.SUCCESSFUL && order.paymentStatus !== PAYMENT_STATUSES.PAID
+
   const updated = await prisma.$transaction(async (tx) => {
     const next = await tx.order.update({
       where: { id: order.id },
-      data: { status: target },
+      data: {
+        status: target,
+        ...(confirmsPayment ? { paymentStatus: PAYMENT_STATUSES.PAID } : {}),
+      },
       include: ORDER_INCLUDE,
     })
 

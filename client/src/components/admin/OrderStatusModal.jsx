@@ -181,8 +181,10 @@ export default function OrderStatusModal({ orderId, onClose, onSaved }) {
   const hint = !canUpdate
     ? 'No further status updates allowed for this order.'
     : raw === 'placed' || raw === 'pending'
-      ? 'You can move this order to Packed, Shipped, Delivered, or Cancelled.'
-      : ''
+      ? 'You can move this order to Successful, Packed, Shipped, Delivered, or Cancelled.'
+      : raw === 'successful'
+        ? 'You can move this order to Packed, Shipped, Delivered, or Cancelled.'
+        : ''
 
   return createPortal(
     <>

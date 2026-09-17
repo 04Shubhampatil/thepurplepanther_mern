@@ -41,6 +41,7 @@ const BULK_ITEMS = [{ value: 'delete', label: 'Delete', confirm: 'Action: Delete
 /** `.status-badge` variants, straight from OrderStatuses::badgeClass. */
 const BADGE_CLASSES = {
   'badge-placed': 'bg-[#eceff1] text-[#546e7a]',
+  'badge-successful': 'bg-[#e0f2f1] text-[#00796b]',
   'badge-packed': 'bg-[#e3f2fd] text-[#1565c0]',
   'badge-shipped': 'bg-[#fff3e0] text-[#ef6c00]',
   'badge-delivered': 'bg-[#e8f5e9] text-[#2e7d32]',
