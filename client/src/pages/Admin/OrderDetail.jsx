@@ -202,11 +202,18 @@ export default function OrderDetail() {
                           ) : null}
                           <div>
                             <span>{item.productTitle}</span>
-                            {item.color || item.size ? (
+                            {/* Colour, size and — for accessories — the chosen pack, dot-separated,
+                                the same "Pack: 1 piece" wording the order emails and the customer's
+                                order history use. */}
+                            {item.color || item.size || item.packageLabel ? (
                               <div className="mt-1 text-[12px] text-[#888]">
-                                {item.color ? `Colour: ${item.color}` : ''}
-                                {item.color && item.size ? ' · ' : ''}
-                                {item.size ? `Size: ${item.size}` : ''}
+                                {[
+                                  item.color ? `Colour: ${item.color}` : null,
+                                  item.size ? `Size: ${item.size}` : null,
+                                  item.packageLabel ? `Pack: ${item.packageLabel}` : null,
+                                ]
+                                  .filter(Boolean)
+                                  .join(' · ')}
                               </div>
                             ) : null}
                           </div>

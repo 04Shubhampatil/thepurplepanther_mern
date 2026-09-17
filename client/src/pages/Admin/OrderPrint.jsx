@@ -139,11 +139,15 @@ export default function OrderPrint() {
             <tr key={item.id}>
               <td style={CELL}>
                 {item.productTitle}
-                {item.color || item.size ? (
+                {item.color || item.size || item.packageLabel ? (
                   <div style={{ fontSize: '12px', color: '#666', marginTop: '2px' }}>
-                    {item.color ? `Colour: ${item.color}` : ''}
-                    {item.color && item.size ? ' · ' : ''}
-                    {item.size ? `Size: ${item.size}` : ''}
+                    {[
+                      item.color ? `Colour: ${item.color}` : null,
+                      item.size ? `Size: ${item.size}` : null,
+                      item.packageLabel ? `Pack: ${item.packageLabel}` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
                   </div>
                 ) : null}
               </td>

@@ -43053,6 +43053,17 @@ article.collection-page__card.collection-page__card--tall:nth-child(9) .collecti
   aspect-ratio: 564/1200
 }
 
+/* Accessories and Collection products: the two lead photos are cropped to 70% of the
+   usual height (1200 * 0.7 = 840) on desktop. Keyed to the category class ProductDetail.jsx
+   puts on <body>, so any future category keeps the full-height crop above. The phone
+   layout (max-width 991.98px, 3/4 ratio) is left as it is. */
+@media (min-width: 992px) {
+  body.category-accessories .product-design__image--half,
+  body.category-collection .product-design__image--half {
+    aspect-ratio: 564/840;
+  }
+}
+
 .product-design__image img {
   display: block;
   width: 100%;

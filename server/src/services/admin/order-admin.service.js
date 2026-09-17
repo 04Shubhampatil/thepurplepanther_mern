@@ -73,20 +73,40 @@ export async function listOrders({
   const term = String(search ?? '').trim()
   const orderedAt = dayRange(date)
 
+  /*
+   * Filter by Status = Successful means "every order whose payment has landed", not only
+   * the ones sitting at the `successful` step: a paid order that has since been packed,
+   * shipped or delivered is still a successful sale and the client wants it in this view.
+   * So that one choice matches on payment_status, OR'd with the raw status so an order
+   * marked successful by hand before its payment row was corrected is not lost either.
+   *
+   * The conditions are AND'ed as a list rather than spread into one object because the
+   * search term also builds an OR, and two OR keys on one object would overwrite each other.
+   */
+  const statusCondition = !status
+    ? null
+    : status === ORDER_STATUSES.SUCCESSFUL
+      ? { OR: [{ status }, { paymentStatus: PAYMENT_STATUSES.PAID }] }
+      : { status }
+
   const where = {
-    ...(status ? { status } : {}),
-    ...(orderedAt ? { orderedAt } : {}),
-    ...(term
-      ? {
-          OR: [
-            { orderNumber: { contains: term } },
-            { userName: { contains: term } },
-            { userEmail: { contains: term } },
-            { userPhone: { contains: term } },
-            { shippingName: { contains: term } },
-          ],
-        }
-      : {}),
+    AND: [
+      ...(statusCondition ? [statusCondition] : []),
+      ...(orderedAt ? [{ orderedAt }] : []),
+      ...(term
+        ? [
+            {
+              OR: [
+                { orderNumber: { contains: term } },
+                { userName: { contains: term } },
+                { userEmail: { contains: term } },
+                { userPhone: { contains: term } },
+                { shippingName: { contains: term } },
+              ],
+            },
+          ]
+        : []),
+    ],
   }
 
   const take = Math.min(Math.max(1, perPage), 100)

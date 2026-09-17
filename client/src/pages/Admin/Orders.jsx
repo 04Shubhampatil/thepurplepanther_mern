@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Wrench, Printer, Trash2 } from 'lucide-react'
 import { useApi } from '../../hooks/useApi.js'
 import { ConfirmDialog, Pagination } from '../../components/admin/AdminUI.jsx'
@@ -56,8 +56,23 @@ export default function Orders() {
   usePageTitle('Order List - Purple Panther')
 
   const [search, setSearch] = useState('')
-  const [status, setStatus] = useState('')
   const [date, setDate] = useState('')
+
+  /*
+   * Filter by Status lives in the URL (`?status=successful`) so the dashboard's Transactions
+   * card can link straight to the paid orders and land with the select already showing
+   * Successful. The other filters stay local state as before. Reading from the URL rather
+   * than seeding state once also means a link followed while this page is already open
+   * still applies, since React Router keeps the component mounted across that navigation.
+   */
+  const [params, setParams] = useSearchParams()
+  const status = /^[a-z]+$/.test(params.get('status') ?? '') ? params.get('status') : ''
+  const setStatus = (value) => {
+    const next = new URLSearchParams(params)
+    if (value) next.set('status', value)
+    else next.delete('status')
+    setParams(next, { replace: true })
+  }
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(10)
   const [sort, setSort] = useState({ key: 'ordered_at', dir: 'desc' })

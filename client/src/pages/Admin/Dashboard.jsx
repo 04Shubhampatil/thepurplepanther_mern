@@ -27,11 +27,11 @@ const STAT_CARDS = [
   { key: 'users', label: 'Users', to: '/admin/users', tone: 'admin-stat-green', Icon: Users },
   { key: 'orders', label: 'Orders', to: '/admin/orders', tone: 'admin-stat-cyan', Icon: ShoppingCart },
   /*
-   * Transactions is the SUM over PAID orders. It links to the plain order list, whose
-   * Total Amount row is the same paid-only figure, so the number on the card and the
-   * number at the foot of the list always agree.
+   * Transactions is the SUM over PAID orders, so it opens the order list with Filter by
+   * Status already on Successful — which the list defines as every paid order — so the
+   * rows shown and the Total Amount at their foot are exactly what the card counted.
    */
-  { key: 'transactions', label: 'Transactions', to: '/admin/orders', tone: 'admin-stat-pink', Icon: Receipt, money: true },
+  { key: 'transactions', label: 'Transactions', to: '/admin/orders?status=successful', tone: 'admin-stat-pink', Icon: Receipt, money: true },
 ]
 
 const SHOW_BRANDS = false
