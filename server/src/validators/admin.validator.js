@@ -210,12 +210,32 @@ export const productSchema = z.object({
   accessory_packages: jsonArray,
   colors: variantList,
   sizes: variantList,
+  /*
+   * The ids of gallery images the Remove checkboxes ticked.
+   *
+   * It arrives JSON-ENCODED. The product form posts multipart (there are file inputs), and
+   * toFormData JSON.stringifies every array, so this field reads "[12,13]" — not "12,13".
+   * Only splitting on commas turned that into ["[12", "13]"], both NaN, both filtered out,
+   * so the list was ALWAYS empty and ticking Remove silently did nothing. JSON is tried
+   * first; the comma form is still accepted for a hand-made request.
+   */
   remove_gallery: z
     .union([z.array(z.union([z.string(), z.number()])), z.string()])
     .nullish()
     .transform((v) => {
       if (v == null || v === '') return []
-      const arr = Array.isArray(v) ? v : String(v).split(',')
+
+      let arr = v
+      if (!Array.isArray(arr)) {
+        const text = String(arr).trim()
+        try {
+          const parsed = JSON.parse(text)
+          arr = Array.isArray(parsed) ? parsed : [parsed]
+        } catch {
+          arr = text.split(',')
+        }
+      }
+
       return arr.map((n) => Number(n)).filter((n) => Number.isInteger(n) && n > 0)
     }),
   sort_order: int0,
