@@ -53,7 +53,7 @@ export default function Checkout() {
       first_name: data.checkoutUser?.firstName ?? '',
       last_name: data.checkoutUser?.lastName ?? '',
       company: '',
-      email: data.checkoutUser?.email ?? '',
+      email: user?.role === 'admin' ? '' : data.checkoutUser?.email ?? '',
       phone: data.checkoutUser?.phone ?? '',
       address_line1: data.checkoutAddress?.address_line1 ?? '',
       address_line2: data.checkoutAddress?.address_line2 ?? '',
@@ -280,7 +280,6 @@ export default function Checkout() {
                           type="email"
                           required
                           placeholder="Email"
-                          readOnly={isLoggedIn}
                         />
                         <label htmlFor="pp_email" className="form-label">Email Address *</label>
                         <div className="invalid-feedback d-block" data-error-for="email">{errors.email?.message}</div>

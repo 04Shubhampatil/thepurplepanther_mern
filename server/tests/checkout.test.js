@@ -573,9 +573,46 @@ describe('verifyAndComplete', () => {
 
   beforeEach(() => {
     prismaMock.order.findUnique.mockResolvedValue(pendingOrder())
+    // The atomic claim: one row was still unpaid and is now ours.
+    prismaMock.order.updateMany.mockResolvedValue({ count: 1 })
     prismaMock.order.update.mockResolvedValue(
-      pendingOrder({ paymentStatus: 'paid', status: 'placed', paymentId }),
+      pendingOrder({ paymentStatus: 'paid', status: 'placed', paymentId, razorpayOrderId }),
     )
+  })
+
+  it('claims the payment atomically before writing anything else', async () => {
+    await checkout.verifyAndComplete({ orderId: 500n, payload: validPayload(), user: null })
+
+    const claim = prismaMock.order.updateMany.mock.calls.find(
+      ([arg]) => arg.data?.paymentStatus === 'paid',
+    )
+    expect(claim).toBeTruthy()
+    expect(claim[0].where).toEqual({ id: 500n, paymentStatus: { not: 'paid' } })
+    // Claim first, full write second.
+    expect(prismaMock.order.updateMany.mock.invocationCallOrder[0]).toBeLessThan(
+      prismaMock.order.update.mock.invocationCallOrder[0],
+    )
+  })
+
+  it('sends NOTHING when a concurrent request already claimed the payment', async () => {
+    // Both requests passed the read guard; the other one's UPDATE won the row lock, so
+    // this one's conditional claim matches no rows.
+    prismaMock.order.updateMany.mockResolvedValue({ count: 0 })
+    prismaMock.order.findUnique
+      .mockResolvedValueOnce(pendingOrder())
+      .mockResolvedValueOnce(pendingOrder({ paymentStatus: 'paid', paymentId }))
+
+    const { order, alreadyPaid } = await checkout.verifyAndComplete({
+      orderId: 500n,
+      payload: validPayload(),
+      user: null,
+    })
+
+    expect(alreadyPaid).toBe(true)
+    expect(order.paymentStatus).toBe('paid')
+    expect(prismaMock.order.update).not.toHaveBeenCalled()
+    expect(prismaMock.orderStatusLog.create).not.toHaveBeenCalled()
+    expect(sentEmails).toHaveLength(0)
   })
 
   it('marks the order paid on a valid signature', async () => {
@@ -710,7 +747,25 @@ describe('verifyAndComplete', () => {
 
     expect(sentEmails).toHaveLength(2)
     expect(sentEmails[0].subject).toBe('Order confirmed — ORDabc123xyz456')
-    expect(sentEmails[1].subject).toBe('New order — ORDabc123xyz456')
+    expect(sentEmails[1].subject).toBe('Payment Successful - Order ORDabc123xyz456')
+  })
+
+  it('addresses the payment-success email to the admin with the verified payment details', async () => {
+    await checkout.verifyAndComplete({ orderId: 500n, payload: validPayload(), user: null })
+
+    const admin = sentEmails[1]
+    expect(admin.to).toBe(env.mailAdminAddress)
+    expect(admin.html).toContain('Payment Successful')
+    expect(admin.html).toContain(
+      'Payment for this order has been successfully completed by the customer.',
+    )
+    expect(admin.html).toContain('ORDabc123xyz456')
+    expect(admin.html).toContain(paymentId)
+    expect(admin.html).toContain(razorpayOrderId)
+    expect(admin.html).toContain('Paid')
+    // The plain-text part carries the same facts for clients that strip HTML.
+    expect(admin.text).toContain(`Payment ID: ${paymentId}`)
+    expect(admin.text).toContain(`Razorpay Order ID: ${razorpayOrderId}`)
   })
 
   it('includes the guest password in the confirmation email', async () => {

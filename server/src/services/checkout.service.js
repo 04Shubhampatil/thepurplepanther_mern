@@ -12,7 +12,7 @@ import * as payment from './payment.service.js'
 import { sendAsync } from '../integrations/email/mailer.js'
 import {
   orderPlacedCustomerMail,
-  orderPlacedAdminMail,
+  paymentSuccessAdminMail,
 } from '../integrations/email/templates/order-emails.js'
 
 /**
@@ -313,45 +313,84 @@ export async function verifyAndComplete({ orderId, payload, user, guestPassword 
       ? ORDER_STATUSES.PLACED
       : order.status
 
-  const completed = await prisma.$transaction(async (tx) => {
-    const updated = await tx.order.update({
+  /*
+   * Thrown inside the transaction when another request has ALREADY claimed this payment.
+   * Local to this function on purpose: it is a control-flow signal, never an API error.
+   */
+  const CLAIMED_ELSEWHERE = Symbol('payment already claimed')
+
+  let completed
+  try {
+    completed = await prisma.$transaction(async (tx) => {
+      /*
+       * ATOMIC CLAIM — the duplicate-email guard.
+       *
+       * The `paymentStatus === PAID` check above is a plain read, so two verifications
+       * arriving together (a double-click on Razorpay's success handler, a retried request)
+       * could BOTH pass it, both run this transaction, and both send the admin two emails
+       * for one payment. This conditional write closes that window: the WHERE only matches
+       * while the row is still unpaid, InnoDB serialises the two UPDATEs on the row lock,
+       * and the second sees count 0. It then throws, its transaction rolls back with
+       * nothing written, and the caller reports `alreadyPaid` exactly as the early return
+       * does. No new column: payment_status itself is the claim.
+       */
+      const claim = await tx.order.updateMany({
+        where: { id: order.id, paymentStatus: { not: PAYMENT_STATUSES.PAID } },
+        data: { paymentStatus: PAYMENT_STATUSES.PAID },
+      })
+      if (claim.count === 0) throw CLAIMED_ELSEWHERE
+
+      const updated = await tx.order.update({
+        where: { id: order.id },
+        data: {
+          paymentId,
+          razorpayOrderId: razorpayOrderId || order.razorpayOrderId,
+          paymentMode: 'razorpay',
+          paymentStatus: PAYMENT_STATUSES.PAID,
+          status: fulfilmentStatus,
+          orderedAt: order.orderedAt ?? new Date(),
+        },
+        include: { items: true, user: true },
+      })
+
+      await tx.orderStatusLog.create({
+        data: {
+          orderId: order.id,
+          status: fulfilmentStatus,
+          title: 'Payment received',
+          description: `Payment successful via Razorpay. Payment ID: ${paymentId}`,
+          loggedAt: new Date(),
+        },
+      })
+
+      // Inside the transaction: the redemption row and used_count must move together, or
+      // the counter drifts and usage_limit stops being enforced.
+      await promotions.recordRedemption(updated, updated.userId, tx)
+
+      // The cart is only emptied once payment is confirmed. Clearing it at order creation
+      // would lose the cart if payment failed.
+      await tx.cartItem.deleteMany({ where: { userId: order.userId } })
+
+      return updated
+    })
+  } catch (error) {
+    if (error !== CLAIMED_ELSEWHERE) throw error
+    const paid = await prisma.order.findUnique({
       where: { id: order.id },
-      data: {
-        paymentId,
-        razorpayOrderId: razorpayOrderId || order.razorpayOrderId,
-        paymentMode: 'razorpay',
-        paymentStatus: PAYMENT_STATUSES.PAID,
-        status: fulfilmentStatus,
-        orderedAt: order.orderedAt ?? new Date(),
-      },
       include: { items: true, user: true },
     })
+    return { order: paid ?? order, alreadyPaid: true }
+  }
 
-    await tx.orderStatusLog.create({
-      data: {
-        orderId: order.id,
-        status: fulfilmentStatus,
-        title: 'Payment received',
-        description: `Payment successful via Razorpay. Payment ID: ${paymentId}`,
-        loggedAt: new Date(),
-      },
-    })
-
-    // Inside the transaction: the redemption row and used_count must move together, or
-    // the counter drifts and usage_limit stops being enforced.
-    await promotions.recordRedemption(updated, updated.userId, tx)
-
-    // The cart is only emptied once payment is confirmed. Clearing it at order creation
-    // would lose the cart if payment failed.
-    await tx.cartItem.deleteMany({ where: { userId: order.userId } })
-
-    return updated
-  })
-
-  // Email is fire-and-forget: SMTP latency must not sit on the payment-confirmation path,
-  // and a mail failure must never fail a paid order. Both are logged inside the mailer.
+  /*
+   * Email is fire-and-forget: SMTP latency must not sit on the payment-confirmation path,
+   * and a mail failure must never fail a paid order — send() resolves false and logs
+   * instead of throwing. Both go out from here and ONLY from here: after the signature
+   * has verified and the transaction that wrote payment_status = paid has committed. The
+   * browser's "Payment Successful" never reaches this line on its own.
+   */
   sendAsync(orderPlacedCustomerMail(completed, guestPassword))
-  sendAsync(orderPlacedAdminMail(completed))
+  sendAsync(paymentSuccessAdminMail(completed))
 
   logger.info(
     { orderNumber: completed.orderNumber, paymentId },

@@ -8,7 +8,8 @@ import { statusLabel } from '../../../constants/order-statuses.js'
  * Subjects are reproduced verbatim; customers filter and search on them.
  *
  *   OrderPlacedCustomerMail        'Order confirmed — {number}'
- *   OrderPlacedAdminMail           'New order — {number}'
+ *   OrderPlacedAdminMail           'New order — {number}'   → now paymentSuccessAdminMail,
+ *                                  'Payment Successful - Order {number}' (see below)
  *   OrderStatusUpdatedMail         'Order {number} — {status}'
  *   OrderDeliveryDateUpdatedMail   'Expected delivery update — {number}'
  */
@@ -151,28 +152,89 @@ export function orderPlacedCustomerMail(order, guestPassword = null) {
   }
 }
 
-/** Admin notification. */
-export function orderPlacedAdminMail(order) {
+/**
+ * Admin notification — the port of OrderPlacedAdminMail, reworded 2026-09-19 at the
+ * client's request to read as a PAYMENT notice. It is sent from exactly one place,
+ * checkout.service verifyAndComplete, after the Razorpay signature has verified and the
+ * transaction writing payment_status = paid has committed — so "Payment Status: Paid"
+ * below is a statement of what the database now holds, never of what the browser said.
+ *
+ * The line-item table the old email carried is kept beneath the requested sections: it is
+ * what the admin packs from, and dropping it would trade one notification for two.
+ */
+export function paymentSuccessAdminMail(order) {
+  const customerName = order.userName || order.shippingName || order.user?.name || ''
+  const customerEmail = order.userEmail || customerRecipient(order) || ''
+  const customerPhone = order.userPhone || order.shippingPhone || order.user?.phone || ''
+
+  // Payment date carries the time as well, in the shop's zone: the day alone is not much
+  // use for matching against the Razorpay dashboard.
+  const paidAt = order.orderedAt
+    ? new Date(order.orderedAt).toLocaleString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: env.TZ,
+      })
+    : ''
+
+  const row = (label, value) => `<tr>
+      <td style="padding:5px 0;font-size:14px;color:${COLORS.muted};width:44%;">${escapeHtml(label)}</td>
+      <td style="padding:5px 0;font-size:14px;color:${COLORS.body};">${escapeHtml(value ?? '')}</td>
+    </tr>`
+
+  const section = (title, rows) => `<tr>
+  <td style="padding:0 32px 18px;">
+    <div style="font-size:12px;font-weight:bold;letter-spacing:.08em;text-transform:uppercase;color:${COLORS.brand};padding-bottom:6px;border-bottom:1px solid ${COLORS.border};margin-bottom:6px;">${escapeHtml(title)}</div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table>
+  </td>
+</tr>`
+
   const body = [
     paragraph(
-      `A new order has been placed.<br><br>
-       ${metaLine(order)}<br>
-       ${escapeHtml(order.shippingName ?? '')} &middot; ${escapeHtml(order.shippingPhone ?? '')}
-       &middot; ${escapeHtml(customerRecipient(order) ?? '')}`,
+      `<strong>Payment for this order has been successfully completed by the customer.</strong>`,
+    ),
+    section(
+      'Order Details',
+      row('Order Number', order.orderNumber) +
+        row('Customer Name', customerName) +
+        row('Customer Email', customerEmail) +
+        row('Customer Phone', customerPhone),
+    ),
+    section(
+      'Payment Details',
+      row('Payment Status', 'Paid') +
+        row('Payment ID', order.paymentId || '—') +
+        row('Razorpay Order ID', order.razorpayOrderId || '—') +
+        row('Payment Amount', format(order.payableAmount)) +
+        row('Payment Date', paidAt),
     ),
     orderTable(order),
   ].join('\n')
 
   return {
     to: env.mailAdminAddress,
-    subject: `New order — ${order.orderNumber}`,
+    subject: `Payment Successful - Order ${order.orderNumber}`,
     html: layout({
-      eyebrow: 'New order',
-      heading: `Order ${order.orderNumber}`,
-      preheader: `New order ${order.orderNumber} — ${format(order.payableAmount)}`,
+      eyebrow: 'The Purple Panther',
+      heading: 'Payment Successful',
+      preheader: `Payment received for order ${order.orderNumber} — ${format(order.payableAmount)}`,
       body,
     }),
-    text: `New order ${order.orderNumber} — ${format(order.payableAmount)}\n${order.shippingName} · ${order.shippingPhone}\n`,
+    text:
+      `The Purple Panther — Payment Successful\n\n` +
+      `Payment for this order has been successfully completed by the customer.\n\n` +
+      `Order Number: ${order.orderNumber}\n` +
+      `Customer Name: ${customerName}\n` +
+      `Customer Email: ${customerEmail}\n` +
+      `Customer Phone: ${customerPhone}\n\n` +
+      `Payment Status: Paid\n` +
+      `Payment ID: ${order.paymentId || '-'}\n` +
+      `Razorpay Order ID: ${order.razorpayOrderId || '-'}\n` +
+      `Payment Amount: ${format(order.payableAmount)}\n` +
+      `Payment Date: ${paidAt}\n`,
   }
 }
 
@@ -229,7 +291,7 @@ export function orderDeliveryDateUpdatedMail(order) {
 
 export default {
   orderPlacedCustomerMail,
-  orderPlacedAdminMail,
+  paymentSuccessAdminMail,
   orderStatusUpdatedMail,
   orderDeliveryDateUpdatedMail,
   customerRecipient,
