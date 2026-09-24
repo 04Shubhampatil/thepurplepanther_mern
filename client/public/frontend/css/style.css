@@ -42467,6 +42467,145 @@ article.collection-page__card.collection-page__card--tall img {
   background: var(--swatch, #3b3738);
 }
 
+/* The picker replaces the Quick add button in the same corner of the media. */
+.collection-page__card.is-picking .collection-page__quick {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.collection-page__picker {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 14px;
+  z-index: 2;
+  background: #fff;
+  padding: 14px 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: calc(100% - 28px);
+  overflow-y: auto;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, .12);
+  text-align: left;
+}
+
+.collection-page__picker-close {
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  border: 0;
+  background: none;
+  font-size: 20px;
+  line-height: 1;
+  color: #767676;
+  padding: 2px 4px;
+  cursor: pointer;
+}
+
+.collection-page__picker-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.collection-page__picker-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: #767676;
+}
+
+.collection-page__picker-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.collection-page__picker-swatch {
+  width: 22px;
+  height: 22px;
+  border: 1px solid #e6e6e6;
+  border-radius: 50%;
+  padding: 3px;
+  background: #fff;
+  position: relative;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.collection-page__picker-swatch:after {
+  content: "";
+  display: block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--swatch, #3b3738);
+}
+
+.collection-page__picker-swatch.is-active {
+  border-color: #3a1651;
+  box-shadow: 0 0 0 1px #3a1651;
+}
+
+.collection-page__picker-size {
+  min-width: 34px;
+  padding: 5px 8px;
+  border: 1px solid #ddd;
+  background: #fff;
+  font-size: 12px;
+  line-height: 1;
+  color: #1d1d1d;
+  cursor: pointer;
+}
+
+.collection-page__picker-size.is-active {
+  border-color: #3a1651;
+  background: #3a1651;
+  color: #fff;
+}
+
+.collection-page__picker-add {
+  margin-top: 2px;
+  min-height: 40px;
+  border: 0;
+  background: #3a1651;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.collection-page__picker-add[disabled] {
+  opacity: .6;
+  cursor: default;
+}
+
+/* Narrow cards leave no room for the roomier spacing, so the picker tightens rather than
+   overflowing the card it sits in. */
+@media (max-width: 575.98px) {
+  .collection-page__picker {
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    padding: 10px 10px 8px;
+    gap: 8px;
+  }
+
+  .collection-page__picker-swatch {
+    width: 20px;
+    height: 20px;
+  }
+
+  .collection-page__picker-add {
+    min-height: 34px;
+    font-size: 11px;
+  }
+}
+
 .collection-page__swatches .is-pattern {
   border-color: #3b3738
 }

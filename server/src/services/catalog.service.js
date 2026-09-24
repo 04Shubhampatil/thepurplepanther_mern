@@ -228,7 +228,7 @@ export const YOU_MAY_ALSO_LIKE = 'you_may_also_like'
  * same reason the automatic queries exclude them — the product you are already looking at,
  * or already have in the bag, is not a recommendation.
  */
-export async function getCuratedProducts(section, { exclude = [], limit = 8 } = {}) {
+export async function getCuratedProducts(section, { exclude = [], limit = null } = {}) {
   const excludeKeys = new Set(exclude.map((id) => String(id)))
 
   const rows = await prisma.homeSectionProduct.findMany({
@@ -237,11 +237,12 @@ export async function getCuratedProducts(section, { exclude = [], limit = 8 } = 
     include: { product: { include: CARD_INCLUDE } },
   })
 
-  return rows
+  const picked = rows
     .map((row) => row.product)
     .filter((product) => product && product.isActive && !excludeKeys.has(String(product.id)))
-    .slice(0, limit)
-    .map(presentProductCard)
+
+  // No limit means every pick the admin made; a limit is only applied when one is asked for.
+  return (limit == null ? picked : picked.slice(0, limit)).map(presentProductCard)
 }
 
 /**
@@ -254,10 +255,9 @@ export async function getCuratedProducts(section, { exclude = [], limit = 8 } = 
 export async function getRelatedProducts(product, limit = 8) {
   const productId = BigInt(product.id)
 
-  const curated = await getCuratedProducts(YOU_MAY_ALSO_LIKE, {
-    exclude: [product.id],
-    limit,
-  })
+  // Uncapped for the same reason as the cart rail: `limit` bounds the AUTOMATIC query
+  // below, and must not quietly hide products an admin chose by hand.
+  const curated = await getCuratedProducts(YOU_MAY_ALSO_LIKE, { exclude: [product.id] })
   if (curated.length > 0) return curated
 
   const sameCategory = await prisma.product.findMany({
@@ -331,7 +331,15 @@ export async function searchProducts(query, limit = 8) {
  * kept — the rail looked broken with two cards in a four-column grid.
  */
 export async function getCartRecommendations(excludeIds = []) {
-  const curated = await getCuratedProducts(YOU_MAY_ALSO_LIKE, { exclude: excludeIds, limit: 4 })
+  /*
+   * The admin's picks are shown IN FULL, not trimmed to four.
+   *
+   * The four-item cap below exists because the AUTOMATIC rail looked broken with two cards
+   * in a four-column grid — it is a floor for generated picks, not a ceiling on a human
+   * decision. Applying it here silently hid everything past the fourth product someone had
+   * deliberately chosen, with nothing in the admin to explain why.
+   */
+  const curated = await getCuratedProducts(YOU_MAY_ALSO_LIKE, { exclude: excludeIds })
   if (curated.length > 0) return curated
 
   const exclude = excludeIds.map((id) => BigInt(id))

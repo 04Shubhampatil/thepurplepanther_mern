@@ -198,9 +198,10 @@ export function presentProductDetail(product) {
     highlights: {
       image: product.highlightsImage ? mediaUrl(product.highlightsImage) : featuredImageUrl(product),
       shortDescription: product.highlightsShortDescription,
-      items: parseJsonArray(product.highlightsItems).map((item) => ({
+      // The index drives the default icon when a highlight has none of its own.
+      items: parseJsonArray(product.highlightsItems).map((item, index) => ({
         ...item,
-        icon: highlightIconUrl(item?.icon),
+        icon: highlightIconUrl(item?.icon, index),
       })),
     },
     informationItems: parseJsonArray(product.informationItems),

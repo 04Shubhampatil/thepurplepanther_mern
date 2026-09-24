@@ -43,9 +43,34 @@ export function productImageUrl(path) {
   return mediaUrl(path, PRODUCT_FALLBACK)
 }
 
-/** Matches Product::highlightIconUrl. */
-export function highlightIconUrl(path) {
-  return path ? mediaUrl(path, 'frontend/images/icon.svg') : asset('frontend/images/icon.svg')
+/**
+ * The house default icons for Product Highlights, by position.
+ *
+ * Highlights follow the same four beats on nearly every product — what it is made of, how
+ * it fits, how it feels, what it is for — so a product with no uploaded icons now shows
+ * this set instead of four copies of one generic mark. They are THEME files, not uploads,
+ * so they are the same on every product and survive a product being edited or deleted.
+ *
+ * An uploaded icon always wins; these only fill the gap.
+ */
+const DEFAULT_HIGHLIGHT_ICONS = [
+  'frontend/images/highlights/fabric.jpg',
+  'frontend/images/highlights/fit.jpg',
+  'frontend/images/highlights/feel.jpg',
+  'frontend/images/highlights/made-for.jpg',
+]
+
+/**
+ * Matches Product::highlightIconUrl, with the position-aware default above.
+ *
+ * `index` is the highlight's place in the list. Beyond the fourth the set repeats rather
+ * than falling back to the old generic mark, so a fifth highlight still gets a drawn icon.
+ */
+export function highlightIconUrl(path, index = 0) {
+  if (path) return mediaUrl(path, DEFAULT_HIGHLIGHT_ICONS[0])
+
+  const position = Number.isInteger(index) && index >= 0 ? index : 0
+  return asset(DEFAULT_HIGHLIGHT_ICONS[position % DEFAULT_HIGHLIGHT_ICONS.length])
 }
 
 /** Matches User::getAvatarUrlAttribute — the ui-avatars fallback is part of the UI. */
