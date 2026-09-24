@@ -160,6 +160,103 @@ describe('admin authorisation', () => {
 
 // ══════════════════════════════════════════════ pivot sync
 
+describe('product scalars — a save must not erase what the form never sends', () => {
+  beforeEach(() => {
+    prismaMock.product.findFirst.mockResolvedValue(null)
+    prismaMock.product.findUnique.mockResolvedValue({
+      id: 5n,
+      title: 'Kurti',
+      images: [],
+      colors: [],
+      sizes: [],
+    })
+  })
+
+  const dataOf = () => prismaMock.product.update.mock.calls.at(-1)[0].data
+
+  it('leaves brand_id and sort_order ALONE when the form omits them', async () => {
+    // The admin product form has no brand input (Brands is hidden) and no sort input.
+    // Writing them anyway set brand to NULL and sort to 0 on every single product save.
+    await catalogAdmin.updateProduct(5n, { title: 'Kurti', category_id: 2, mrp: 100 })
+
+    const data = dataOf()
+    expect(data).not.toHaveProperty('brandId')
+    expect(data).not.toHaveProperty('sortOrder')
+  })
+
+  it('still writes them when they ARE sent, including clearing the brand', async () => {
+    await catalogAdmin.updateProduct(5n, {
+      title: 'Kurti',
+      category_id: 2,
+      mrp: 100,
+      brand_id: 3,
+      sort_order: 7,
+    })
+    expect(dataOf()).toMatchObject({ brandId: 3n, sortOrder: 7 })
+
+    await catalogAdmin.updateProduct(5n, {
+      title: 'Kurti',
+      category_id: 2,
+      mrp: 100,
+      brand_id: null,
+      sort_order: 0,
+    })
+    expect(dataOf()).toMatchObject({ brandId: null, sortOrder: 0 })
+  })
+})
+
+describe('product JSON columns — must not be wiped by a partial update', () => {
+  beforeEach(() => {
+    prismaMock.product.findFirst.mockResolvedValue(null)
+    prismaMock.product.findUnique.mockResolvedValue({
+      id: 5n,
+      title: 'Kurti',
+      images: [],
+      colors: [],
+      sizes: [],
+    })
+  })
+
+  const dataOf = () => prismaMock.product.update.mock.calls.at(-1)[0].data
+
+  it('leaves information_items and specifications ALONE when they are not sent', async () => {
+    // The reported bug: an update that did not resend these columns wrote NULL over them,
+    // and the loss only surfaced on the next page load.
+    await catalogAdmin.updateProduct(5n, { title: 'Kurti', category_id: 2, mrp: 100 })
+
+    const data = dataOf()
+    expect(data).not.toHaveProperty('informationItems')
+    expect(data).not.toHaveProperty('specifications')
+    expect(data).not.toHaveProperty('highlightsItems')
+    expect(data).not.toHaveProperty('accessoryPackages')
+  })
+
+  it('still CLEARS them when the admin deliberately removes every row', async () => {
+    await catalogAdmin.updateProduct(5n, {
+      title: 'Kurti',
+      category_id: 2,
+      mrp: 100,
+      information_items: [],
+      specifications: [],
+    })
+
+    const data = dataOf()
+    expect(data.informationItems).toBe('[]')
+    expect(data.specifications).toBe('[]')
+  })
+
+  it('writes the rows it is given', async () => {
+    await catalogAdmin.updateProduct(5n, {
+      title: 'Kurti',
+      category_id: 2,
+      mrp: 100,
+      specifications: [{ key: 'Collar', value: 'Regular' }],
+    })
+
+    expect(JSON.parse(dataOf().specifications)).toEqual([{ key: 'Collar', value: 'Regular' }])
+  })
+})
+
 describe('product variant sync — must not destroy stock', () => {
   beforeEach(() => {
     prismaMock.product.findFirst.mockResolvedValue(null) // title is free

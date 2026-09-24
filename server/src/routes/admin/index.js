@@ -245,7 +245,14 @@ router.patch('/users/:id/toggle', admin.userToggle)
 // ── banners & home sections ────────────────────────────────────────────────
 // bannerUploader, not `upload`: banners are the only module that accepts video, at 50 MB
 // rather than the 4 MB every other upload is held to.
-const bannerUpload = bannerUploader.fields([{ name: 'images', maxCount: 20 }])
+/*
+ * `.any()`, not `.fields()`: the mobile media inputs are named at runtime —
+ * `mobile_image_<slide id>` for a slide that already exists and `mobile_images` for the
+ * ones being uploaded — so the field list cannot be written out ahead of time. The
+ * controller regroups the array into the map the services expect, exactly as the product
+ * routes do for their colour-gallery inputs.
+ */
+const bannerUpload = bannerUploader.any()
 
 router.get('/banners', admin.bannerIndex)
 router.post('/banners', bannerUpload, validate(v.bannerSchema), admin.bannerStore)

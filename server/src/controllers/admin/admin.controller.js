@@ -325,7 +325,7 @@ export const bannerShow = asyncHandler(async (req, res) =>
 )
 
 export const bannerStore = asyncHandler(async (req, res) =>
-  created(res, { item: await miscAdmin.createBanner(req.body, req.files ?? {}) }, 'Banner created successfully.'),
+  created(res, { item: await miscAdmin.createBanner(req.body, groupFiles(req)) }, 'Banner created successfully.'),
 )
 
 /**
@@ -338,7 +338,7 @@ export const bannerStore = asyncHandler(async (req, res) =>
 export const bannerUpdate = asyncHandler(async (req, res) =>
   ok(
     res,
-    { item: await miscAdmin.updateBanner(req.params.id, req.body, req.files ?? {}) },
+    { item: await miscAdmin.updateBanner(req.params.id, req.body, groupFiles(req)) },
     'Banner updated successfully.',
   ),
 )

@@ -204,7 +204,6 @@ function productScalars(data) {
     title: data.title,
     categoryId: BigInt(data.category_id),
     subCategoryId: data.sub_category_id ? BigInt(data.sub_category_id) : null,
-    brandId: data.brand_id ? BigInt(data.brand_id) : null,
     offerId: data.offer_id ? BigInt(data.offer_id) : null,
     shortDescription: data.short_description ?? null,
     features: data.features ?? null,
@@ -218,7 +217,24 @@ function productScalars(data) {
     showSizeGuide: Boolean(data.show_size_guide),
     sizeGuideContent: data.size_guide_content ?? null,
     highlightsShortDescription: data.highlights_short_description ?? null,
-    sortOrder: Number(data.sort_order ?? 0),
+  }
+
+  /*
+   * ABSENT IS NOT "CLEAR IT" — these two are the fields the product form does not send.
+   *
+   * Brands are hidden in the admin (the nav entry is withheld, not the feature), so the
+   * form has no brand input; `sort_order` has no input either. Writing them unconditionally
+   * meant `brand_id` became NULL and `sort_order` became 0 on EVERY product save, silently
+   * undoing a brand assignment and any manual ordering the moment anyone edited a title.
+   * Verified against the live admin before the fix: brand 3 -> NULL, sort 7 -> 0.
+   *
+   * Omitted rather than defaulted so a CREATE still falls to the column defaults.
+   */
+  if (data.brand_id !== undefined) {
+    out.brandId = data.brand_id ? BigInt(data.brand_id) : null
+  }
+  if (data.sort_order !== undefined) {
+    out.sortOrder = Number(data.sort_order) || 0
   }
 
   for (const [key, field] of [

@@ -90,6 +90,11 @@ export function presentBanner(banner) {
       // decided from the stored filename here rather than guessed in the browser.
       isVideo: isVideoFile(image.image),
       videoMimeType: videoMimeType(image.image),
+      // The MOBILE file is described separately: it is managed independently of the
+      // desktop one, so it can be a video where the desktop is an image or the reverse,
+      // and the hero has to know which element to render for each.
+      isMobileVideo: image.mobileImage ? isVideoFile(image.mobileImage) : false,
+      mobileVideoMimeType: image.mobileImage ? videoMimeType(image.mobileImage) : null,
     })),
   }
 }

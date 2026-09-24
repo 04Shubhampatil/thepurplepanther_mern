@@ -42287,9 +42287,14 @@ only screen and (min-width: 576px) and (max-width: 767px),
   overflow: hidden;
   background: #f1f2f2
 }
-article.collection-page__card .collection-page__media img {
+/* article.collection-page__card .collection-page__media img {
 object-position: 0% 55%;
-}
+} */
+
+.category-accessories article.collection-page__card .collection-page__media img {
+  object-position: 0% 55%;
+ } 
+
 article.collection-page__card.collection-page__card--tall img {
  object-position: 50% 5% !important;
 }
@@ -42420,6 +42425,46 @@ article.collection-page__card.collection-page__card--tall img {
 
 .collection-page__swatches .is-pattern:after {
   background: url('../images/collection-products/swatch.png') center/cover
+}
+
+/* ── Card colour swatches ────────────────────────────────────────────────────
+   The swatch dot takes its colour from the --swatch custom property the card sets from
+   the product's own colour code, so these match the existing 15px swatch look without
+   needing a hand-written class per colour. */
+.collection-page__pricerow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 12px;
+  flex-wrap: wrap;
+}
+
+/* The standalone swatch block sets margin-top:18px; inside the price row it has to sit on
+   the price's own line instead. */
+.collection-page__pricerow .collection-page__swatches {
+  margin-top: 0;
+  flex-wrap: wrap;
+}
+
+.collection-page__swatch {
+  display: block;
+  width: 15px;
+  height: 15px;
+  border: 1px solid #e6e6e6;
+  border-radius: 50%;
+  padding: 2px;
+  background: #fff;
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.collection-page__swatch:after {
+  content: "";
+  display: block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--swatch, #3b3738);
 }
 
 .collection-page__swatches .is-pattern {
@@ -42594,8 +42639,16 @@ article.collection-page__card.collection-page__card--tall img {
 .collection-template .collection-page__card--tall .collection-page__media {
   aspect-ratio: 524 / 1228;
 }
+/* The 9th card is the one tall slot whose photo is square rather than portrait. Its media
+   is overridden back to 1/1 above — but --tall also reserves TWO grid rows, and a square
+   card only fills one, leaving a card-sized hole beneath it (573px at desktop widths).
+   The span has to match the height, so this card takes a single row like any other square
+   one. Without it the grid shows an empty cell mid-page. */
 article.collection-page__card.collection-page__card--tall:nth-child(9) .collection-page__media {
     aspect-ratio: 1 / 1;
+}
+article.collection-page__card.collection-page__card--tall:nth-child(9) {
+    grid-row: span 1;
 }
 .collection-template .collection-page__info {
   padding-right: 28px;

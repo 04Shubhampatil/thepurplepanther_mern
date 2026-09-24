@@ -5,6 +5,7 @@ import { useApi } from '../../hooks/useApi.js'
 import * as api from '../../services/endpoints.js'
 import { useAuthStore, useCartStore } from '../../store/index.js'
 import { loadRazorpay } from '../../utils/razorpay.js'
+import ErrorMessage from '../../components/common/ErrorMessage.jsx'
 import Loading from '../../components/common/Loading.jsx'
 import { useBodyClass, usePageTitle } from '../../theme/page.js'
 
@@ -38,7 +39,7 @@ export default function Checkout() {
   useBodyClass()
   usePageTitle('Checkout - The Purple Panther')
 
-  const { data, error, loading } = useApi(() => api.checkout.context(), [])
+  const { data, error, loading, refetch } = useApi(() => api.checkout.context(), [])
   const [submitting, setSubmitting] = useState(false)
   const [failure, setFailure] = useState(null)
   const [couponCode, setCouponCode] = useState('')
@@ -74,7 +75,25 @@ export default function Checkout() {
   }, [error, navigate])
 
   if (loading) return <Loading full />
-  if (!data) return null
+
+  /*
+   * A 422 means the cart is empty and the effect above is already redirecting, so keep the
+   * spinner rather than flashing an error on the way out. Anything else — a 500, a dropped
+   * connection — used to `return null`, leaving the customer on a BLANK page at the most
+   * important step of the site with no message and no way back. Show the failure and offer
+   * a retry instead.
+   */
+  if (error && error.status !== 422) {
+    return (
+      <main className="body_content_wrapper">
+        <div className="container py-5">
+          <ErrorMessage error={error} onRetry={refetch} />
+        </div>
+      </main>
+    )
+  }
+
+  if (!data) return <Loading full />
 
   const isLoggedIn = Boolean(user)
   const items = cart.items ?? []

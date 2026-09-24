@@ -76,16 +76,29 @@ export async function listProducts({ categorySlug = null, search = '', page = 1,
   const take = Math.min(Math.max(1, perPage), 100)
   const currentPage = Math.max(1, page)
 
-  // One round trip for the page and its total, rather than two sequential queries.
-const total = await prisma.product.count({ where })
+  /*
+   * SEQUENTIAL, and deliberately not a $transaction or a Promise.all.
+   *
+   * These two were wrapped in one interactive transaction until it started timing out on
+   * the production database (commit "fix product listing transaction timeout"). They are
+   * two independent reads with nothing to keep consistent — a product appearing between
+   * the count and the page shifts a row, it does not corrupt anything — so a transaction
+   * bought nothing and risked the timeout.
+   *
+   * Promise.all is avoided for a different reason: this host counts NEW connections per
+   * hour and the pool is deliberately small (DB_POOL_MAX, default 5), so firing listing
+   * queries concurrently on every page view is the wrong trade. One at a time is slower by
+   * one round trip and cheaper in the resource that actually runs out.
+   */
+  const total = await prisma.product.count({ where })
 
-const rows = await prisma.product.findMany({
-  where,
-  include: CARD_INCLUDE,
-  orderBy: PRODUCT_ORDER,
-  skip: (currentPage - 1) * take,
-  take,
-})
+  const rows = await prisma.product.findMany({
+    where,
+    include: CARD_INCLUDE,
+    orderBy: PRODUCT_ORDER,
+    skip: (currentPage - 1) * take,
+    take,
+  })
 
   // The collection page renders a "New Arrivals" strip under the grid, and Laravel loaded
   // it in the same controller action (FrontendController::collection). Keeping it here
@@ -198,13 +211,54 @@ export async function getProductBySlug(slug) {
 }
 
 /**
- * Related products — same category first, topped up from anywhere when fewer than 4.
+ * The section key the admin's "You May Also Like" picks are filed under, in the same
+ * `home_section_products` table Shop the Look already uses. Reusing that table rather than
+ * adding another one keeps one ordering mechanism and one admin shape for curated rails.
+ */
+export const YOU_MAY_ALSO_LIKE = 'you_may_also_like'
+
+/**
+ * The admin's hand-picked products for a section, in the order they chose.
+ *
+ * Returns [] when nothing is curated, which is what lets both callers fall back to their
+ * existing automatic behaviour — an empty rail is worse than an automatic one.
+ *
+ * Inactive products are dropped rather than shown: a product pulled from sale must not
+ * reappear here just because it was picked months ago. Excluded ids are removed for the
+ * same reason the automatic queries exclude them — the product you are already looking at,
+ * or already have in the bag, is not a recommendation.
+ */
+export async function getCuratedProducts(section, { exclude = [], limit = 8 } = {}) {
+  const excludeKeys = new Set(exclude.map((id) => String(id)))
+
+  const rows = await prisma.homeSectionProduct.findMany({
+    where: { section },
+    orderBy: { position: 'asc' },
+    include: { product: { include: CARD_INCLUDE } },
+  })
+
+  return rows
+    .map((row) => row.product)
+    .filter((product) => product && product.isActive && !excludeKeys.has(String(product.id)))
+    .slice(0, limit)
+    .map(presentProductCard)
+}
+
+/**
+ * Related products — the admin's "You May Also Like" picks when they have made any,
+ * otherwise same category first, topped up from anywhere when fewer than 4.
  *
  * The top-up rule is not cosmetic: the theme's related-products carousel breaks its
  * layout below four items, which is why Laravel had the same fallback.
  */
 export async function getRelatedProducts(product, limit = 8) {
   const productId = BigInt(product.id)
+
+  const curated = await getCuratedProducts(YOU_MAY_ALSO_LIKE, {
+    exclude: [product.id],
+    limit,
+  })
+  if (curated.length > 0) return curated
 
   const sameCategory = await prisma.product.findMany({
     where: { ...ACTIVE, id: { not: productId }, ...(product.category ? { categoryId: BigInt(product.category.id) } : {}) },
@@ -277,6 +331,9 @@ export async function searchProducts(query, limit = 8) {
  * kept — the rail looked broken with two cards in a four-column grid.
  */
 export async function getCartRecommendations(excludeIds = []) {
+  const curated = await getCuratedProducts(YOU_MAY_ALSO_LIKE, { exclude: excludeIds, limit: 4 })
+  if (curated.length > 0) return curated
+
   const exclude = excludeIds.map((id) => BigInt(id))
   const notInCart = exclude.length ? { id: { notIn: exclude } } : {}
 

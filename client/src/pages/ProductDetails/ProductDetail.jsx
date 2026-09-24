@@ -5,6 +5,7 @@ import WishlistButton from '../../components/product/WishlistButton.jsx'
 import ProductRecommendations from '../../components/product/ProductRecommendations.jsx'
 import SizeGuideDrawer from '../../components/product/SizeGuideDrawer.jsx'
 import ReviewSection from './ReviewSection.jsx'
+import ErrorMessage from '../../components/common/ErrorMessage.jsx'
 import Loading from '../../components/common/Loading.jsx'
 import NotFound from '../NotFound.jsx'
 import { useApi } from '../../hooks/useApi.js'
@@ -137,6 +138,21 @@ export default function ProductDetail() {
   }, [stockLimit])
 
   if (error?.status === 404) return <NotFound />
+
+  /*
+   * Any OTHER failure used to fall through to `loading || !product`, which is false-then-
+   * null — a spinner that never stops. Say what happened and let the customer retry.
+   */
+  if (error) {
+    return (
+      <main className="body_content_wrapper">
+        <div className="container py-5">
+          <ErrorMessage error={error} onRetry={refetch} />
+        </div>
+      </main>
+    )
+  }
+
   if (loading || !product) return <Loading full />
 
   const soldOut = stockLimit < 1

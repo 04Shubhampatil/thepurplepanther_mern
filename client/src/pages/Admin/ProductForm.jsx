@@ -395,7 +395,28 @@ export default function ProductForm() {
         .filter(([, v]) => v.checked)
         .map(([key, v]) => ({ id: Number(key), quantity: Number(v.quantity) || 0 }))
 
+    /*
+     * Highlight rows and their icons MUST be numbered the same way.
+     *
+     * The icon pickers key their file by the row's index in the full `highlights` array,
+     * but blank rows are filtered out of `highlights_items`, and the server pairs the two
+     * by position in that FILTERED list. With a blank row anywhere above a filled one the
+     * numbers diverged and the uploaded icon was silently dropped: saved successfully,
+     * highlight still has no icon. Re-keyed here so both sides count the same rows.
+     */
+    const keptHighlights = highlights
+      .map((row, index) => ({ row, index }))
+      .filter(({ row }) =>
+        [row.title, row.subtitle, row.description].some((v) => String(v ?? '').trim()),
+      )
+
     const upload = { ...files }
+    for (const { index } of keptHighlights) delete upload[`highlight_icon_${index}`]
+    keptHighlights.forEach(({ index }, position) => {
+      const picked = files[`highlight_icon_${index}`]
+      if (picked) upload[`highlight_icon_${position}`] = picked
+    })
+
     // Each ticked colour's picker becomes its own field, since the name carries the colour.
     for (const colorId of selectedColorIds) {
       const picked = files[`color_gallery_${colorId}`]
@@ -425,15 +446,14 @@ export default function ProductForm() {
         show_size_guide: form.show_size_guide,
         size_guide_content: form.size_guide_content,
         highlights_short_description: form.highlights_short_description,
-        highlights_items: highlights
-          .filter((row) => [row.title, row.subtitle, row.description].some((v) => String(v ?? '').trim()))
+        // Built from `keptHighlights` so the rows and their icon files agree on an index.
+        highlights_items: keptHighlights.map(({ row }) => ({
+          title: row.title ?? '',
+          subtitle: row.subtitle ?? '',
+          description: row.description ?? '',
           // `existing_icon` rides along so a row whose icon was not re-picked keeps it.
-          .map((row) => ({
-            title: row.title ?? '',
-            subtitle: row.subtitle ?? '',
-            description: row.description ?? '',
-            existing_icon: row.icon ?? '',
-          })),
+          existing_icon: row.icon ?? '',
+        })),
         information_items: rows(information, ['title', 'text']),
         specifications: rows(specifications, ['key', 'value']),
         // Packages are only sent when the category and the switch both allow them; the

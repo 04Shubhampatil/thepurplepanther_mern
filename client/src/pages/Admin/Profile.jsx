@@ -22,6 +22,27 @@ import * as api from '../../services/endpoints.js'
  * Saving refreshes the auth store, so the header's name and avatar update without a reload —
  * in Laravel the redirect re-rendered the layout and did that for free.
  */
+/*
+ * Module scope, NOT inside the component.
+ *
+ * Declared in the body, this got a new function identity on every render, so React saw a
+ * different element type, unmounted the whole row and mounted fresh DOM nodes. Every
+ * keystroke destroyed the input the admin was typing into and focus fell back to <body> —
+ * one character per click. Purely presentational, so it only ever needed its props.
+ */
+const Row = ({ label, top = false, children }) => (
+  <div
+    className={`grid grid-cols-1 gap-2 border-b border-[#f0f0f0] py-3.5 min-[768px]:grid-cols-[220px_1fr] min-[768px]:gap-4 ${
+      top ? 'items-start' : 'min-[768px]:items-center'
+    }`}
+  >
+    <label className="text-[14px] font-semibold text-[#555]">
+      {label} <span className="text-[#888]">:-</span>
+    </label>
+    <div className="min-w-0">{children}</div>
+  </div>
+)
+
 export default function Profile() {
   usePageTitle('My Profile - Purple Panther')
 
@@ -119,18 +140,6 @@ export default function Profile() {
     errors[field] ? <p className="mt-1 text-[12px] text-[#e53935]">{errors[field]}</p> : null
 
   /** `.offer-form-row` */
-  const Row = ({ label, top = false, children }) => (
-    <div
-      className={`grid grid-cols-1 gap-2 border-b border-[#f0f0f0] py-3.5 min-[768px]:grid-cols-[220px_1fr] min-[768px]:gap-4 ${
-        top ? 'items-start' : 'min-[768px]:items-center'
-      }`}
-    >
-      <label className="text-[14px] font-semibold text-[#555]">
-        {label} <span className="text-[#888]">:-</span>
-      </label>
-      <div className="min-w-0">{children}</div>
-    </div>
-  )
 
   /** `getAvatarUrlAttribute` — the fallback is generated from the name. */
   const avatarSrc =

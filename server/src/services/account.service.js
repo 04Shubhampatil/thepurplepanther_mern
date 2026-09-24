@@ -271,16 +271,28 @@ export async function updateProfile(user, data) {
 
 // ─────────────────────────────────────────────────────── addresses
 
+/**
+ * The columns an address write sets.
+ *
+ * `addressLine2`, `state` and `phone` are only written when the caller actually sent them.
+ * They used to be written unconditionally as `?? null`, and the account area's address
+ * form does not include those three fields — so a customer editing an address created at
+ * checkout silently lost their apartment line, state and contact number, and their next
+ * order shipped without them. Absent means "leave it", which is what a partial update
+ * means; sending an empty string still clears the field deliberately.
+ *
+ * `create` passes a fresh object, so an omitted field simply falls to the column default.
+ */
 const addressData = (data, fallbackLabel = 'Shipping') => ({
   name: data.name,
   addressLine1: data.address_line1,
-  addressLine2: data.address_line2 ?? null,
   city: data.city,
-  state: data.state ?? null,
   pincode: data.pincode,
   country: data.country,
   label: data.label || fallbackLabel,
-  phone: data.phone ?? null,
+  ...(data.address_line2 === undefined ? {} : { addressLine2: data.address_line2 || null }),
+  ...(data.state === undefined ? {} : { state: data.state || null }),
+  ...(data.phone === undefined ? {} : { phone: data.phone || null }),
 })
 
 /**

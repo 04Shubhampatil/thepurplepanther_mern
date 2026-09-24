@@ -57,6 +57,7 @@ const NAV = [
     children: [
       { to: '/admin/banners', label: 'Sections & Images' },
       { to: '/admin/home-sections', label: 'Shop the Look Products' },
+      { to: '/admin/you-may-also-like', label: 'You May Also Like' },
     ],
   },
   {

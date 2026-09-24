@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom'
 import { useApi } from '../../hooks/useApi.js'
+import ErrorMessage from '../../components/common/ErrorMessage.jsx'
 import Loading from '../../components/common/Loading.jsx'
 import ProfileForm from './ProfileForm.jsx'
 import AddressBook from './AddressBook.jsx'
@@ -233,7 +234,7 @@ export default function Account() {
 
   // One call for the whole area, as AccountController::bootstrap did — the payload does not
   // vary by page, so switching tabs re-renders rather than re-fetching.
-  const { data, loading, refetch } = useApi(() => api.account.page('overview'), [])
+  const { data, error, loading, refetch } = useApi(() => api.account.page('overview'), [])
   const [openOrderId, setOpenOrderId] = useState(null)
   const [feedback, setFeedback] = useState({ message: '', error: false })
 
@@ -242,7 +243,20 @@ export default function Account() {
 
   if (!PAGES.has(page)) return <Navigate to="/account/overview" replace />
   if (loading) return <Loading full />
-  if (!data) return null
+
+  // Was `return null` — a blank account page whenever the request failed.
+  if (error || !data) {
+    return (
+      <main className="body_content_wrapper">
+        <div className="container py-5">
+          <ErrorMessage
+            error={error ?? 'We could not load your account just now.'}
+            onRetry={refetch}
+          />
+        </div>
+      </main>
+    )
+  }
 
   const customer = data.customer ?? {}
   const orders = data.orders ?? []

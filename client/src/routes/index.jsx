@@ -69,6 +69,7 @@ const AdminUsers = lazy(() => import('../pages/Admin/Users.jsx'))
 const AdminUserDetail = lazy(() => import('../pages/Admin/UserDetail.jsx'))
 const AdminUserForm = lazy(() => import('../pages/Admin/UserForm.jsx'))
 const AdminHomeSections = lazy(() => import('../pages/Admin/HomeSections.jsx'))
+const AdminYouMayAlsoLike = lazy(() => import('../pages/Admin/YouMayAlsoLike.jsx'))
 
 /**
  * Reserved first-path segments — the negative lookahead from Laravel's clean-category
@@ -241,6 +242,7 @@ export default function AppRoutes() {
             <Route path="banners/create" element={<AdminBannerForm />} />
             <Route path="banners/:id/edit" element={<AdminBannerForm />} />
             <Route path="home-sections" element={<AdminHomeSections />} />
+            <Route path="you-may-also-like" element={<AdminYouMayAlsoLike />} />
 
             <Route path="news-types" element={<AdminNewsTypes />} />
             <Route path="blog-posts" element={<AdminJournalPosts />} />

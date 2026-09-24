@@ -21,6 +21,29 @@ import * as api from '../../services/endpoints.js'
  * bottom underline the Contact List and User Detail tabs use — three tab strips in this
  * panel, three different treatments.
  */
+/*
+ * Module scope, NOT inside the component.
+ *
+ * Declared in the body, this got a new function identity on every render, so React saw a
+ * different element type, unmounted the whole row and mounted fresh DOM nodes. Every
+ * keystroke destroyed the input the admin was typing into and focus fell back to <body> —
+ * one character per click. Purely presentational, so it only ever needed its props.
+ */
+const Row = ({ label, required, top = false, children }) => (
+  <div
+    className={`grid grid-cols-1 gap-2 border-b border-[#f0f0f0] py-3.5 min-[768px]:grid-cols-[220px_1fr] min-[768px]:gap-4 ${
+      top ? 'items-start' : 'min-[768px]:items-center'
+    }`}
+  >
+    <label className="text-[14px] font-semibold text-[#555]">
+      {label}
+      {required ? <span className="ml-0.5 text-[#e53935]">*</span> : null}{' '}
+      <span className="text-[#888]">:-</span>
+    </label>
+    <div className="min-w-0">{children}</div>
+  </div>
+)
+
 export default function PageSettings() {
   usePageTitle('Page Settings - Purple Panther')
 
@@ -70,20 +93,6 @@ export default function PageSettings() {
   }
 
   /** `.offer-form-row` */
-  const Row = ({ label, required, top = false, children }) => (
-    <div
-      className={`grid grid-cols-1 gap-2 border-b border-[#f0f0f0] py-3.5 min-[768px]:grid-cols-[220px_1fr] min-[768px]:gap-4 ${
-        top ? 'items-start' : 'min-[768px]:items-center'
-      }`}
-    >
-      <label className="text-[14px] font-semibold text-[#555]">
-        {label}
-        {required ? <span className="ml-0.5 text-[#e53935]">*</span> : null}{' '}
-        <span className="text-[#888]">:-</span>
-      </label>
-      <div className="min-w-0">{children}</div>
-    </div>
-  )
 
   return (
     <div className="overflow-hidden rounded-[10px] bg-white shadow-admin-card">

@@ -6,6 +6,7 @@ import { FormGroup, FORM_CONTROL } from '../../components/admin/AdminControls.js
 import { usePageTitle } from '../../theme/page.js'
 import { toast } from '../../store/toast.js'
 import * as api from '../../services/endpoints.js'
+import { fetchAllProducts } from '../../utils/all-products.js'
 
 /**
  * admin/home-sections/edit.blade.php — "Shop the Look Products".
@@ -32,9 +33,10 @@ export default function HomeSections() {
   const [saving, setSaving] = useState(false)
 
   const { data, refetch } = useApi(() => api.admin.homeSections.get(SECTION), [])
-  const { data: productData } = useApi(() => api.admin.products.list({ per_page: 100 }), [])
+  // Every product, paged through: the list endpoint clamps per_page to 100.
+  const { data: allProducts } = useApi(() => fetchAllProducts(), [])
 
-  const products = productData?.items ?? []
+  const products = allProducts ?? []
 
   // Positions are 1 and 2; the API returns the rows already ordered by position.
   useEffect(() => {

@@ -88,6 +88,15 @@ export default function BannerForm() {
   const [slides, setSlides] = useState([])
   const [removeIds, setRemoveIds] = useState([])
   const [files, setFiles] = useState([])
+  /*
+   * Mobile media is tracked SEPARATELY from the desktop files so the two can be managed
+   * independently: `mobileBySlide` holds a replacement picked for an existing slide,
+   * `clearMobile` the ids whose mobile file should be dropped, and `mobileForNew` the
+   * optional mobile file for each newly chosen desktop file, aligned by index.
+   */
+  const [mobileBySlide, setMobileBySlide] = useState({})
+  const [clearMobile, setClearMobile] = useState([])
+  const [mobileForNew, setMobileForNew] = useState({})
   const [newMeta, setNewMeta] = useState([])
   const [errors, setErrors] = useState({})
   const [saving, setSaving] = useState(false)
@@ -124,6 +133,7 @@ export default function BannerForm() {
       (banner.images ?? []).map((image) => ({
         id: String(image.id),
         image: image.image,
+        mobile_image: image.mobileImage ?? '',
         title: image.title ?? '',
         subtitle: image.subtitle ?? '',
         button_text: image.buttonText ?? '',
@@ -218,8 +228,26 @@ export default function BannerForm() {
           image_subtitles: files.map((_, i) => newMeta[i]?.subtitle ?? ''),
           image_button_texts: files.map((_, i) => newMeta[i]?.button_text ?? ''),
           image_button_links: files.map((_, i) => newMeta[i]?.button_link ?? ''),
+          remove_mobile_images: clearMobile.filter((slideId) => !removeIds.includes(slideId)),
         },
-        { images: files },
+        {
+          images: files,
+          /*
+           * Index-aligned with `images`: a new slide with no mobile file still needs a
+           * placeholder or every later slide would take the wrong mobile media. An empty
+           * File carries the position without carrying content, and the server treats a
+           * zero-byte upload as "none" — see below.
+           */
+          mobile_images: files.map(
+            (_, i) => mobileForNew[i] ?? new File([], 'none.placeholder'),
+          ),
+          // Existing slides are addressed by id, so ordering cannot drift.
+          ...Object.fromEntries(
+            Object.entries(mobileBySlide)
+              .filter(([slideId, file]) => file && !removeIds.includes(slideId))
+              .map(([slideId, file]) => [`mobile_image_${slideId}`, file]),
+          ),
+        },
       )
 
       toast.success(res.$message)
@@ -412,6 +440,77 @@ export default function BannerForm() {
                         />
                         Remove
                       </label>
+
+                      {/*
+                        MOBILE media for this slide, managed on its own. Empty is a valid
+                        state: the site then shows the desktop file on phones too.
+                      */}
+                      <div className="mt-3 border-t border-[#eee] pt-2.5">
+                        <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-[#888]">
+                          Mobile version
+                        </span>
+
+                        {mobileBySlide[slide.id] ? (
+                          <p className="mb-1.5 break-all text-[11px] text-[#2e7d32]">
+                            New file: {mobileBySlide[slide.id].name}
+                          </p>
+                        ) : slide.mobile_image && !clearMobile.includes(slide.id) ? (
+                          isVideoPath(slide.mobile_image) ? (
+                            <video
+                              src={storageUrl(slide.mobile_image)}
+                              muted
+                              playsInline
+                              preload="metadata"
+                              className="max-h-[120px] w-full rounded-md object-cover"
+                            />
+                          ) : (
+                            <img
+                              src={storageUrl(slide.mobile_image)}
+                              alt=""
+                              className="h-[90px] w-full rounded-md object-cover"
+                            />
+                          )
+                        ) : (
+                          <p className="mb-1.5 text-[11px] text-[#888]">
+                            None — the desktop file is used on phones.
+                          </p>
+                        )}
+
+                        <input
+                          type="file"
+                          accept={ACCEPT}
+                          onChange={(event) => {
+                            const picked = event.target.files?.[0] ?? null
+                            setMobileBySlide((prev) => ({ ...prev, [slide.id]: picked }))
+                            // Picking a replacement cancels a pending clear.
+                            if (picked) {
+                              setClearMobile((prev) => prev.filter((v) => v !== slide.id))
+                            }
+                          }}
+                          className={`${FORM_CONTROL} !mt-1.5 !py-1 !text-[11px]`}
+                        />
+
+                        {slide.mobile_image || mobileBySlide[slide.id] ? (
+                          <label className="mt-1.5 flex cursor-pointer items-center gap-1.5 text-[11px] text-[#e53935]">
+                            <input
+                              type="checkbox"
+                              checked={clearMobile.includes(slide.id)}
+                              onChange={() =>
+                                setClearMobile((prev) => {
+                                  const on = prev.includes(slide.id)
+                                  if (!on) {
+                                    setMobileBySlide((m) => ({ ...m, [slide.id]: null }))
+                                    return [...prev, slide.id]
+                                  }
+                                  return prev.filter((v) => v !== slide.id)
+                                })
+                              }
+                              className="accent-admin-primary"
+                            />
+                            Remove mobile
+                          </label>
+                        ) : null}
+                      </div>
                     </div>
 
                     {/* .banner-existing-fields — auto-fit minmax(140px, 1fr) */}
@@ -516,6 +615,27 @@ export default function BannerForm() {
                   key={url}
                   className="mb-2.5 grid grid-cols-1 gap-2.5 rounded-lg border border-dashed border-[#ddd] bg-white p-3 min-[576px]:grid-cols-[repeat(auto-fit,minmax(160px,1fr))]"
                 >
+                  {/* The optional mobile counterpart for this newly picked file. */}
+                  <div className="flex min-w-0 flex-col">
+                    <FieldLabel suffix={false}>Image {index + 1} Mobile version</FieldLabel>
+                    <input
+                      type="file"
+                      accept={ACCEPT}
+                      onChange={(event) =>
+                        setMobileForNew((prev) => ({
+                          ...prev,
+                          [index]: event.target.files?.[0] ?? null,
+                        }))
+                      }
+                      className={`${FORM_CONTROL} !py-1 !text-[11px]`}
+                    />
+                    <span className="mt-1 text-[11px] text-[#888]">
+                      {mobileForNew[index]
+                        ? mobileForNew[index].name
+                        : 'Optional — the desktop file is used on phones.'}
+                    </span>
+                  </div>
+
                   <div className="flex min-w-0 flex-col">
                     <FieldLabel suffix={false}>Image {index + 1} Title</FieldLabel>
                     <input

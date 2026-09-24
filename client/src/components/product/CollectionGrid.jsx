@@ -13,6 +13,7 @@ import { useCartStore } from '../../store/index.js'
  *
  * The variants line falls back to "Shop now" here rather than to nothing, which is where
  * it differs from the card on the homepage.
+ *
  */
 const TALL_EVERY = 3
 
@@ -52,6 +53,7 @@ export default function CollectionGrid({ products }) {
   return products.map((item, index) => {
     const variant = defaultVariant(item)
     const tall = (index + 1) % TALL_EVERY === 0
+    const colors = item.colors ?? []
 
     return (
       <article
@@ -83,7 +85,23 @@ export default function CollectionGrid({ products }) {
         </WishlistButton>
         <div className="collection-page__info">
           <h2><Link to={item.url}>{item.title}</Link></h2>
-          <div className="collection-page__price"><PpPrice product={item} /></div>
+          {/* Price and colours share one baseline-aligned row; the swatches sit to the
+              right of the price rather than on a line of their own. */}
+          <div className="collection-page__pricerow">
+            <div className="collection-page__price"><PpPrice product={item} /></div>
+            {colors.length > 0 ? (
+              <div className="collection-page__swatches" aria-label="Available colours">
+                {colors.map((color) => (
+                  <span
+                    key={color.id ?? color.name}
+                    className="collection-page__swatch"
+                    style={{ '--swatch': color.code || '#3b3738' }}
+                    title={color.name ?? ''}
+                  />
+                ))}
+              </div>
+            ) : null}
+          </div>
           <p className="collection-page__variants">{variantsLine(item)}</p>
         </div>
       </article>

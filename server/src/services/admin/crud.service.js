@@ -179,9 +179,24 @@ export function createCrudService(config) {
       const existing = await this.find(id)
       const payload = camelizeKeys(data)
 
-      // The slug follows the name when the name changes, matching Str::slug on save.
-      if (hasSlug && payload[nameField] && !payload.slug) {
-        payload.slug = slugify(payload[nameField])
+      /*
+       * The slug is FROZEN after creation unless the admin types a new one.
+       *
+       * It used to follow the name on every save. Because no admin form sends `slug`, and
+       * `optStr` turns an absent key into null rather than undefined, that fired on every
+       * update: renaming a category from "Accessories" to anything rewrote its slug, and
+       * with it the public URL. Verified before the fix — /accessories became
+       * /accessories-updated, breaking every inbound link, bookmark and search result
+       * pointing at the old address, silently and with a success toast.
+       *
+       * A slug is an address, not a display name. `updateProduct` already treats it that
+       * way (`if (data.slug)`); this brings categories, brands, offers, colours, sizes,
+       * news types and journal posts into line.
+       */
+      if (hasSlug && payload.slug) {
+        payload.slug = slugify(payload.slug)
+      } else {
+        delete payload.slug
       }
 
       await assertUnique(payload, id)

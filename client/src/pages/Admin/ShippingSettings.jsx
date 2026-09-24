@@ -17,6 +17,24 @@ import * as api from '../../services/endpoints.js'
  * fields says which subtotal it is measured against, and it is repeated from the Blade
  * rather than paraphrased.
  */
+/*
+ * Module scope, NOT inside the component.
+ *
+ * Declared in the body, this got a new function identity on every render, so React saw a
+ * different element type, unmounted the whole row and mounted fresh DOM nodes. Every
+ * keystroke destroyed the input the admin was typing into and focus fell back to <body> —
+ * one character per click. Purely presentational, so it only ever needed its props.
+ */
+const Row = ({ label, htmlFor, children }) => (
+  <div className="grid grid-cols-1 gap-2 border-b border-[#f0f0f0] py-3.5 min-[768px]:grid-cols-[220px_1fr] min-[768px]:items-center min-[768px]:gap-4">
+    <label htmlFor={htmlFor} className="text-[14px] font-semibold text-[#555]">
+      {label}
+      <span className="ml-0.5 text-[#e53935]">*</span> <span className="text-[#888]">:-</span>
+    </label>
+    <div className="min-w-0">{children}</div>
+  </div>
+)
+
 export default function ShippingSettings() {
   usePageTitle('Shipping Settings - Purple Panther')
 
@@ -69,15 +87,6 @@ export default function ShippingSettings() {
   }
 
   /** `.offer-form-row` */
-  const Row = ({ label, htmlFor, children }) => (
-    <div className="grid grid-cols-1 gap-2 border-b border-[#f0f0f0] py-3.5 min-[768px]:grid-cols-[220px_1fr] min-[768px]:items-center min-[768px]:gap-4">
-      <label htmlFor={htmlFor} className="text-[14px] font-semibold text-[#555]">
-        {label}
-        <span className="ml-0.5 text-[#e53935]">*</span> <span className="text-[#888]">:-</span>
-      </label>
-      <div className="min-w-0">{children}</div>
-    </div>
-  )
 
   return (
     <div className="overflow-hidden rounded-[10px] bg-white shadow-admin-card">

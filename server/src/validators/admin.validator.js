@@ -31,12 +31,26 @@ const bool = z
 const num = z.coerce.number().nullish().transform((v) => (v === null || Number.isNaN(v) ? null : v))
 const int0 = z.coerce.number().int().min(0).optional()
 
-/** A JSON array that may arrive as a real array or an encoded string. */
+/**
+ * A JSON array that may arrive as a real array or an encoded string.
+ *
+ * ABSENT IS NOT EMPTY, and the difference is why product Information and Specifications
+ * were being wiped. A key missing from the body used to fall through this transform and
+ * come out as `null`, which is NOT `undefined` — so buildScalars' `data[key] !== undefined`
+ * guard let it through and wrote NULL over the stored JSON. Any update that did not
+ * resend these columns silently destroyed them, and the loss only showed on the next
+ * page load, which is exactly how it was reported: "saves, then gone after a refresh".
+ *
+ * So `undefined` is preserved as `undefined` — the field was not sent, leave the column
+ * alone, which is what PATCH means. An explicit `[]` still clears the rows, so an admin
+ * who deletes every row still gets an empty section.
+ */
 const jsonArray = z
   .union([z.array(z.any()), z.string()])
   .nullish()
   .transform((v) => {
-    if (v == null || v === '') return null
+    if (v === undefined) return undefined
+    if (v === null || v === '') return null
     if (Array.isArray(v)) return v
     try {
       const parsed = JSON.parse(v)
@@ -367,6 +381,8 @@ export const bannerSchema = z.object({
    * Both shapes reach us JSON-encoded: the form is multipart (it carries files), and
    * toFormData stringifies anything that is not a scalar.
    */
+  /* Slide ids whose MOBILE media should be cleared, leaving the desktop file alone. */
+  remove_mobile_images: jsonArray,
   image_titles: jsonArray,
   image_subtitles: jsonArray,
   image_button_texts: jsonArray,

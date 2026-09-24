@@ -2,8 +2,21 @@ import { z } from 'zod'
 
 /** Account validation — rules and messages from AccountController. */
 
+/**
+ * An optional string that distinguishes ABSENT from EMPTY.
+ *
+ * A key missing from the body stays `undefined`, so a partial update leaves that column
+ * alone; an explicit empty string still clears it. Collapsing both to `null` meant the
+ * account area's address form — which has no line 2, state or phone input — erased those
+ * three fields every time a customer edited an address created at checkout, so their next
+ * order shipped with no state and no contact number.
+ */
 const optionalString = (max) =>
-  z.string().max(max).nullish().transform((v) => (v == null || v === '' ? null : v.trim()))
+  z
+    .string()
+    .max(max)
+    .nullish()
+    .transform((v) => (v === undefined ? undefined : v == null || v === '' ? null : v.trim()))
 
 export const updateProfileSchema = z
   .object({

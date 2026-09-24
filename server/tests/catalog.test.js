@@ -127,9 +127,15 @@ describe('listProducts', () => {
     expect(prismaMock.product.findMany.mock.calls[0][0].take).toBe(100)
   })
 
-  it('runs the count and the page in one transaction', async () => {
+  it('does NOT wrap the count and the page in a transaction', async () => {
+    // They were transactional until it timed out on the production database. Two
+    // independent reads need no transaction, and the small connection pool is why they are
+    // also not fired concurrently. Asserted so neither is quietly reintroduced.
     await catalog.listProducts({})
-    expect(prismaMock.$transaction).toHaveBeenCalledTimes(1)
+
+    expect(prismaMock.$transaction).not.toHaveBeenCalled()
+    expect(prismaMock.product.count).toHaveBeenCalledTimes(1)
+    expect(prismaMock.product.findMany).toHaveBeenCalled()
   })
 
   it('returns pagination metadata', async () => {
@@ -205,6 +211,73 @@ describe('getProductBySlug', () => {
     expect(include.images.orderBy).toEqual({ sortOrder: 'asc' })
     // Inactive reviews must never reach the page.
     expect(include.reviews.where).toEqual({ isActive: true })
+  })
+})
+
+describe("You May Also Like — the admin's curated rail", () => {
+  const product = { id: 1n, category: { id: 2n } }
+
+  const curate = (rows) =>
+    prismaMock.homeSectionProduct.findMany.mockResolvedValue(
+      rows.map((r, i) => ({ position: i + 1, product: r })),
+    )
+
+  it("uses the admin's picks on the product page, in their order, instead of the automatic ones", async () => {
+    curate([productRow({ id: 7n, title: 'Picked A' }), productRow({ id: 8n, title: 'Picked B' })])
+
+    const related = await catalog.getRelatedProducts(product)
+
+    expect(related.map((p) => p.title)).toEqual(['Picked A', 'Picked B'])
+    // The automatic same-category query must not even run when a selection exists.
+    expect(prismaMock.product.findMany).not.toHaveBeenCalled()
+  })
+
+  it('uses the same picks on the cart rail', async () => {
+    curate([productRow({ id: 7n, title: 'Picked A' })])
+
+    const rail = await catalog.getCartRecommendations([])
+
+    expect(rail.map((p) => p.title)).toEqual(['Picked A'])
+    expect(prismaMock.product.findMany).not.toHaveBeenCalled()
+  })
+
+  it('never recommends the product being viewed, even when it is on the list', async () => {
+    curate([productRow({ id: 1n, title: 'This One' }), productRow({ id: 8n, title: 'Picked B' })])
+
+    const related = await catalog.getRelatedProducts(product)
+
+    expect(related.map((p) => p.title)).toEqual(['Picked B'])
+  })
+
+  it('never recommends something already in the bag', async () => {
+    curate([productRow({ id: 7n, title: 'Picked A' }), productRow({ id: 8n, title: 'Picked B' })])
+
+    const rail = await catalog.getCartRecommendations([8])
+
+    expect(rail.map((p) => p.title)).toEqual(['Picked A'])
+  })
+
+  it('skips a picked product that has since been deactivated', async () => {
+    curate([
+      productRow({ id: 7n, title: 'Picked A', isActive: false }),
+      productRow({ id: 8n, title: 'Picked B' }),
+    ])
+
+    expect((await catalog.getCuratedProducts('you_may_also_like')).map((p) => p.title)).toEqual([
+      'Picked B',
+    ])
+  })
+
+  it('falls back to the automatic picks when the admin has selected nothing', async () => {
+    curate([])
+    prismaMock.product.findMany.mockResolvedValue(
+      Array.from({ length: 6 }, (_, i) => productRow({ id: BigInt(i + 2) })),
+    )
+
+    const related = await catalog.getRelatedProducts(product)
+
+    expect(prismaMock.product.findMany).toHaveBeenCalled() // the automatic query DID run
+    expect(related).toHaveLength(6)
   })
 })
 

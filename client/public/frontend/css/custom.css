@@ -2280,3 +2280,21 @@ span.pp-price.pp-price--has-selling-price span.pp-price__mrp {
   height: 100%;
   object-fit: cover;
 }
+
+/* Banner VIDEO layers. The image layers are swapped by the .bg.bg-position rules above;
+   a <video> does not carry those classes, so it needs its own pair at the same 767px
+   breakpoint. Kept adjacent so the two stay in step if the breakpoint ever moves. */
+section.home21-banner .banner-media-desktop {
+    display: block;
+}
+section.home21-banner .banner-media-mobile {
+    display: none;
+}
+@media(max-width:767px) {
+    section.home21-banner .banner-media-desktop {
+        display: none;
+    }
+    section.home21-banner .banner-media-mobile {
+        display: block;
+    }
+}

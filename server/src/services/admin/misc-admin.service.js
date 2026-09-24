@@ -519,6 +519,24 @@ const slideText = (value) => {
  * banner_images.id — the slide already has one. `image_*` are POSITIONAL arrays, because a
  * file being uploaded has no id yet and index i simply describes the i-th file.
  */
+/**
+ * Per-slide MOBILE media, posted as `mobile_image_<slide id>`.
+ *
+ * Named at runtime because the ids only exist once a slide has been saved, which is why
+ * the banner routes use multer's `any()`. Mirrors `color_gallery_<colorId>` on products.
+ */
+function mobileImageFiles(files) {
+  const out = new Map()
+
+  for (const [field, list] of Object.entries(files)) {
+    const match = /^mobile_image_(\d+)$/.exec(field)
+    if (!match || !list?.length) continue
+    out.set(match[1], list[0])
+  }
+
+  return out
+}
+
 async function syncBannerImages(bannerId, data, files) {
   const removeIds = (data.remove_images ?? []).map((v) => BigInt(v))
 
@@ -534,6 +552,7 @@ async function syncBannerImages(bannerId, data, files) {
   }
 
   await updateExistingSlides(bannerId, data)
+  await syncMobileImages(bannerId, data, files)
 
   const uploads = files.images ?? []
   if (uploads.length) {
@@ -548,12 +567,22 @@ async function syncBannerImages(bannerId, data, files) {
     const subtitles = data.image_subtitles ?? []
     const buttonTexts = data.image_button_texts ?? []
     const buttonLinks = data.image_button_links ?? []
+    // Aligned BY INDEX with `images`: the i-th mobile file belongs to the i-th new slide.
+    // The client sends a placeholder for a slide given no mobile file, so the two lists
+    // stay the same length and the pairing cannot drift.
+    const mobileUploads = files.mobile_images ?? []
 
     for (const [index, file] of uploads.entries()) {
+      // A zero-byte placeholder means "this slide has no mobile media"; it only exists to
+      // hold the position so the index pairing above stays honest.
+      const candidate = mobileUploads[index]
+      const mobile = candidate && candidate.size > 0 ? candidate : null
+
       await prisma.bannerImage.create({
         data: {
           bannerId,
           image: persist(file, UPLOAD_DIRS.banners),
+          mobileImage: mobile ? persist(mobile, UPLOAD_DIRS.banners) : null,
           title: slideText(titles[index]),
           subtitle: slideText(subtitles[index]),
           buttonText: slideText(buttonTexts[index]),
@@ -563,6 +592,46 @@ async function syncBannerImages(bannerId, data, files) {
         },
       })
     }
+  }
+}
+
+/**
+ * Desktop and mobile media are managed INDEPENDENTLY: setting or clearing one never
+ * touches the other, so a banner can carry a landscape desktop image and a portrait mobile
+ * one, or a desktop-only image that the site reuses on phones.
+ *
+ * A slide with no mobile media is not broken — HomeHero falls back to the desktop file, so
+ * clearing the mobile one restores the previous single-image behaviour rather than leaving
+ * a blank hero.
+ */
+async function syncMobileImages(bannerId, data, files) {
+  const clearIds = (data.remove_mobile_images ?? []).map(String)
+  const uploads = mobileImageFiles(files)
+
+  const ids = [...new Set([...clearIds, ...uploads.keys()])]
+  if (!ids.length) return
+
+  const slides = await prisma.bannerImage.findMany({
+    where: { bannerId, id: { in: ids.map((id) => BigInt(id)) } },
+  })
+
+  for (const slide of slides) {
+    const key = String(slide.id)
+    const file = uploads.get(key)
+
+    // An upload wins over a clear: ticking Remove and picking a replacement in the same
+    // save means "replace", not "delete then lose it".
+    if (!file && !clearIds.includes(key)) continue
+
+    const nextPath = file ? persist(file, UPLOAD_DIRS.banners) : null
+
+    await prisma.bannerImage.update({
+      where: { id: slide.id },
+      data: { mobileImage: nextPath },
+    })
+
+    // Only after the row points elsewhere, so a failed write cannot orphan the record.
+    if (slide.mobileImage && slide.mobileImage !== nextPath) remove(slide.mobileImage)
   }
 }
 

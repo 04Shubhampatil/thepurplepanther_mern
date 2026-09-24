@@ -147,9 +147,19 @@ export default function HomeHero({ heroImages, homeHero }) {
             ) : (
               <SwiperSlide key={image.id ?? index}>
                 <div className="home21-banner-item">
+                  {/*
+                    DESKTOP and MOBILE media are rendered as two layers and swapped by CSS
+                    at 767px, never by JavaScript — a width measured in the browser would
+                    flash the wrong one on first paint and would be wrong again after a
+                    rotate. Each layer is a <video> or a background <div> independently, so
+                    a video desktop can pair with an image on phones, or the reverse.
+
+                    With no mobile file uploaded the mobile layer falls back to the desktop
+                    one, which is the behaviour every existing banner already had.
+                  */}
                   {image.isVideo ? (
                     <video
-                      className="bg home21-banner-video"
+                      className="bg home21-banner-video banner-media-desktop"
                       muted
                       playsInline
                       preload="metadata"
@@ -158,21 +168,32 @@ export default function HomeHero({ heroImages, homeHero }) {
                       <source src={image.image} type={image.videoMimeType} />
                     </video>
                   ) : (
-                    <>
-                      <div
-                        className="bg bg-position banner-desktop"
-                        style={{ backgroundImage: `url(${image.image || '/frontend/images/banner-1.jpg'})` }}
-                        data-swiper-parallax="1000"
-                      ></div>
-                      <div
-                        className="bg bg-position banner-mobile"
-                        style={{
-                          backgroundImage: `url(${image.mobileImage || image.image || '/frontend/images/mobile-banner-1.jpg'})`,
-                        }}
-                        data-swiper-parallax="1000"
-                      ></div>
-                    </>
+                    <div
+                      className="bg bg-position banner-desktop"
+                      style={{ backgroundImage: `url(${image.image || '/frontend/images/banner-1.jpg'})` }}
+                      data-swiper-parallax="1000"
+                    ></div>
                   )}
+
+                  {image.isMobileVideo ? (
+                    <video
+                      className="bg home21-banner-video banner-media-mobile"
+                      muted
+                      playsInline
+                      preload="metadata"
+                      data-swiper-parallax="1000"
+                    >
+                      <source src={image.mobileImage} type={image.mobileVideoMimeType} />
+                    </video>
+                  ) : image.mobileImage || !image.isVideo ? (
+                    <div
+                      className="bg bg-position banner-mobile"
+                      style={{
+                        backgroundImage: `url(${image.mobileImage || image.image || '/frontend/images/mobile-banner-1.jpg'})`,
+                      }}
+                      data-swiper-parallax="1000"
+                    ></div>
+                  ) : null}
                   <span className="overly position-absolute"></span>
                   <div className="container"><div className="row"><div className="col-lg-12"><div className="banner-content">
                     <h3 className="title mb10">{image.title || homeHero?.title}</h3>
