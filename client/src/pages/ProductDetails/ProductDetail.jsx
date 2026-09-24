@@ -494,14 +494,14 @@ export default function ProductDetail() {
         )}
       </section>
 
-      <ReviewSection product={product} slug={slug} onSubmitted={refetch} />
-
       <ProductRecommendations
         items={related}
         heading="YOU MAY ALSO LIKE"
         titleId="related-products-title"
         variant="related"
       />
+
+      <ReviewSection product={product} slug={slug} onSubmitted={refetch} />
 
       <ProductRecommendations
         items={recentlyViewed}
