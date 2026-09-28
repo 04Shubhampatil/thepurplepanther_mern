@@ -273,8 +273,31 @@ describe('presentProductDetail', () => {
 
   it('exposes per-variant stock, which the cart depends on', () => {
     const detail = presentProductDetail(detailed)
-    expect(detail.colors).toEqual([{ id: 3n, name: 'Red', code: '#f00', quantity: 4 }])
+    // `image` is the colour's own photo, used by the swatch hover on product cards; it is
+    // null when that colour has no picture tagged to it.
+    expect(detail.colors).toEqual([
+      { id: 3n, name: 'Red', code: '#f00', quantity: 4, image: null },
+    ])
     expect(detail.sizes).toEqual([{ id: 9n, name: 'M', quantity: 2 }])
+  })
+
+  it('pairs each colour with its OWN first image, for the card swatch hover', () => {
+    const withColourImages = {
+      ...detailed,
+      images: [
+        { image: 'products/red-2.jpg', colorId: 3n, sortOrder: 2 },
+        { image: 'products/red-1.jpg', colorId: 3n, sortOrder: 1 },
+        { image: 'products/untagged.jpg', colorId: null, sortOrder: 0 },
+      ],
+    }
+
+    const [red] = presentProductDetail(withColourImages).colors
+
+    // The FIRST image given for that colour wins — the query orders them, so this must not
+    // re-sort or pick at random.
+    expect(red.image).toContain('red-2.jpg')
+    // An untagged image must never be mistaken for a colour's own.
+    expect(red.image).not.toContain('untagged')
   })
 
   it('computes the saving from MRP', () => {

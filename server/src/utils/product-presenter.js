@@ -56,13 +56,31 @@ export function accessoryPackages(product) {
 }
 
 /** Colour/size pivots carry `quantity`, which is the per-variant stock. */
-const presentColors = (product) =>
-  (product.colors ?? []).map((pc) => ({
-    id: pc.color?.id ?? pc.colorId,
-    name: pc.color?.name ?? null,
-    code: pc.color?.code ?? null,
-    quantity: pc.quantity ?? 0,
-  }))
+/**
+ * `image` is the FIRST picture tagged with that colour, so hovering a swatch on a product
+ * card can show what that colour actually looks like. It is null when the colour has no
+ * pictures of its own, and the card then keeps showing the featured image — every product
+ * predates this mapping, so a missing one is normal rather than a fault.
+ */
+const presentColors = (product) => {
+  const byColor = new Map()
+  for (const img of product.images ?? []) {
+    if (!img.colorId) continue
+    const key = String(img.colorId)
+    if (!byColor.has(key)) byColor.set(key, mediaUrl(img.image))
+  }
+
+  return (product.colors ?? []).map((pc) => {
+    const id = pc.color?.id ?? pc.colorId
+    return {
+      id,
+      name: pc.color?.name ?? null,
+      code: pc.color?.code ?? null,
+      quantity: pc.quantity ?? 0,
+      image: byColor.get(String(id)) ?? null,
+    }
+  })
+}
 
 const presentSizes = (product) =>
   (product.sizes ?? []).map((ps) => ({

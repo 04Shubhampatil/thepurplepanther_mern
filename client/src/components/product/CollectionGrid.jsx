@@ -40,6 +40,8 @@ export default function CollectionGrid({ products }) {
   const [pickerId, setPickerId] = useState(null)
   const [choice, setChoice] = useState({ color: '', size: '' })
   const [busy, setBusy] = useState(false)
+  // { [productId]: imageUrl } — the colour currently hovered on that card, if any.
+  const [hoverImage, setHoverImage] = useState({})
 
   // Escape closes it, as it does for the site's drawers.
   useEffect(() => {
@@ -105,7 +107,13 @@ export default function CollectionGrid({ products }) {
       >
         <div className="collection-page__media">
           <Link to={item.url}>
-            <img src={item.image} alt={item.title} loading="lazy" />
+            {/* Falls back to the product's own image the moment the pointer leaves a
+                swatch, and for any colour that has no picture of its own. */}
+            <img
+              src={hoverImage[item.id] ?? item.image}
+              alt={item.title}
+              loading="lazy"
+            />
           </Link>
           <button
             type="button"
@@ -215,6 +223,23 @@ export default function CollectionGrid({ products }) {
                     className="collection-page__swatch"
                     style={{ '--swatch': color.code || '#3b3738' }}
                     title={color.name ?? ''}
+                    /*
+                     * Hovering shows that colour's own photo. A colour with no picture
+                     * sets nothing, so the card keeps the featured image rather than
+                     * blanking — most products predate this mapping.
+                     */
+                    onMouseEnter={() =>
+                      color.image &&
+                      setHoverImage((prev) => ({ ...prev, [item.id]: color.image }))
+                    }
+                    onMouseLeave={() =>
+                      setHoverImage((prev) => {
+                        if (!(item.id in prev)) return prev
+                        const next = { ...prev }
+                        delete next[item.id]
+                        return next
+                      })
+                    }
                   />
                 ))}
               </div>

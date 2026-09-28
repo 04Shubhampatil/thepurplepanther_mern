@@ -21,6 +21,17 @@ const CARD_INCLUDE = {
   offer: { select: { id: true, title: true, discountPercent: true } },
   colors: { include: { color: { select: { id: true, name: true, code: true } } } },
   sizes: { include: { size: { select: { id: true, name: true } } } },
+  /*
+   * Only the COLOUR-TAGGED images, and only the two columns needed to pair one with its
+   * swatch. Listing pages render up to 50 cards, so the untagged gallery images are left
+   * out: the card already has `image` and `hoverImage`, and this is purely so hovering a
+   * swatch can show that colour.
+   */
+  images: {
+    where: { colorId: { not: null } },
+    select: { image: true, colorId: true },
+    orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+  },
 }
 
 /** Laravel's default ordering for every product list: sort_order ASC, then id DESC. */

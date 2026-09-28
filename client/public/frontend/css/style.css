@@ -42401,8 +42401,8 @@ article.collection-page__card.collection-page__card--tall img {
 }
 
 .collection-page__swatches button {
-  width: 15px;
-  height: 15px;
+  width: 20px;
+  height: 23px;
   border: 1px solid #e6e6e6;
   border-radius: 50%;
   padding: 2px;
@@ -42446,13 +42446,16 @@ article.collection-page__card.collection-page__card--tall img {
   flex-wrap: wrap;
 }
 
+/* 22px, up from the theme's original 15px: the swatches are now an interactive control
+   (hover shows that colour's photo), and 15px was a smaller target than a fingertip. The
+   ring and the dot grow together so the proportions stay the same. */
 .collection-page__swatch {
   display: block;
-  width: 15px;
-  height: 15px;
+  width: 22px;
+  height: 22px;
   border: 1px solid #e6e6e6;
   border-radius: 50%;
-  padding: 2px;
+  padding: 3px;
   background: #fff;
   position: relative;
   flex: 0 0 auto;
@@ -42461,10 +42464,37 @@ article.collection-page__card.collection-page__card--tall img {
 .collection-page__swatch:after {
   content: "";
   display: block;
-  width: 9px;
-  height: 9px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   background: var(--swatch, #3b3738);
+}
+
+/* Hovering a swatch grows it ~15% and shows that colour's photo on the card.
+   TRANSFORM, not width/height: scaling paints larger without changing the element's
+   measured box, so the row of swatches and the price beside them do not shift. */
+.collection-page__swatch {
+  cursor: pointer;
+  transition: transform .18s ease, border-color .18s ease;
+  transform-origin: center;
+}
+
+.collection-page__swatch:hover,
+.collection-page__swatch:focus-visible {
+  transform: scale(1.15);
+  border-color: #b9b0c2;
+}
+
+/* Someone who has asked for less motion still gets the border cue, without the grow. */
+@media (prefers-reduced-motion: reduce) {
+  .collection-page__swatch {
+    transition: border-color .18s ease;
+  }
+
+  .collection-page__swatch:hover,
+  .collection-page__swatch:focus-visible {
+    transform: none;
+  }
 }
 
 /* The picker replaces the Quick add button in the same corner of the media. */
