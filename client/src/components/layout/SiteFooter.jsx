@@ -189,7 +189,7 @@ export default function SiteFooter() {
               <div className="col-md-4">
                 <div className="footer_bottom_left d-flex align-items-center">
                   <div className="lang_widgets">
-                    <div className="text">&copy; {new Date().getFullYear()}, The Purple Panther | <span><Link to="https://nivtech.co.in/" >Developed by nivtech</Link></span> </div>
+                    <div className="text">&copy; {new Date().getFullYear()}, The Purple Panther | <span><Link to="https://nivtech.co.in/" >Develop by Nivtech</Link></span> </div>
                   </div>
                 </div>
               </div>
